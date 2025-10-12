@@ -208,3 +208,50 @@ extern "C" SEALPlaintext* seal_decrypt(
         return nullptr;
     }
 }
+
+// ============================================
+// Homomorphic Operations
+// ============================================
+extern "C" SEALCiphertext* seal_add(
+    SEALContext* ctx,
+    SEALCiphertext* a,
+    SEALCiphertext* b
+) {
+    try {
+        if (!ctx || !a || !b) return nullptr;
+        
+        Evaluator evaluator(*ctx->context);
+        SEALCiphertext* result = new SEALCiphertext();
+        evaluator.add(
+            a->ciphertext,
+            b->ciphertext,
+            result->ciphertext
+        );
+        
+        return result;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+extern "C" SEALCiphertext* seal_multiply(
+    SEALContext* ctx,
+    SEALCiphertext* a,
+    SEALCiphertext* b
+) {
+    try {
+        if (!ctx || !a || !b) return nullptr;
+        
+        Evaluator evaluator(*ctx->context);
+        SEALCiphertext* result = new SEALCiphertext();
+        evaluator.multiply(
+            a->ciphertext,
+            b->ciphertext,
+            result->ciphertext
+        );
+        
+        return result;
+    } catch (...) {
+        return nullptr;
+    }
+}
