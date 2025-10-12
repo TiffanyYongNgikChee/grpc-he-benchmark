@@ -160,3 +160,29 @@ extern "C" const char* seal_plaintext_to_string(SEALPlaintext* plain) {
     strcpy(result, str.c_str());
     return result;
 }
+
+// ============================================
+// Encryption Implementation
+// ============================================
+extern "C" SEALCiphertext* seal_encrypt(
+    SEALEncryptor* encryptor,
+    SEALPlaintext* plaintext
+) {
+    try {
+        if (!encryptor || !plaintext) return nullptr;
+        
+        SEALCiphertext* cipher = new SEALCiphertext();
+        encryptor->encryptor->encrypt(
+            plaintext->plaintext,
+            cipher->ciphertext
+        );
+        
+        return cipher;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+extern "C" void seal_destroy_ciphertext(SEALCiphertext* cipher) {
+    if (cipher) delete cipher;
+}
