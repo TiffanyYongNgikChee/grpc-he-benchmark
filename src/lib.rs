@@ -19,6 +19,23 @@ pub enum SealError {
     OperationFailed,
 }
 
+
+// Implement Display for SealError
+impl std::fmt::Display for SealError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SealError::NullPointer => write!(f, "Null pointer returned from SEAL"),
+            SealError::InvalidParameter => write!(f, "Invalid parameter provided"),
+            SealError::EncryptionFailed => write!(f, "Encryption operation failed"),
+            SealError::DecryptionFailed => write!(f, "Decryption operation failed"),
+            SealError::OperationFailed => write!(f, "SEAL operation failed"),
+        }
+    }
+}
+
+// Implement Error trait for SealError
+impl std::error::Error for SealError {}
+
 pub type Result<T> = std::result::Result<T, SealError>;
 
 // ============================================
