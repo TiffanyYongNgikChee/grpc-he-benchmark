@@ -2,16 +2,17 @@
 //! 
 //! This module provides a safe, idiomatic Rust interface to Microsoft SEAL.
 
-mod bindings;
+mod bindings; // imports the low-level FFI bindings (the C function definitions) that connect to C++ wrapper
 
-use std::ffi::{CStr, CString};
-use std::ptr::NonNull;
+use std::ffi::{CStr, CString}; // CStr and CString convert between Rust strings and C strings.
+use std::ptr::NonNull; // NonNull safely wraps raw pointers that should never be null.
 
 // ============================================
 // Error Types
 // ============================================
 #[derive(Debug)]
 pub enum SealError {
+    // Defines all possible errors might encounter
     NullPointer,
     InvalidParameter,
     EncryptionFailed,
@@ -21,6 +22,7 @@ pub enum SealError {
 
 
 // Implement Display for SealError
+// Makes SealError printable and compatible with Rust’s standard Result and ? error-handling syntax
 impl std::fmt::Display for SealError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -42,6 +44,7 @@ pub type Result<T> = std::result::Result<T, SealError>;
 // Context (owns SEAL context and keys)
 // ============================================
 pub struct Context {
+    // store only a pointer to the C++ object, but wrapped in NonNull to ensure it’s valid
     ptr: NonNull<bindings::SEALContext>,
 }
 
@@ -55,6 +58,7 @@ impl Context {
         // Standard coefficient modulus for given poly degree
         let coeff_modulus = vec![36, 36, 37]; // bits per prime (109 bits total)
         
+        // Calls C++ seal_create_context function via FFI (marked unsafe because it’s a raw pointer)
         let ptr = unsafe {
             bindings::seal_create_context(
                 poly_modulus_degree,
@@ -63,13 +67,16 @@ impl Context {
                 plain_modulus,
             )
         };
-        
+        // If the pointer returned from C++ is valid, store it inside a Context.
+        // If it’s null, return a NullPointer error.
         NonNull::new(ptr)
             .map(|ptr| Context { ptr })
             .ok_or(SealError::NullPointer)
     }
 }
 
+// When the Rust Context goes out of scope, 
+// it automatically calls the C++ function to free memory — so the user can’t forget
 impl Drop for Context {
     fn drop(&mut self) {
         unsafe {
@@ -81,10 +88,12 @@ impl Drop for Context {
 // ============================================
 // Encryptor
 // ============================================
+// Represents the C++ Encryptor object (handles encryption).
 pub struct Encryptor {
     ptr: NonNull<bindings::SEALEncryptor>,
 }
 
+// Creates an encryptor using the existing SEAL context.
 impl Encryptor {
     pub fn new(context: &Context) -> Result<Self> {
         let ptr = unsafe {
