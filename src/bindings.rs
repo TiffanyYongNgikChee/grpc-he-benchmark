@@ -1,6 +1,6 @@
 //! Raw FFI bindings to SEAL C wrapper
 
-use std::os::raw::{c_char, c_uint, c_ulonglong};
+use std::os::raw::{c_char, c_ulonglong};
 
 // ============================================
 // Opaque Types (match C header)
@@ -33,7 +33,7 @@ pub struct SEALPlaintext {
 // ============================================
 // FFI Function Declarations
 // ============================================
-extern "C" {
+unsafe extern "C" {
     // Context management
     pub fn seal_create_context(
         poly_modulus_degree: c_ulonglong,
