@@ -206,3 +206,34 @@ impl Drop for Ciphertext {
         }
     }
 }
+
+// ============================================
+// Homomorphic Operations
+// ============================================
+pub fn add(context: &Context, a: &Ciphertext, b: &Ciphertext) -> Result<Ciphertext> {
+    let ptr = unsafe {
+        bindings::seal_add(
+            context.ptr.as_ptr(),
+            a.ptr.as_ptr(),
+            b.ptr.as_ptr(),
+        )
+    };
+    
+    NonNull::new(ptr)
+        .map(|ptr| Ciphertext { ptr })
+        .ok_or(SealError::OperationFailed)
+}
+
+pub fn multiply(context: &Context, a: &Ciphertext, b: &Ciphertext) -> Result<Ciphertext> {
+    let ptr = unsafe {
+        bindings::seal_multiply(
+            context.ptr.as_ptr(),
+            a.ptr.as_ptr(),
+            b.ptr.as_ptr(),
+        )
+    };
+    
+    NonNull::new(ptr)
+        .map(|ptr| Ciphertext { ptr })
+        .ok_or(SealError::OperationFailed)
+}
