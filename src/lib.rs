@@ -53,7 +53,7 @@ impl Context {
     /// - plain_modulus: Plaintext modulus for BFV
     pub fn new(poly_modulus_degree: u64, plain_modulus: u64) -> Result<Self> {
         // Standard coefficient modulus for given poly degree
-        let coeff_modulus = vec![60, 40, 40, 60]; // bits per prime
+        let coeff_modulus = vec![36, 36, 37]; // bits per prime (109 bits total)
         
         let ptr = unsafe {
             bindings::seal_create_context(

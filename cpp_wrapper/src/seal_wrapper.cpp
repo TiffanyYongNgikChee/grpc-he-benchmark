@@ -10,7 +10,7 @@ using namespace std;
 // Opaque Struct Definitions
 // ============================================
 struct SEALContextWrapper {
-    shared_ptr<seal::SEALContext> context;
+    shared_ptr<seal::SEALContext> seal_context;
     shared_ptr<KeyGenerator> keygen;
     PublicKey public_key;
     SecretKey secret_key;
@@ -46,32 +46,38 @@ extern "C" SEALContextWrapper* seal_create_context(
         EncryptionParameters parms(scheme_type::bfv);
         parms.set_poly_modulus_degree(poly_modulus_degree);
         
-        // Set coefficient modulus
-        vector<Modulus> coeff_modulus;
+        // FIXED: Use CoeffModulus::Create to generate proper primes from bit sizes
+        vector<int> bit_sizes;
         for (size_t i = 0; i < coeff_modulus_size; i++) {
-            coeff_modulus.push_back(Modulus(coeff_modulus_bits[i]));
+            bit_sizes.push_back(static_cast<int>(coeff_modulus_bits[i]));
         }
+        auto coeff_modulus = CoeffModulus::Create(poly_modulus_degree, bit_sizes);
         parms.set_coeff_modulus(coeff_modulus);
         
         // Set plaintext modulus
         parms.set_plain_modulus(plain_modulus_value);
         
         // Create context
-        auto context = make_shared<seal::SEALContext>(parms);
+        auto seal_ctx = make_shared<seal::SEALContext>(parms);
+        
+        // Check if context is valid
+        if (!seal_ctx->parameters_set()) {
+            return nullptr;
+        }
         
         // Generate keys
-        KeyGenerator keygen(*context);
+        KeyGenerator keygen(*seal_ctx);
         
         // Allocate and populate result
         SEALContextWrapper* result = new SEALContextWrapper();
-        result->context = context;
-        result->keygen = make_shared<KeyGenerator>(*context);
+        result->seal_context = seal_ctx;
+        result->keygen = make_shared<KeyGenerator>(*seal_ctx);
         keygen.create_public_key(result->public_key);
         result->secret_key = keygen.secret_key();
         
         return result;
     } catch (const exception& e) {
-        // Error handling
+        // Error handling - could log error here
         return nullptr;
     }
 }
@@ -93,7 +99,7 @@ extern "C" SEALEncryptor* seal_create_encryptor(
         
         SEALEncryptor* enc = new SEALEncryptor();
         enc->encryptor = make_unique<Encryptor>(
-            *ctx->context, 
+            *ctx->seal_context, 
             ctx->public_key
         );
         
@@ -120,7 +126,7 @@ extern "C" SEALDecryptor* seal_create_decryptor(
         
         SEALDecryptor* dec = new SEALDecryptor();
         dec->decryptor = make_unique<Decryptor>(
-            *ctx->context,
+            *ctx->seal_context,
             ctx->secret_key
         );
         
@@ -220,7 +226,7 @@ extern "C" SEALCiphertext* seal_add(
     try {
         if (!ctx || !a || !b) return nullptr;
         
-        Evaluator evaluator(*ctx->context);
+        Evaluator evaluator(*ctx->seal_context);
         SEALCiphertext* result = new SEALCiphertext();
         evaluator.add(
             a->ciphertext,
@@ -242,7 +248,7 @@ extern "C" SEALCiphertext* seal_multiply(
     try {
         if (!ctx || !a || !b) return nullptr;
         
-        Evaluator evaluator(*ctx->context);
+        Evaluator evaluator(*ctx->seal_context);
         SEALCiphertext* result = new SEALCiphertext();
         evaluator.multiply(
             a->ciphertext,
