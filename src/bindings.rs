@@ -30,6 +30,16 @@ pub struct SEALPlaintext {
     _private: [u8; 0],
 }
 
+#[repr(C)]
+pub struct SEALBatchEncoder {
+    _private: [u8; 0],
+}
+
+#[repr(C)]
+pub struct SEALGaloisKeys {
+    _private: [u8; 0],
+}
+
 // ============================================
 // FFI Function Declarations
 // ============================================
@@ -97,5 +107,31 @@ unsafe extern "C" {
         ctx: *mut SEALContext,
         a: *mut SEALCiphertext,
         b: *mut SEALCiphertext,
+    ) -> *mut SEALCiphertext;
+
+    // Batch encoder
+    pub fn seal_create_batch_encoder(ctx: *mut SEALContext) -> *mut SEALBatchEncoder;
+    pub fn seal_destroy_batch_encoder(encoder: *mut SEALBatchEncoder);
+    pub fn seal_batch_encode(
+        encoder: *mut SEALBatchEncoder,
+        values: *const i64,
+        values_size: usize,
+    ) -> *mut SEALPlaintext;
+    pub fn seal_batch_decode(
+        encoder: *mut SEALBatchEncoder,
+        plain: *mut SEALPlaintext,
+        output: *mut i64,
+        output_size: *mut usize,
+    );
+    pub fn seal_get_slot_count(encoder: *mut SEALBatchEncoder) -> usize;
+    
+    // Galois keys
+    pub fn seal_generate_galois_keys(ctx: *mut SEALContext) -> *mut SEALGaloisKeys;
+    pub fn seal_destroy_galois_keys(keys: *mut SEALGaloisKeys);
+    pub fn seal_rotate_rows(
+        ctx: *mut SEALContext,
+        cipher: *mut SEALCiphertext,
+        steps: i32,
+        galois_keys: *mut SEALGaloisKeys,
     ) -> *mut SEALCiphertext;
 }
