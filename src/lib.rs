@@ -175,6 +175,119 @@ impl Drop for Decryptor {
     }
 }
 
+// ============================================
+// Batch Encoder
+// ============================================
+pub struct BatchEncoder {
+    ptr: NonNull<bindings::SEALBatchEncoder>,
+}
+
+impl BatchEncoder {
+    pub fn new(context: &Context) -> Result<Self> {
+        let ptr = unsafe {
+            bindings::seal_create_batch_encoder(context.ptr.as_ptr())
+        };
+        
+        NonNull::new(ptr)
+            .map(|ptr| BatchEncoder { ptr })
+            .ok_or(SealError::NullPointer)
+    }
+    
+    /// Encode a vector of integers into a plaintext
+    pub fn encode(&self, values: &[i64]) -> Result<Plaintext> {
+        let ptr = unsafe {
+            bindings::seal_batch_encode(
+                self.ptr.as_ptr(),
+                values.as_ptr(),
+                values.len(),
+            )
+        };
+        
+        NonNull::new(ptr)
+            .map(|ptr| Plaintext { ptr })
+            .ok_or(SealError::NullPointer)
+    }
+    
+    /// Decode a plaintext back to vector of integers
+    pub fn decode(&self, plain: &Plaintext) -> Result<Vec<i64>> {
+        let mut output = vec![0i64; self.slot_count()];
+        let mut output_size = output.len();
+        
+        unsafe {
+            bindings::seal_batch_decode(
+                self.ptr.as_ptr(),
+                plain.ptr.as_ptr(),
+                output.as_mut_ptr(),
+                &mut output_size,
+            );
+        }
+        
+        output.truncate(output_size);
+        Ok(output)
+    }
+    
+    pub fn slot_count(&self) -> usize {
+        unsafe { bindings::seal_get_slot_count(self.ptr.as_ptr()) }
+    }
+}
+
+impl Drop for BatchEncoder {
+    fn drop(&mut self) {
+        unsafe {
+            bindings::seal_destroy_batch_encoder(self.ptr.as_ptr());
+        }
+    }
+}
+
+// ============================================
+// Galois Keys
+// ============================================
+pub struct GaloisKeys {
+    ptr: NonNull<bindings::SEALGaloisKeys>,
+}
+
+impl GaloisKeys {
+    pub fn generate(context: &Context) -> Result<Self> {
+        let ptr = unsafe {
+            bindings::seal_generate_galois_keys(context.ptr.as_ptr())
+        };
+        
+        NonNull::new(ptr)
+            .map(|ptr| GaloisKeys { ptr })
+            .ok_or(SealError::NullPointer)
+    }
+}
+
+impl Drop for GaloisKeys {
+    fn drop(&mut self) {
+        unsafe {
+            bindings::seal_destroy_galois_keys(self.ptr.as_ptr());
+        }
+    }
+}
+
+// ============================================
+// Rotation
+// ============================================
+pub fn rotate_rows(
+    context: &Context,
+    cipher: &Ciphertext,
+    steps: i32,
+    galois_keys: &GaloisKeys,
+) -> Result<Ciphertext> {
+    let ptr = unsafe {
+        bindings::seal_rotate_rows(
+            context.ptr.as_ptr(),
+            cipher.ptr.as_ptr(),
+            steps,
+            galois_keys.ptr.as_ptr(),
+        )
+    };
+    
+    NonNull::new(ptr)
+        .map(|ptr| Ciphertext { ptr })
+        .ok_or(SealError::OperationFailed)
+}
 
 // ============================================
 // Plaintext
