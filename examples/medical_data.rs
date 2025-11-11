@@ -29,6 +29,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("║                                                                   ║");
     println!("╚═══════════════════════════════════════════════════════════════════╝");
     println!();
+
+    // ============================================
+    // SIMULATED MEDICAL DATA
+    // ============================================
+    let medical_record = 
+        "PATIENT ID: 12345 | NAME: Bob Smith | AGE: 45 | \
+         DIAGNOSIS: HYPERTENSION STAGE 2 | BP: 160/100 | \
+         MEDICATION: LISINOPRIL 10MG DAILY | \
+         ALLERGIES: EGG | LAST VISIT: 2024-11-10 | \
+         NOTES: PATIENT SHOWS IMPROVEMENT WITH CURRENT TREATMENT";
+    
+    println!("📋 Medical Record to Encrypt:");
+    println!("─────────────────────────────────────────────────────────────────");
+    println!("{}", medical_record);
+    println!("─────────────────────────────────────────────────────────────────");
+    println!("encrypt it using SEAL homomorphic encryption\n");
+    
+    sleep(Duration::from_secs(2));
     
     Ok(())
 }
