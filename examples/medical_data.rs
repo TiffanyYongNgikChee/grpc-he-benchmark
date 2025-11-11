@@ -124,7 +124,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // text becomes a list of integers, one per character. So we can perform mathematical operations (encryption, rotation) on this vector.
     
     // to show how many characters were in the original record (data.len() gives the vector length).
-    println!("   📊 Record length: {} characters", data.len());
+    println!("    Record length: {} characters", data.len());
     
     processing_step("Padding data to encryption block size", 500);
     
@@ -153,6 +153,58 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Encoding time: {:.2}s\n", phase2_time.as_secs_f64());
     
     sleep(Duration::from_secs(1));
+
+    // ENCRYPTION
+    println!("╔═══════════════════════════════════════════════════════════════════╗");
+    println!("║           HOMOMORPHIC ENCRYPTION                                  ║");
+    println!("╚═══════════════════════════════════════════════════════════════════╝");
+    println!();
+    
+    // Captures the current high-precision timestamp to measure how long Phase 3 (encryption) takes in total.
+    let phase3_start = Instant::now(); 
+    
+    processing_step("Initializing encryptor with public key", 400);
+    // Creates an Encryptor instance using the previously defined encryption context
+    // &context — provides encryption parameters (moduli, keys, etc.) created during setup.
+    let encryptor = Encryptor::new(&context)?;
+    // Encryptor is the object responsible for turning plaintexts into ciphertexts using the public key.
+    // Once created, can call encryptor.encrypt() to actually encrypt data.
+
+    println!("\n   Encrypting medical record...");
+    // Starts a new timer to measure only the encryption process, not the whole phase.
+    let encrypt_start = Instant::now();
+    
+    // Show progress during encryption
+    // Simulates a live encryption progress animation.
+    // loop five times to represent progress steps (20%, 40%, 60%, 80%, 100%).
+    for i in 0..5 {
+        // pause for 200 ms to pace the updates.
+        sleep(Duration::from_millis(200));
+        // print_progress("Encryption", i + 1, 5, encrypt_start.elapsed());
+        print_progress("Encryption", i + 1, 5, encrypt_start.elapsed());
+        // uses ANSI escape codes to move the terminal cursor up six lines.
+        print!("\x1B[6A"); // Move cursor up 6 lines
+    }
+    // Calls the encrypt method of the Encryptor, passing in the plaintext generated in Phase 2.
+    // The encryptor uses the public key (already part of the context) to transform the plaintext polynomial into a ciphertext 
+    // — an encrypted polynomial that hides the original data.
+    let ciphertext = encryptor.encrypt(&plaintext)?;
+    // And now the record is fully encrypted: it can be added, multiplied, or rotated under encryption without exposing raw data.
+    
+    // Calculates how long the actual encryption call took by comparing the current time to encrypt_start.
+    let encrypt_time = encrypt_start.elapsed();
+    
+    print_progress("Encryption", 5, 5, encrypt_time);
+    
+    // Computes the total time taken for all of Phase 3 (including initialization, progress display, and encryption).
+    let phase3_time = phase3_start.elapsed();
+    
+    println!("\n    Medical record is now ENCRYPTED!");
+    println!("    Data is secure - cannot be read without secret key");
+    println!("    Encryption time: {:.2}s\n", encrypt_time.as_secs_f64());
+    
+    sleep(Duration::from_secs(2));
+    
     
     Ok(())
 }
