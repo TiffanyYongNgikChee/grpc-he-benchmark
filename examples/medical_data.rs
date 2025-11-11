@@ -102,6 +102,57 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Setup time: {:.2}s\n", phase1_time.as_secs_f64());
     
     sleep(Duration::from_secs(1));
+
+    // DATA PREPARATION & ENCODING
+    // converting the text into a numerical representation and encoding it into SEAL’s plaintext polynomial form.
+    println!("╔═══════════════════════════════════════════════════════════════════╗");
+    println!("║           DATA PREPARATION                                        ║");
+    println!("╚═══════════════════════════════════════════════════════════════════╝");
+    println!();
+    
+    // Captures the current timestamp, so can measure how long this entire phase takes.
+    let phase2_start = Instant::now();
+    
+    // Calls helper function processing_step, which animates a short dot-based progress bar (700 ms).
+    processing_step("Converting medical text to numerical format", 700);
+    // creates an iterator over every character in the string.
+    // Example: "AB" → 'A', 'B'.
+    // And then converts each character into its Unicode numeric code
+    // We cast to i64 because SEAL encoders operate on integers, not text.
+    // gathers all converted numbers into a Vec<i64> (vector of 64-bit integers).
+    let data: Vec<i64> = medical_record.chars().map(|c| c as i64).collect();
+    // text becomes a list of integers, one per character. So we can perform mathematical operations (encryption, rotation) on this vector.
+    
+    // to show how many characters were in the original record (data.len() gives the vector length).
+    println!("   📊 Record length: {} characters", data.len());
+    
+    processing_step("Padding data to encryption block size", 500);
+    
+    // Pads the data vector to match the encoder’s slot capacity.
+    // data.clone() → creates a copy of the original data. (because the original data need to be modified later)
+    let mut padded_data = data.clone();
+    // Ensures the vector’s length equals slot_count (the number of encoding slots retrieved earlier from the encoder).
+    // If the data is shorter than slot_count, it appends zeros (0) until the lengths match.
+    // *** Why pad? ***
+    // Homomorphic encryption encodes data into fixed-size vectors (slots).
+    // Every plaintext polynomial can hold exactly slot_count numbers, so we must fill unused slots with zeros.
+    padded_data.resize(slot_count, 0);
+    
+    processing_step("Encoding data into plaintext polynomial", 800);
+    
+    // Performs the real encoding using the SEAL BatchEncoder.
+    // converts the vector of integers into a Plaintext object.
+    let plaintext = encoder.encode(&padded_data)?;
+    //plaintext now holds the polynomial representation of data text, ready to encrypt.
+    
+    // Calculates how long data preparation took by subtracting the saved start time from the current time.
+    let phase2_time = phase2_start.elapsed();
+    
+    println!("\n   Phase 2 Complete!");
+    println!("   Data encoded: {} → {} slots", data.len(), slot_count);
+    println!("   Encoding time: {:.2}s\n", phase2_time.as_secs_f64());
+    
+    sleep(Duration::from_secs(1));
     
     Ok(())
 }
