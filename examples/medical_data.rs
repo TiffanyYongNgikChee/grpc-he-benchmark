@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     clear_screen();
     
     println!("╔═══════════════════════════════════════════════════════════════════╗");
-    println!("║       🏥 MEDICAL DATA ENCRYPTION - SEAL DEMONSTRATION            ║");
+    println!("║           MEDICAL DATA ENCRYPTION - SEAL DEMONSTRATION            ║");
     println!("║                                                                   ║");
     println!("╚═══════════════════════════════════════════════════════════════════╝");
     println!();
@@ -47,6 +47,61 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("encrypt it using SEAL homomorphic encryption\n");
     
     sleep(Duration::from_secs(2));
+
+    // SETUP & KEY GENERATION
+    println!("╔═══════════════════════════════════════════════════════════════════╗");
+    println!("║           CRYPTOGRAPHIC SETUP                                     ║");
+    println!("╚═══════════════════════════════════════════════════════════════════╝");
+    println!();
+    
+    // Creates a timestamp storing the current instant (high-resolution clock) in the variable phase1_start
+    let phase1_start = Instant::now(); // Instant::now() is used for measuring elapsed time later.
+    
+    // Calls helper function processing_step (defined earlier).
+    // a label that will be printed.800 is means the simulated duration in milliseconds.
+    processing_step("Initializing SEAL encryption context", 800);
+
+    // This actually constructs the encryption context using the: 
+    // Context::new function from the he_benchmark crate (a wrapper for SEAL).
+    // 8192 — typically the polynomial degree (also called poly_modulus_degree). 
+    // This controls the ciphertext polynomial degree and affects performance/security tradeoffs. Larger means more capacity but slower.
+    // 1032193 — likely a modulus (coefficient/modulus parameter). The exact meaning depends on he_benchmark API.
+    let context = Context::new(8192, 1032193)?;
+    
+
+    // The processing_step simulates visible progress; sleep adds extra perceived delay to mimic a heavier real-world key generation operation. 
+    // (In real setups key generation can take a noticeable time.)
+    // processing_step to simulate and display the “Generating public/private key pair” action over ~1200 ms.
+    processing_step("Generating public/private key pair", 1200);
+    // sleep(Duration::from_millis(500)) pauses execution for another 500 ms.
+    sleep(Duration::from_millis(500));
+    
+    processing_step("Creating batch encoder for medical data", 600);
+    
+    // Instantiates a BatchEncoder using the context (passes a reference so the encoder can access encryption parameters.)
+    // BatchEncoder is used to pack multiple integers (or bytes converted to integers) into a plaintext polynomial that SEAL can encrypt efficiently (SIMD-style batching).
+    let encoder = BatchEncoder::new(&context)?;
+
+    // to find how many separate "slots" (elements) can be packed into a single plaintext polynomial given the chosen parameters.
+    let slot_count = encoder.slot_count();
+    
+    // Simulates creating Galois keys with a longer animation (2500 ms) because generating these special keys is usually more expensive.
+    processing_step("Generating Galois keys for data rotation", 2500);
+    
+    // generates the GaloisKeys object by calling GaloisKeys::generate and passing the context. 
+    // will be used whenever the code needs to rotate ciphertext slots while remaining encrypted.
+    let galois_keys = GaloisKeys::generate(&context)?;
+    
+    // capture how long Phase 1 took (initialization, encoder, key generation) for reporting in the summary.
+    let phase1_time = phase1_start.elapsed();
+    
+    println!("\n  Phase 1 Complete!");
+    // show the number of slot_count available for batching encoded data.
+    println!("   Available encryption slots: {}", slot_count);
+    // prints the setup time in seconds to two decimal places:
+    println!("   Setup time: {:.2}s\n", phase1_time.as_secs_f64());
+    
+    sleep(Duration::from_secs(1));
     
     Ok(())
 }
