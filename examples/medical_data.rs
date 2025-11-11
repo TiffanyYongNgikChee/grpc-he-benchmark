@@ -251,6 +251,68 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     sleep(Duration::from_secs(1));
     
+    // DECRYPTION & VERIFICATION
+    println!("╔═══════════════════════════════════════════════════════════════════╗");
+    println!("║           DECRYPTION & VERIFICATION                               ║");
+    println!("╚═══════════════════════════════════════════════════════════════════╝");
+    println!();
+    
+    let phase5_start = Instant::now();
+    
+    processing_step("Initializing decryptor with secret key", 400);
+    // Creates a Decryptor instance using the current encryption context.
+    // The Decryptor uses the private (secret) key stored inside the context.
+    // Only with this secret key can this transform ciphertexts back into readable plaintexts.
+    let decryptor = Decryptor::new(&context)?;
+    
+    
+    println!("\n   Decrypting result...");
+    // Starts another timer, this one measuring just the decryption process itself (not the entire phase).
+    let decrypt_start = Instant::now();
+    
+    // Show progress during decryption
+    for i in 0..5 {
+        sleep(Duration::from_millis(150));
+        print_progress("Decryption", i + 1, 5, decrypt_start.elapsed());
+        print!("\x1B[6A"); //Uses an ANSI escape code to move the cursor up 6 lines so the next update overwrites the old one, making it look animated.
+    }
+    
+    // This is the actual decryption step.
+    // It takes cipher_sum, which was created in Phase 4 (the result of encrypted additions and rotations), and decrypts it back into a Plaintext.
+    // The Decryptor uses the secret key to reverse the encryption process.
+    // The result, decrypted_plain, is now a plaintext polynomial, still numeric, but readable to the program (not directly human-readable text yet).
+    let decrypted_plain = decryptor.decrypt(&cipher_sum)?;
+    // Measures how long the decryption step took, in seconds.
+    let decrypt_time = decrypt_start.elapsed();
+    
+    print_progress("Decryption", 5, 5, decrypt_time);
+    
+    processing_step("Decoding plaintext back to readable format", 600);
+    // Converts (decodes) the decrypted plaintext polynomial back into a vector of integers.
+    // Each integer represents an ASCII code for one character (from Phase 2’s encoding step).
+    // After this step, result_data holds a vector like [80, 65, 84, 73, 69, 78, 84, ...]
+    let result_data = encoder.decode(&decrypted_plain)?;
+    
+    let phase5_time = phase5_start.elapsed();
+    
+    // Converts the numeric vector into a human-readable text string.
+    // result_data[..data.len().min(100)] - Takes at most the first 100 characters (for preview).
+    // .iter() — Iterates over the numbers.
+    // .filter(|&&n| n > 0 && n < 128) — Keeps only valid ASCII characters (ignore zeros or noise from padding).
+    // .map(|&n| (n as u8) as char) — Converts each numeric value back into its character equivalent.
+    // .collect() — Combines all characters into a String.
+    let result_string: String = result_data[..data.len().min(100)]
+        .iter()
+        .filter(|&&n| n > 0 && n < 128)
+        .map(|&n| (n as u8) as char)
+        .collect();
+    // Result: a readable text version of the decrypted message — i.e., the medical record.
+    println!("\n   Decryption successful!");
+    println!("   Decrypted preview: \"{}...\"", &result_string[..50.min(result_string.len())]);
+    println!("   Decryption time: {:.2}s\n", phase5_time.as_secs_f64());
+    
+    sleep(Duration::from_secs(2));
+    
     
     Ok(())
 }
