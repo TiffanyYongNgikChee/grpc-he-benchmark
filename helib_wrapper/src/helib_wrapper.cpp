@@ -1,10 +1,12 @@
 #include "../include/helib_wrapper.h"
 #include <helib/helib.h>
+#include <NTL/ZZX.h>
 #include <memory>
 #include <iostream>
 
 using namespace helib;
 using namespace std;
+using namespace NTL;
 
 
 // Opaque Struct Implementations
@@ -106,4 +108,82 @@ extern "C" HElibPublicKey* helib_get_public_key(HElibSecretKey* sk) {
 
 extern "C" void helib_destroy_public_key(HElibPublicKey* pk) {
     if (pk) delete pk;
+}
+
+// Plaintext Operations Implementation
+extern "C" HElibPlaintext* helib_create_plaintext(
+    HElibContext* ctx,
+    long value
+) {
+    try {
+        HElibPlaintext* plain = new HElibPlaintext();
+        plain->value = value;
+        return plain;
+        
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+extern "C" long helib_plaintext_to_long(HElibPlaintext* plain) {
+    if (!plain) return 0;
+    return plain->value;
+}
+
+extern "C" void helib_destroy_plaintext(HElibPlaintext* plain) {
+    if (plain) delete plain;
+}
+
+// Encryption/Decryption Implementation
+extern "C" HElibCiphertext* helib_encrypt(
+    HElibPublicKey* pk,
+    HElibPlaintext* plain
+) {
+    try {
+        if (!pk || !pk->publicKey || !plain) return nullptr;
+        
+        HElibCiphertext* cipher = new HElibCiphertext();
+        cipher->ctxt = make_unique<Ctxt>(*pk->publicKey);
+        
+        // Encrypt the value
+        pk->publicKey->Encrypt(*cipher->ctxt, to_ZZX(plain->value));
+        
+        return cipher;
+        
+    } catch (const exception& e) {
+        cerr << "Encryption failed: " << e.what() << endl;
+        return nullptr;
+    }
+}
+
+extern "C" HElibPlaintext* helib_decrypt(
+    HElibSecretKey* sk,
+    HElibCiphertext* cipher
+) {
+    try {
+        if (!sk || !sk->secretKey || !cipher || !cipher->ctxt) {
+            return nullptr;
+        }
+        
+        // Decrypt to polynomial
+        ZZX poly;
+        sk->secretKey->Decrypt(poly, *cipher->ctxt);
+        
+        // Convert to integer
+        long value = to_long(coeff(poly, 0));
+        
+        // Create plaintext result
+        HElibPlaintext* plain = new HElibPlaintext();
+        plain->value = value;
+        
+        return plain;
+        
+    } catch (const exception& e) {
+        cerr << "Decryption failed: " << e.what() << endl;
+        return nullptr;
+    }
+}
+
+extern "C" void helib_destroy_ciphertext(HElibCiphertext* cipher) {
+    if (cipher) delete cipher;
 }
