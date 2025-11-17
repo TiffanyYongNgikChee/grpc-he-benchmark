@@ -7,9 +7,7 @@ mod bindings; // imports the low-level FFI bindings (the C function definitions)
 use std::ffi::{CStr, CString}; // CStr and CString convert between Rust strings and C strings.
 use std::ptr::NonNull; // NonNull safely wraps raw pointers that should never be null.
 
-// ============================================
 // Error Types
-// ============================================
 #[derive(Debug)]
 pub enum SealError {
     // Defines all possible errors might encounter
@@ -18,6 +16,7 @@ pub enum SealError {
     EncryptionFailed,
     DecryptionFailed,
     OperationFailed,
+    // Rust’s Result<T, SealError> then makes it safe to handle errors using ?.
 }
 
 
@@ -40,9 +39,7 @@ impl std::error::Error for SealError {}
 
 pub type Result<T> = std::result::Result<T, SealError>;
 
-// ============================================
 // Context (owns SEAL context and keys)
-// ============================================
 pub struct Context {
     // store only a pointer to the C++ object, but wrapped in NonNull to ensure it’s valid
     ptr: NonNull<bindings::SEALContext>,
