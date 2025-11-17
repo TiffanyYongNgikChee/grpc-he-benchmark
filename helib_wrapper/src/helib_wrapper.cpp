@@ -63,3 +63,47 @@ extern "C" void helib_destroy_context(HElibContext* ctx) {
     if (ctx) delete ctx;
 }
 
+// Key Management Implementation
+extern "C" HElibSecretKey* helib_generate_secret_key(HElibContext* ctx) {
+    try {
+        if (!ctx || !ctx->context) return nullptr;
+        
+        HElibSecretKey* sk = new HElibSecretKey();
+        sk->ctx = ctx;
+        
+        // Create secret key
+        sk->secretKey = make_unique<SecKey>(*ctx->context);
+        sk->secretKey->GenSecKey(); // Generate secret key polynomial
+        
+        // Add key-switching matrices (required for multiplication)
+        addSome1DMatrices(*sk->secretKey);
+        
+        return sk;
+        
+    } catch (const exception& e) {
+        cerr << "Secret key generation failed: " << e.what() << endl;
+        return nullptr;
+    }
+}
+
+extern "C" void helib_destroy_secret_key(HElibSecretKey* sk) {
+    if (sk) delete sk;
+}
+
+extern "C" HElibPublicKey* helib_get_public_key(HElibSecretKey* sk) {
+    try {
+        if (!sk || !sk->secretKey) return nullptr;
+        
+        HElibPublicKey* pk = new HElibPublicKey();
+        pk->publicKey = sk->secretKey.get(); // SecKey inherits from PubKey
+        
+        return pk;
+        
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+extern "C" void helib_destroy_public_key(HElibPublicKey* pk) {
+    if (pk) delete pk;
+}
