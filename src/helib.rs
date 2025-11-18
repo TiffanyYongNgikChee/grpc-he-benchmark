@@ -44,3 +44,60 @@ impl Drop for HEContext {
         }
     }
 }
+
+// Secret Key
+pub struct HESecretKey {
+    ptr: NonNull<helib_bindings::HElibSecretKey>,
+}
+
+impl HESecretKey {
+    pub fn generate(context: &HEContext) -> Result<Self> {
+        let ptr = unsafe {
+            helib_bindings::helib_generate_secret_key(context.ptr.as_ptr())
+        };
+        
+        NonNull::new(ptr)
+            .map(|ptr| HESecretKey { ptr })
+            .ok_or(HElibError::NullPointer)
+    }
+    
+    pub fn public_key(&self) -> Result<HEPublicKey> {
+        let ptr = unsafe {
+            helib_bindings::helib_get_public_key(self.ptr.as_ptr())
+        };
+        
+        NonNull::new(ptr)
+            .map(|ptr| HEPublicKey { ptr })
+            .ok_or(HElibError::NullPointer)
+    }
+    
+    pub fn decrypt(&self, ciphertext: &HECiphertext) -> Result<HEPlaintext> {
+        let ptr = unsafe {
+            helib_bindings::helib_decrypt(
+                self.ptr.as_ptr(),
+                ciphertext.ptr.as_ptr(),
+            )
+        };
+        
+        NonNull::new(ptr)
+            .map(|ptr| HEPlaintext { ptr })
+            .ok_or(HElibError::DecryptionFailed)
+    }
+    
+    pub fn noise_budget(&self, ciphertext: &HECiphertext) -> i32 {
+        unsafe {
+            helib_bindings::helib_noise_budget(
+                self.ptr.as_ptr(),
+                ciphertext.ptr.as_ptr(),
+            )
+        }
+    }
+}
+
+impl Drop for HESecretKey {
+    fn drop(&mut self) {
+        unsafe {
+            helib_bindings::helib_destroy_secret_key(self.ptr.as_ptr());
+        }
+    }
+}
