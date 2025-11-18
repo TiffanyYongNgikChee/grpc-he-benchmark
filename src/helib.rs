@@ -101,3 +101,31 @@ impl Drop for HESecretKey {
         }
     }
 }
+
+// Public Key
+pub struct HEPublicKey {
+    ptr: NonNull<helib_bindings::HElibPublicKey>,
+}
+
+impl HEPublicKey {
+    pub fn encrypt(&self, plaintext: &HEPlaintext) -> Result<HECiphertext> {
+        let ptr = unsafe {
+            helib_bindings::helib_encrypt(
+                self.ptr.as_ptr(),
+                plaintext.ptr.as_ptr(),
+            )
+        };
+        
+        NonNull::new(ptr)
+            .map(|ptr| HECiphertext { ptr })
+            .ok_or(HElibError::EncryptionFailed)
+    }
+}
+
+impl Drop for HEPublicKey {
+    fn drop(&mut self) {
+        unsafe {
+            helib_bindings::helib_destroy_public_key(self.ptr.as_ptr());
+        }
+    }
+}
