@@ -56,3 +56,74 @@ struct ComparisonResult {
     helib: PhaseMetrics, // Timing results for the HElib encryption run.
     data_description: String, // Human-readable description of the dataset (size, type, etc.).
 }
+
+// UI Helper Functions
+// These functions provide visual formatting,
+// progress indicators, and animated steps for
+// a more user-friendly terminal experience.
+
+/// Clears the terminal screen and moves the cursor
+/// to the top-left corner using ANSI escape codes.
+fn clear_screen() {
+    print!("\x1B[2J\x1B[1;1H");
+    io::stdout().flush().unwrap();
+}
+
+/// Prints a stylized header box with a centered title.
+/// Used at the beginning of major sections.
+fn print_header(title: &str) {
+    println!("\n╔═══════════════════════════════════════════════════════════════════╗");
+    println!("║ {:^65} ║", title);
+    println!("╚═══════════════════════════════════════════════════════════════════╝\n");
+}
+
+/// Prints a small labeled section divider.
+/// Used to visually separate steps in the process.
+fn print_section(title: &str) {
+    println!("\n┌─────────────────────────────────────────────────────────────────┐");
+    println!("│ {} ", title);
+    println!("└─────────────────────────────────────────────────────────────────┘");
+}
+
+/// Displays an animated "processing" step with dots,
+/// simulating work being done. The duration controls
+/// how long the animation lasts.
+fn processing_step(label: &str, duration_ms: u64) {
+    print!("   {} ", label);
+    io::stdout().flush().unwrap();
+    
+    let steps = 20; // total number of dots
+    let step_duration = duration_ms / steps; // delay per dot
+    
+    // Print dots gradually to simulate progress.
+    for _ in 0..steps {
+        print!(".");
+        io::stdout().flush().unwrap();
+        sleep(Duration::from_millis(step_duration));
+    }
+    println!(" ✓"); // success checkmark at the end
+}
+
+/// Prints a detailed progress bar showing:
+/// - percentage completion
+/// - visual bar ("█" for completed, "░" for remaining)
+/// - current step vs total
+/// - elapsed time
+///
+/// Used for longer multi-step operations.
+fn print_progress(label: &str, current: usize, total: usize, elapsed: Duration) {
+    let percentage = (current as f64 / total as f64 * 100.0) as usize;
+    let bar_width = 50;
+    let filled = (percentage * bar_width / 100).min(bar_width);
+    let empty = bar_width - filled;
+    
+    println!("┌─────────────────────────────────────────────────────────────────┐");
+    println!("│  {} Progress: {}%", label, percentage);
+    println!("├─────────────────────────────────────────────────────────────────┤");
+    print!("│  [");
+    print!("{}", "█".repeat(filled)); // filled portion
+    print!("{}", "░".repeat(empty)); // empty portion
+    println!("] {}/{}", current, total);
+    println!("│  Elapsed: {:.1}s", elapsed.as_secs_f64());
+    println!("└─────────────────────────────────────────────────────────────────┘");
+}
