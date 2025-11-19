@@ -12,3 +12,7 @@ cc = "1.0"
 [lib]
 name = "he_benchmark"
 path = "src/lib.rs"
+
+[[example]]
+name = "seal_vs_helib_benchmark"
+path = "examples/seal_vs_helib_benchmark.rs"
