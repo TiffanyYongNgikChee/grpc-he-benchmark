@@ -346,3 +346,98 @@ fn run_helib_encryption(medical_data: &[i64]) -> Result<PhaseMetrics, Box<dyn st
     
     Ok(metrics)
 }
+
+// Comparison Display
+fn print_comparison(result: &ComparisonResult) {
+    clear_screen();
+    
+    print_header("PERFORMANCE COMPARISON: SEAL vs HElib");
+    
+    println!(" Test Data: {}\n", result.data_description);
+    
+    // Header
+    println!("┌─────────────────────────┬──────────────┬──────────────┬──────────────┐");
+    println!("│ Phase                   │ SEAL         │ HElib        │ Winner       │");
+    println!("├─────────────────────────┼──────────────┼──────────────┼──────────────┤");
+    
+    // Setup
+    print_comparison_row(
+        "Setup & Keys",
+        result.seal.setup_time,
+        result.helib.setup_time,
+    );
+    
+    // Encoding
+    print_comparison_row(
+        "Data Encoding",
+        result.seal.encoding_time,
+        result.helib.encoding_time,
+    );
+    
+    // Encryption
+    print_comparison_row(
+        "Encryption",
+        result.seal.encryption_time,
+        result.helib.encryption_time,
+    );
+    
+    // Operations
+    print_comparison_row(
+        "Encrypted Operations",
+        result.seal.operation_time,
+        result.helib.operation_time,
+    );
+    
+    // Decryption
+    print_comparison_row(
+        "Decryption",
+        result.seal.decryption_time,
+        result.helib.decryption_time,
+    );
+    
+    println!("├─────────────────────────┼──────────────┼──────────────┼──────────────┤");
+    
+    // Total
+    print_comparison_row(
+        "TOTAL TIME",
+        result.seal.total_time,
+        result.helib.total_time,
+    );
+    
+    println!("└─────────────────────────┴──────────────┴──────────────┴──────────────┘");
+    
+    // Speedup calculation
+    let speedup = if result.seal.total_time < result.helib.total_time {
+        result.helib.total_time.as_secs_f64() / result.seal.total_time.as_secs_f64()
+    } else {
+        result.seal.total_time.as_secs_f64() / result.helib.total_time.as_secs_f64()
+    };
+    
+    let faster = if result.seal.total_time < result.helib.total_time {
+        "SEAL"
+    } else {
+        "HElib"
+    };
+    
+    println!("\n Summary:");
+    println!("   {} is {:.2}x faster overall", faster, speedup);
+    println!();
+}
+
+fn print_comparison_row(phase: &str, seal_time: Duration, helib_time: Duration) {
+    let seal_ms = seal_time.as_millis();
+    let helib_ms = helib_time.as_millis();
+    
+    let winner = if seal_ms < helib_ms {
+        "SEAL ⚡"
+    } else if helib_ms < seal_ms {
+        "HElib ⚡"
+    } else {
+        "Tie"
+    };
+    
+    println!(
+        "│ {:23} │ {:>10}ms │ {:>10}ms │ {:12} │",
+        phase, seal_ms, helib_ms, winner
+    );
+}
