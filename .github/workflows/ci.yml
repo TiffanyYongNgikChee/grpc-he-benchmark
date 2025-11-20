@@ -1,0 +1,70 @@
+name: CI
+
+# When to run: on every push and pull request
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    name: Test on Ubuntu
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Step 1: Get your code
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      # Step 2: Install C++ tools
+      - name: Install C++ dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ make libntl-dev
+      
+      # Step 3: Install Rust
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      # Step 4: Cache dependencies (makes builds faster)
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+      
+      # Step 5: Build C++ libraries (SEAL and HElib)
+      - name: Build SEAL
+        run: |
+          cd seal-wrapper
+          mkdir -p build && cd build
+          cmake ..
+          make -j$(nproc)
+      
+      - name: Build HElib
+        run: |
+          cd helib-wrapper
+          mkdir -p build && cd build
+          cmake ..
+          make -j$(nproc)
+      
+      # Step 6: Build Rust project
+      - name: Build Rust project
+        run: cargo build --verbose
+      
+      # Step 7: Run tests
+      - name: Run tests
+        run: cargo test --verbose
+      
+      # Step 8: Build examples
+      - name: Build benchmark example
+        run: cargo build --example benchmark --verbose
