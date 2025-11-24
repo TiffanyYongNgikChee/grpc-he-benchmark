@@ -29,7 +29,7 @@ OpenFHEContext* openfhe_create_bfv_context(
 void openfhe_destroy_context(OpenFHEContext* ctx);
 
 // Key Management
-/// Generate public/private key pair
+/// Generate public/private k ey pair
 /// @param ctx: OpenFHE context
 /// @return Pointer to key pair or NULL on failure
 OpenFHEKeyPair* openfhe_generate_keypair(OpenFHEContext* ctx);
@@ -37,6 +37,59 @@ OpenFHEKeyPair* openfhe_generate_keypair(OpenFHEContext* ctx);
 /// Destroy key pair and free memory
 void openfhe_destroy_keypair(OpenFHEKeyPair* keypair);
 
+// Plaintext Operations
+
+/// Create plaintext from integer vector
+/// @param ctx: OpenFHE context
+/// @param values: Array of integers
+/// @param length: Number of integers
+/// @return Pointer to plaintext or NULL on failure
+OpenFHEPlaintext* openfhe_create_plaintext(
+    OpenFHEContext* ctx,
+    const int64_t* values,
+    size_t length
+);
+
+/// Destroy plaintext and free memory
+void openfhe_destroy_plaintext(OpenFHEPlaintext* plain);
+
+/// Get plaintext values
+/// @param plain: Plaintext to extract from
+/// @param out_values: Output buffer (caller allocates)
+/// @param out_length: Pointer to store actual length
+/// @return true on success, false on failure
+bool openfhe_get_plaintext_values(
+    OpenFHEPlaintext* plain,
+    int64_t* out_values,
+    size_t* out_length
+);
+
+// Encryption/Decryption
+
+/// Encrypt a plaintext
+/// @param ctx: OpenFHE context
+/// @param keypair: Key pair (uses public key)
+/// @param plain: Plaintext to encrypt
+/// @return Pointer to ciphertext or NULL on failure
+OpenFHECiphertext* openfhe_encrypt(
+    OpenFHEContext* ctx,
+    OpenFHEKeyPair* keypair,
+    OpenFHEPlaintext* plain
+);
+
+/// Decrypt a ciphertext
+/// @param ctx: OpenFHE context
+/// @param keypair: Key pair (uses secret key)
+/// @param cipher: Ciphertext to decrypt
+/// @return Pointer to plaintext or NULL on failure
+OpenFHEPlaintext* openfhe_decrypt(
+    OpenFHEContext* ctx,
+    OpenFHEKeyPair* keypair,
+    OpenFHECiphertext* cipher
+);
+
+/// Destroy ciphertext and free memory
+void openfhe_destroy_ciphertext(OpenFHECiphertext* cipher);
 
 #ifdef __cplusplus
 }
