@@ -83,3 +83,37 @@ extern "C" void openfhe_destroy_context(OpenFHEContext* ctx) {
         delete ctx;
     }
 }
+
+// Key Management Implementation
+extern "C" OpenFHEKeyPair* openfhe_generate_keypair(OpenFHEContext* ctx) {
+    if (!ctx) {
+        set_error("Invalid context");
+        return nullptr;
+    }
+    
+    try {
+        // Generate key pair
+        KeyPair<DCRTPoly> keyPair = ctx->cryptoContext->KeyGen();
+        
+        // Generate evaluation key for multiplication
+        ctx->cryptoContext->EvalMultKeyGen(keyPair.secretKey);
+        
+        // Allocate and return
+        OpenFHEKeyPair* kp = new OpenFHEKeyPair();
+        kp->keyPair = keyPair;
+        kp->ctx = ctx;
+        
+        set_error("");
+        return kp;
+        
+    } catch (const std::exception& e) {
+        set_error(std::string("Failed to generate keys: ") + e.what());
+        return nullptr;
+    }
+}
+
+extern "C" void openfhe_destroy_keypair(OpenFHEKeyPair* keypair) {
+    if (keypair) {
+        delete keypair;
+    }
+}
