@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  he-benchmark:
+    build: .
+    volumes:
+      - .:/app
+      - cargo-cache:/root/.cargo/registry
+      - target-cache:/app/target
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    environment:
+      - RUST_BACKTRACE=1
+      - LD_LIBRARY_PATH=/usr/local/lib:/usr/local/helib_pack/lib
+
+volumes:
+  cargo-cache:
+  target-cache:
