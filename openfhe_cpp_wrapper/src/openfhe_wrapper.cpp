@@ -2,7 +2,7 @@
 
 // OpenFHE headers - include lat-backend.h which defines DCRTPoly
 #include "openfhe/core/lattice/hal/lat-backend.h"
-#include "openfhe/pke/constants-defs.h"
+#include "openfhe/pke/constants.h"
 #include "openfhe/pke/encoding/plaintext-fwd.h"
 #include "openfhe/pke/scheme/gen-cryptocontext-params.h"
 #include "openfhe/pke/openfhe.h"
