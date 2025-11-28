@@ -35,6 +35,7 @@ struct OpenFHEPlaintext {
 
 struct OpenFHECiphertext {
     Ciphertext<DCRTPoly> ciphertext;
+    OpenFHEContext* ctx;
 };
 
 // Error Handling
@@ -252,5 +253,91 @@ extern "C" OpenFHEPlaintext* openfhe_decrypt(
 extern "C" void openfhe_destroy_ciphertext(OpenFHECiphertext* cipher) {
     if (cipher) {
         delete cipher;
+    }
+}
+
+// Homomorphic Operations Implementation
+extern "C" OpenFHECiphertext* openfhe_eval_add(
+    OpenFHECiphertext* ct1,
+    OpenFHECiphertext* ct2
+) {
+    if (!ct1 || !ct2 || !ct1->ctx) {
+        set_error("Invalid ciphertext parameters");
+        return nullptr;
+    }
+    
+    try {
+        // Cast to ConstCiphertext for the API
+        auto result = ct1->ctx->cryptoContext->EvalAdd(
+            std::const_pointer_cast<const CiphertextImpl<DCRTPoly>>(ct1->ciphertext),
+            std::const_pointer_cast<const CiphertextImpl<DCRTPoly>>(ct2->ciphertext)
+        );
+        
+        auto* out = new OpenFHECiphertext();
+        out->ciphertext = result;
+        out->ctx = ct1->ctx;
+        
+        set_error("");
+        return out;
+        
+    } catch (const std::exception& e) {
+        set_error(std::string("EvalAdd failed: ") + e.what());
+        return nullptr;
+    }
+}
+
+extern "C" OpenFHECiphertext* openfhe_eval_mult(
+    OpenFHECiphertext* ct1,
+    OpenFHECiphertext* ct2
+) {
+    if (!ct1 || !ct2 || !ct1->ctx) {
+        set_error("Invalid ciphertext parameters");
+        return nullptr;
+    }
+    
+    try {
+        auto result = ct1->ctx->cryptoContext->EvalMult(
+            std::const_pointer_cast<const CiphertextImpl<DCRTPoly>>(ct1->ciphertext),
+            std::const_pointer_cast<const CiphertextImpl<DCRTPoly>>(ct2->ciphertext)
+        );
+        
+        auto* out = new OpenFHECiphertext();
+        out->ciphertext = result;
+        out->ctx = ct1->ctx;
+        
+        set_error("");
+        return out;
+        
+    } catch (const std::exception& e) {
+        set_error(std::string("EvalMult failed: ") + e.what());
+        return nullptr;
+    }
+}
+
+extern "C" OpenFHECiphertext* openfhe_eval_sub(
+    OpenFHECiphertext* ct1,
+    OpenFHECiphertext* ct2
+) {
+    if (!ct1 || !ct2 || !ct1->ctx) {
+        set_error("Invalid ciphertext parameters");
+        return nullptr;
+    }
+    
+    try {
+        auto result = ct1->ctx->cryptoContext->EvalSub(
+            std::const_pointer_cast<const CiphertextImpl<DCRTPoly>>(ct1->ciphertext),
+            std::const_pointer_cast<const CiphertextImpl<DCRTPoly>>(ct2->ciphertext)
+        );
+        
+        auto* out = new OpenFHECiphertext();
+        out->ciphertext = result;
+        out->ctx = ct1->ctx;
+        
+        set_error("");
+        return out;
+        
+    } catch (const std::exception& e) {
+        set_error(std::string("EvalSub failed: ") + e.what());
+        return nullptr;
     }
 }
