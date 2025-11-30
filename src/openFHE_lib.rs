@@ -117,3 +117,64 @@ impl Drop for KeyPair {
         }
     }
 }
+
+// Plaintext (unencrypted data)
+pub struct Plaintext {
+    ptr: NonNull<ffi::OpenFHEPlaintext>,
+}
+
+impl Plaintext {
+    /// Create plaintext from integer vector
+    pub fn from_vec(context: &Context, values: &[i64]) -> Result<Self> {
+        if values.is_empty() {
+            return Err(OpenFHEError::InvalidParameter);
+        }
+        
+        let ptr = unsafe {
+            ffi::openfhe_create_plaintext(
+                context.as_ptr(),
+                values.as_ptr(),
+                values.len(),
+            )
+        };
+        
+        NonNull::new(ptr)
+            .map(|ptr| Plaintext { ptr })
+            .ok_or_else(|| OpenFHEError::Unknown(get_last_error()))
+    }
+    
+    /// Extract values from plaintext
+    pub fn to_vec(&self) -> Result<Vec<i64>> {
+        const MAX_SIZE: usize = 8192; // Reasonable maximum
+        let mut buffer = vec![0i64; MAX_SIZE];
+        let mut length = MAX_SIZE;
+        
+        let success = unsafe {
+            ffi::openfhe_get_plaintext_values(
+                self.ptr.as_ptr(),
+                buffer.as_mut_ptr(),
+                &mut length as *mut usize,
+            )
+        };
+        
+        if !success {
+            return Err(OpenFHEError::Unknown(get_last_error()));
+        }
+        
+        buffer.truncate(length);
+        Ok(buffer)
+    }
+    
+    /// Get raw pointer (for internal use)
+    pub(crate) fn as_ptr(&self) -> *mut ffi::OpenFHEPlaintext {
+        self.ptr.as_ptr()
+    }
+}
+
+impl Drop for Plaintext {
+    fn drop(&mut self) {
+        unsafe {
+            ffi::openfhe_destroy_plaintext(self.ptr.as_ptr());
+        }
+    }
+}
