@@ -282,3 +282,37 @@ impl Drop for Ciphertext {
         }
     }
 }
+
+// Tests
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_context_creation() {
+        let ctx = Context::new_bfv(65537, 2);
+        assert!(ctx.is_ok());
+    }
+    
+    #[test]
+    fn test_keypair_generation() {
+        let ctx = Context::new_bfv(65537, 2).unwrap();
+        let keypair = KeyPair::generate(&ctx);
+        assert!(keypair.is_ok());
+    }
+    
+    #[test]
+    fn test_encryption_decryption() {
+        let ctx = Context::new_bfv(65537, 2).unwrap();
+        let keypair = KeyPair::generate(&ctx).unwrap();
+        
+        let values = vec![1, 2, 3, 4, 5];
+        let plaintext = Plaintext::from_vec(&ctx, &values).unwrap();
+        
+        let ciphertext = Ciphertext::encrypt(&ctx, &keypair, &plaintext).unwrap();
+        let decrypted = ciphertext.decrypt(&ctx, &keypair).unwrap();
+        
+        let result = decrypted.to_vec().unwrap();
+        assert_eq!(&result[..5], &values[..]);
+    }
+}
