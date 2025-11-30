@@ -86,3 +86,34 @@ impl Drop for Context {
 // Context is thread-safe
 unsafe impl Send for Context {}
 unsafe impl Sync for Context {}
+
+// KeyPair (owns public and secret keys)
+pub struct KeyPair {
+    ptr: NonNull<ffi::OpenFHEKeyPair>,
+}
+
+impl KeyPair {
+    /// Generate a new key pair from context
+    pub fn generate(context: &Context) -> Result<Self> {
+        let ptr = unsafe {
+            ffi::openfhe_generate_keypair(context.as_ptr())
+        };
+        
+        NonNull::new(ptr)
+            .map(|ptr| KeyPair { ptr })
+            .ok_or_else(|| OpenFHEError::Unknown(get_last_error()))
+    }
+    
+    /// Get raw pointer (for internal use)
+    pub(crate) fn as_ptr(&self) -> *mut ffi::OpenFHEKeyPair {
+        self.ptr.as_ptr()
+    }
+}
+
+impl Drop for KeyPair {
+    fn drop(&mut self) {
+        unsafe {
+            ffi::openfhe_destroy_keypair(self.ptr.as_ptr());
+        }
+    }
+}
