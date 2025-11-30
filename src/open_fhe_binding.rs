@@ -26,9 +26,8 @@ pub struct OpenFHECiphertext {
 }
 
 // FFI Function Declarations
-// ============================================
 
-extern "C" {
+unsafe extern "C" {
     // Context management
     pub fn openfhe_create_bfv_context(
         plaintext_modulus: c_ulonglong,
@@ -75,21 +74,17 @@ extern "C" {
     pub fn openfhe_destroy_ciphertext(cipher: *mut OpenFHECiphertext);
     
     // Homomorphic operations
-    pub fn openfhe_add(
-        ctx: *mut OpenFHEContext,
+    pub fn openfhe_eval_add(
         a: *mut OpenFHECiphertext,
         b: *mut OpenFHECiphertext,
     ) -> *mut OpenFHECiphertext;
     
-    pub fn openfhe_multiply(
-        ctx: *mut OpenFHEContext,
-        keypair: *mut OpenFHEKeyPair,
+    pub fn openfhe_eval_mult(
         a: *mut OpenFHECiphertext,
         b: *mut OpenFHECiphertext,
     ) -> *mut OpenFHECiphertext;
     
-    pub fn openfhe_subtract(
-        ctx: *mut OpenFHEContext,
+    pub fn openfhe_eval_subtract(
         a: *mut OpenFHECiphertext,
         b: *mut OpenFHECiphertext,
     ) -> *mut OpenFHECiphertext;

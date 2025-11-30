@@ -5,6 +5,8 @@
 mod bindings; // imports the low-level FFI bindings (the C function definitions) that connect to C++ wrapper
 mod helib_bindings;     // HElib FFI bindings
 pub mod helib;          // HElib safe wrapper 
+mod open_fhe_binding;
+pub mod open_fhe_lib;
 
 use std::ffi::{CStr, CString}; // CStr and CString convert between Rust strings and C strings.
 use std::ptr::NonNull; // NonNull safely wraps raw pointers that should never be null.
@@ -417,4 +419,8 @@ pub fn multiply(context: &Context, a: &Ciphertext, b: &Ciphertext) -> Result<Cip
 pub use helib::{
     HEContext, HESecretKey, HEPublicKey, 
     HEPlaintext, HECiphertext
+};
+
+pub use open_fhe_lib::{
+    OpenFHEContext, OpenFHEKeyPair, OpenFHEPlaintext, OpenFHECiphertext
 };
