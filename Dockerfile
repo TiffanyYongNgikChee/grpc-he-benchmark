@@ -125,6 +125,11 @@ RUN echo "=== Installing OpenFHE ===" && \
     echo "OpenFHE installed successfully" && \
     cd /root && rm -rf openfhe-development
 
+# Verify library installations
+RUN echo "=== Verifying HE libraries ===" && \
+    ldconfig -p | grep -E "seal|helib|openfhe" && \
+    echo "Libraries verified successfully"
+
 # Set environment variables
 ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/helib_pack/lib:${LD_LIBRARY_PATH}
 ENV PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH}
@@ -169,5 +174,18 @@ RUN echo "=== Building OpenFHE wrapper ===" && \
     ls -lh libopenfhe_wrapper.so && \
     cp libopenfhe_wrapper.so /app/ && \
     echo "OpenFHE wrapper built successfully"
+
+# Build the Rust project
+RUN echo "=== Building Rust project ===" && \
+    cargo build --release && \
+    echo "Rust project built successfully"
+
+# Verify all shared libraries are accessible
+RUN echo "=== Verifying wrapper libraries ===" && \
+    ls -lh /app/*.so && \
+    ldd /app/libseal_wrapper.so && \
+    ldd /app/libhelib_wrapper.so && \
+    ldd /app/libopenfhe_wrapper.so && \
+    echo "All wrappers verified successfully"
 
 CMD ["/bin/bash"]

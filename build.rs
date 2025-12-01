@@ -49,7 +49,7 @@ fn main() {
         // HElib
         println!("cargo:rustc-link-search=native=/app/helib_wrapper/build");
         println!("cargo:rustc-link-lib=helib_wrapper");
-        println!("cargo:rustc-link-search=native=/usr/local/helib_pack/helib_pack/lib");
+        println!("cargo:rustc-link-search=native=/usr/local/helib_pack/lib");
         println!("cargo:rustc-link-search=native=/usr/local/lib");
         println!("cargo:rustc-link-lib=helib");
         println!("cargo:rustc-link-lib=ntl");
@@ -65,7 +65,7 @@ fn main() {
         println!("cargo:rustc-link-arg=-Wl,-rpath,/app/cpp_wrapper/build");
         println!("cargo:rustc-link-arg=-Wl,-rpath,/app/helib_wrapper/build");
         println!("cargo:rustc-link-arg=-Wl,-rpath,/usr/local/lib");
-        println!("cargo:rustc-link-arg=-Wl,-rpath,/usr/local/helib_pack/helib_pack/lib");
+        println!("cargo:rustc-link-arg=-Wl,-rpath,/usr/local/helib_pack/lib");
     }
     
     // ============================================
