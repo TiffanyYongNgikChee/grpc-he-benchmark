@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.13)
 project(helib_wrapper)
 
+# Set HElib installation path
+set(CMAKE_PREFIX_PATH "/usr/local/helib_pack/helib_pack" ${CMAKE_PREFIX_PATH})
+
 # Find HElib
 find_package(helib 2.2.0 REQUIRED)
 

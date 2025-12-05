@@ -215,6 +215,7 @@ extern "C" OpenFHECiphertext* openfhe_encrypt(
         // Allocate and return
         OpenFHECiphertext* cipher = new OpenFHECiphertext();
         cipher->ciphertext = ciphertext;
+        cipher->ctx = ctx;  // Store context reference
         
         set_error("");
         return cipher;
@@ -274,11 +275,13 @@ extern "C" OpenFHECiphertext* openfhe_eval_add(
     }
     
     try {
-        // Cast to ConstCiphertext for the API
-        auto result = ct1->ctx->cryptoContext->EvalAdd(
-            std::const_pointer_cast<const CiphertextImpl<DCRTPoly>>(ct1->ciphertext),
-            std::const_pointer_cast<const CiphertextImpl<DCRTPoly>>(ct2->ciphertext)
-        );
+        // Perform homomorphic addition
+        auto result = ct1->ctx->cryptoContext->EvalAdd(ct1->ciphertext, ct2->ciphertext);
+        
+        if (!result) {
+            set_error("EvalAdd returned null result");
+            return nullptr;
+        }
         
         auto* out = new OpenFHECiphertext();
         out->ciphertext = result;
@@ -303,10 +306,12 @@ extern "C" OpenFHECiphertext* openfhe_eval_mult(
     }
     
     try {
-        auto result = ct1->ctx->cryptoContext->EvalMult(
-            std::const_pointer_cast<const CiphertextImpl<DCRTPoly>>(ct1->ciphertext),
-            std::const_pointer_cast<const CiphertextImpl<DCRTPoly>>(ct2->ciphertext)
-        );
+        auto result = ct1->ctx->cryptoContext->EvalMult(ct1->ciphertext, ct2->ciphertext);
+        
+        if (!result) {
+            set_error("EvalMult returned null result");
+            return nullptr;
+        }
         
         auto* out = new OpenFHECiphertext();
         out->ciphertext = result;

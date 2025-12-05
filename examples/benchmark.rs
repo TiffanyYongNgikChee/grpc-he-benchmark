@@ -1,6 +1,6 @@
-//! Medical Data Encryption Comparison: SEAL vs HElib
+//! Medical Data Encryption Comparison: SEAL vs HElib vs OpenFHE
 //! 
-//! This example encrypts the same medical record using both frameworks
+//! This example encrypts the same medical record using all three frameworks
 //! and provides a detailed performance comparison.
 
 use he_benchmark::{
@@ -10,8 +10,11 @@ use he_benchmark::{
     BatchEncoder as SealBatchEncoder,
     HEContext,
     HESecretKey,
-    HEPublicKey,
     HEPlaintext,
+    OpenFHEContext,
+    OpenFHEKeyPair,
+    OpenFHEPlaintext,
+    OpenFHECiphertext,
 };
 
 use std::time::{Instant, Duration};
@@ -48,12 +51,13 @@ impl PhaseMetrics {
 }
 
 #[derive(Debug)]
-// ComparisonResult contains the performance metrics for BOTH
-// encryption frameworks, SEAL and HElib, as well as a description
+// ComparisonResult contains the performance metrics for ALL THREE
+// encryption frameworks, SEAL, HElib, and OpenFHE, as well as a description
 // of the test data used (e.g., "200-character medical record").
 struct ComparisonResult {
     seal: PhaseMetrics, // Timing results for the SEAL encryption run.
     helib: PhaseMetrics, // Timing results for the HElib encryption run.
+    openfhe: PhaseMetrics, // Timing results for the OpenFHE encryption run.
     data_description: String, // Human-readable description of the dataset (size, type, etc.).
 }
 
@@ -111,6 +115,7 @@ fn processing_step(label: &str, duration_ms: u64) {
 /// - elapsed time
 ///
 /// Used for longer multi-step operations.
+#[allow(dead_code)]
 fn print_progress(label: &str, current: usize, total: usize, elapsed: Duration) {
     let percentage = (current as f64 / total as f64 * 100.0) as usize;
     let bar_width = 50;
@@ -335,7 +340,7 @@ fn run_helib_encryption(medical_data: &[i64]) -> Result<PhaseMetrics, Box<dyn st
     let decrypt_start = Instant::now();
     
     processing_step("Decrypting result", 700);
-    let decrypted = secret_key.decrypt(&result_cipher)?;
+    let _decrypted = secret_key.decrypt(&result_cipher)?;
     
     metrics.decryption_time = decrypt_start.elapsed();
     println!("    Decryption complete: {:.2}s", metrics.decryption_time.as_secs_f64());
@@ -347,98 +352,211 @@ fn run_helib_encryption(medical_data: &[i64]) -> Result<PhaseMetrics, Box<dyn st
     Ok(metrics)
 }
 
+// OpenFHE Encryption Process
+// This function benchmarks a full encryption workflow using the OpenFHE backend.
+// It measures performance across setup, encoding, encryption, homomorphic
+// computation, and decryption, storing results in a PhaseMetrics structure.
+fn run_openfhe_encryption(medical_data: &[i64]) -> Result<PhaseMetrics, Box<dyn std::error::Error>> {
+    // Initialize metric tracker and start global runtime timer
+    let mut metrics = PhaseMetrics::new();
+    let total_start = Instant::now();
+    
+    print_section("🔶 OpenFHE Encryption Process");
+    
+    // Phase 1: Setup
+    // Initializes the OpenFHE cryptographic environment and generates keys.
+    println!("\n Phase 1: OpenFHE Setup & Key Generation");
+    let setup_start = Instant::now();
+    
+    // Create OpenFHE context with BFV scheme
+    processing_step("Creating OpenFHE context (BFV, plaintext_mod: 65537)", 700);
+    let context = OpenFHEContext::new_bfv(65537, 2)?;
+    
+    // Generate keypair (includes multiplication keys)
+    processing_step("Generating OpenFHE keypair", 900);
+    let keypair = OpenFHEKeyPair::generate(&context)?;
+    
+    metrics.setup_time = setup_start.elapsed();
+    println!("   Setup complete: {:.2}s", metrics.setup_time.as_secs_f64());
+    
+    // Phase 2: Encoding
+    // OpenFHE uses batch encoding similar to SEAL
+    println!("\n Phase 2: OpenFHE Data Encoding");
+    let encode_start = Instant::now();
+    
+    processing_step("Encoding medical data into plaintext", 400);
+    // Take first few values for demo (OpenFHE batches efficiently)
+    let sample_size = medical_data.len().min(8);
+    let plaintext1 = OpenFHEPlaintext::from_vec(&context, &medical_data[..sample_size])?;
+    
+    // Create a second plaintext with all 1s for the operation
+    processing_step("Encoding second value for operation", 300);
+    let ones = vec![1i64; sample_size];
+    let plaintext2 = OpenFHEPlaintext::from_vec(&context, &ones)?;
+    
+    metrics.encoding_time = encode_start.elapsed();
+    println!("   Encoding complete: {:.2}s", metrics.encoding_time.as_secs_f64());
+    
+    // Phase 3: Encryption
+    // Encrypt the encoded plaintexts
+    println!("\n Phase 3: OpenFHE Encryption");
+    let encrypt_start = Instant::now();
+    
+    // Encrypt original values
+    processing_step("Encrypting medical data", 800);
+    let ciphertext1 = OpenFHECiphertext::encrypt(&context, &keypair, &plaintext1)?;
+    
+    // Encrypt the vector of 1s
+    processing_step("Encrypting second value", 800);
+    let ciphertext2 = OpenFHECiphertext::encrypt(&context, &keypair, &plaintext2)?;
+    
+    metrics.encryption_time = encrypt_start.elapsed();
+    println!("    Encryption complete: {:.2}s", metrics.encryption_time.as_secs_f64());
+    
+    // Phase 4: Homomorphic Operation
+    // Performs homomorphic addition: ciphertext1 + ciphertext2
+    println!("\n Phase 4: OpenFHE Encrypted Operations");
+    let op_start = Instant::now();
+    
+    processing_step("Performing encrypted addition", 600);
+    let result_cipher = ciphertext1.add(&context, &ciphertext2)?;
+    
+    metrics.operation_time = op_start.elapsed();
+    println!("    Operation complete: {:.2}s", metrics.operation_time.as_secs_f64());
+    
+    // Phase 5: Decryption
+    // Decrypts the resulting ciphertext
+    println!("\n Phase 5: OpenFHE Decryption");
+    let decrypt_start = Instant::now();
+    
+    processing_step("Decrypting result", 700);
+    let decrypted = result_cipher.decrypt(&context, &keypair)?;
+    let result = decrypted.to_vec()?;
+    
+    metrics.decryption_time = decrypt_start.elapsed();
+    println!("    Decryption complete: {:.2}s", metrics.decryption_time.as_secs_f64());
+    
+    // Sanity check: print first few values
+    println!("   First values: {:?}", &result[..sample_size.min(5)]);
+    
+    // Record total runtime across all phases
+    metrics.total_time = total_start.elapsed();
+    
+    Ok(metrics)
+}
+
 // Comparison Display
 fn print_comparison(result: &ComparisonResult) {
     clear_screen();
     
-    print_header("PERFORMANCE COMPARISON: SEAL vs HElib");
+    print_header("PERFORMANCE COMPARISON: SEAL vs HElib vs OpenFHE");
     
     println!(" Test Data: {}\n", result.data_description);
     
     // Header
-    println!("┌─────────────────────────┬──────────────┬──────────────┬──────────────┐");
-    println!("│ Phase                   │ SEAL         │ HElib        │ Winner       │");
-    println!("├─────────────────────────┼──────────────┼──────────────┼──────────────┤");
+    println!("┌─────────────────────────┬──────────────┬──────────────┬──────────────┬──────────────┐");
+    println!("│ Phase                   │ SEAL         │ HElib        │ OpenFHE      │ Winner       │");
+    println!("├─────────────────────────┼──────────────┼──────────────┼──────────────┼──────────────┤");
     
     // Setup
-    print_comparison_row(
+    print_comparison_row_3way(
         "Setup & Keys",
         result.seal.setup_time,
         result.helib.setup_time,
+        result.openfhe.setup_time,
     );
     
     // Encoding
-    print_comparison_row(
+    print_comparison_row_3way(
         "Data Encoding",
         result.seal.encoding_time,
         result.helib.encoding_time,
+        result.openfhe.encoding_time,
     );
     
     // Encryption
-    print_comparison_row(
+    print_comparison_row_3way(
         "Encryption",
         result.seal.encryption_time,
         result.helib.encryption_time,
+        result.openfhe.encryption_time,
     );
     
     // Operations
-    print_comparison_row(
+    print_comparison_row_3way(
         "Encrypted Operations",
         result.seal.operation_time,
         result.helib.operation_time,
+        result.openfhe.operation_time,
     );
     
     // Decryption
-    print_comparison_row(
+    print_comparison_row_3way(
         "Decryption",
         result.seal.decryption_time,
         result.helib.decryption_time,
+        result.openfhe.decryption_time,
     );
     
-    println!("├─────────────────────────┼──────────────┼──────────────┼──────────────┤");
+    println!("├─────────────────────────┼──────────────┼──────────────┼──────────────┼──────────────┤");
     
     // Total
-    print_comparison_row(
+    print_comparison_row_3way(
         "TOTAL TIME",
         result.seal.total_time,
         result.helib.total_time,
+        result.openfhe.total_time,
     );
     
-    println!("└─────────────────────────┴──────────────┴──────────────┴──────────────┘");
+    println!("└─────────────────────────┴──────────────┴──────────────┴──────────────┴──────────────┘");
     
-    // Speedup calculation
-    let speedup = if result.seal.total_time < result.helib.total_time {
-        result.helib.total_time.as_secs_f64() / result.seal.total_time.as_secs_f64()
-    } else {
-        result.seal.total_time.as_secs_f64() / result.helib.total_time.as_secs_f64()
-    };
+    // Speedup calculation - find the fastest
+    let times = [
+        ("SEAL", result.seal.total_time.as_secs_f64()),
+        ("HElib", result.helib.total_time.as_secs_f64()),
+        ("OpenFHE", result.openfhe.total_time.as_secs_f64()),
+    ];
     
-    let faster = if result.seal.total_time < result.helib.total_time {
-        "SEAL"
-    } else {
-        "HElib"
-    };
+    let fastest = times.iter().min_by(|a, b| a.1.partial_cmp(&b.1).unwrap()).unwrap();
+    let slowest = times.iter().max_by(|a, b| a.1.partial_cmp(&b.1).unwrap()).unwrap();
+    let speedup = slowest.1 / fastest.1;
     
     println!("\n Summary:");
-    println!("   {} is {:.2}x faster overall", faster, speedup);
+    println!("   {} is the fastest ({:.2}x faster than {})", fastest.0, speedup, slowest.0);
+    println!("   SEAL: {:.2}s | HElib: {:.2}s | OpenFHE: {:.2}s", 
+             result.seal.total_time.as_secs_f64(),
+             result.helib.total_time.as_secs_f64(),
+             result.openfhe.total_time.as_secs_f64());
     println!();
 }
 
-fn print_comparison_row(phase: &str, seal_time: Duration, helib_time: Duration) {
+fn print_comparison_row_3way(phase: &str, seal_time: Duration, helib_time: Duration, openfhe_time: Duration) {
     let seal_ms = seal_time.as_millis();
     let helib_ms = helib_time.as_millis();
+    let openfhe_ms = openfhe_time.as_millis();
     
-    let winner = if seal_ms < helib_ms {
+    // Find the winner (minimum time)
+    let min_time = seal_ms.min(helib_ms).min(openfhe_ms);
+    
+    let winner = if seal_ms == min_time && helib_ms == min_time && openfhe_ms == min_time {
+        "3-way Tie"
+    } else if seal_ms == min_time && helib_ms == min_time {
+        "SEAL/HElib"
+    } else if seal_ms == min_time && openfhe_ms == min_time {
+        "SEAL/OpenFHE"
+    } else if helib_ms == min_time && openfhe_ms == min_time {
+        "HElib/OpenFHE"
+    } else if seal_ms == min_time {
         "SEAL ⚡"
-    } else if helib_ms < seal_ms {
+    } else if helib_ms == min_time {
         "HElib ⚡"
     } else {
-        "Tie"
+        "OpenFHE ⚡"
     };
     
     println!(
-        "│ {:23} │ {:>10}ms │ {:>10}ms │ {:12} │",
-        phase, seal_ms, helib_ms, winner
+        "│ {:23} │ {:>10}ms │ {:>10}ms │ {:>10}ms │ {:12} │",
+        phase, seal_ms, helib_ms, openfhe_ms, winner
     );
 }
 
@@ -451,8 +569,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Prints a formatted title/banner for the program
     print_header("MEDICAL DATA ENCRYPTION COMPARISON");
     
-    println!("This example encrypts the same medical record using both");
-    println!("SEAL and HElib frameworks, then compares their performance.\n");
+    println!("This example encrypts the same medical record using SEAL,");
+    println!("HElib, and OpenFHE frameworks, then compares their performance.\n");
 
     sleep(Duration::from_secs(2));
     
@@ -500,12 +618,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     sleep(Duration::from_secs(2));
     
+    // RUN OpenFHE ENCRYPTION
+    // Same process but using OpenFHE library
+    println!("\n{}", "=".repeat(70));
+    println!("🔶 Testing with OpenFHE Framework");
+    println!("{}", "=".repeat(70));
+    let openfhe_metrics = run_openfhe_encryption(&medical_data)?;
+    
+    sleep(Duration::from_secs(2));
+    
     // BUILD AND DISPLAY COMPARISON TABLE
     // Wraps the metrics into a shared structure, then formats them
     // for printing (e.g., encryption time, memory usage, ciphertext size).
     let comparison = ComparisonResult {
         seal: seal_metrics,
         helib: helib_metrics,
+        openfhe: openfhe_metrics,
         data_description: format!("{} character medical record", medical_data.len()),
     };
     
