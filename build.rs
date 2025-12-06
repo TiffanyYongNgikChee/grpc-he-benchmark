@@ -39,31 +39,27 @@ fn main() {
         // ============================================
         // Linux Configuration (Docker)
         // ============================================
-        // SEAL
-        println!("cargo:rustc-link-search=native=/app/cpp_wrapper/build");
+        // All wrapper libraries are in /app/lib
+        println!("cargo:rustc-link-search=native=/app/lib");
         println!("cargo:rustc-link-lib=seal_wrapper");
+        println!("cargo:rustc-link-lib=helib_wrapper");
+        println!("cargo:rustc-link-lib=openfhe_wrapper");
         
+        // System HE libraries
         println!("cargo:rustc-link-search=native=/usr/local/lib");
         println!("cargo:rustc-link-lib=seal-4.1");
-        
-        // HElib
-        println!("cargo:rustc-link-search=native=/app/helib_wrapper/build");
-        println!("cargo:rustc-link-lib=helib_wrapper");
-        println!("cargo:rustc-link-search=native=/usr/local/helib_pack/helib_pack/lib");
-        println!("cargo:rustc-link-search=native=/usr/local/lib");
-        println!("cargo:rustc-link-lib=helib");
-        println!("cargo:rustc-link-lib=ntl");
-        println!("cargo:rustc-link-lib=gmp");
-        // OpenFHE
-        println!("cargo:rustc-link-search=native=/app/openfhe_cpp_wrapper/build");
-        println!("cargo:rustc-link-lib=openfhe_wrapper");
         println!("cargo:rustc-link-lib=OPENFHEcore");
         println!("cargo:rustc-link-lib=OPENFHEpke");
         println!("cargo:rustc-link-lib=OPENFHEbinfhe");
         
-        // Runtime paths (rpath)
-        println!("cargo:rustc-link-arg=-Wl,-rpath,/app/cpp_wrapper/build");
-        println!("cargo:rustc-link-arg=-Wl,-rpath,/app/helib_wrapper/build");
+        // HElib libraries
+        println!("cargo:rustc-link-search=native=/usr/local/helib_pack/helib_pack/lib");
+        println!("cargo:rustc-link-lib=helib");
+        println!("cargo:rustc-link-lib=ntl");
+        println!("cargo:rustc-link-lib=gmp");
+        
+        // Runtime paths (rpath) - simplified for runtime image
+        println!("cargo:rustc-link-arg=-Wl,-rpath,/app/lib");
         println!("cargo:rustc-link-arg=-Wl,-rpath,/usr/local/lib");
         println!("cargo:rustc-link-arg=-Wl,-rpath,/usr/local/helib_pack/helib_pack/lib");
     }

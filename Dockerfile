@@ -1,4 +1,5 @@
-FROM ubuntu:22.04
+# STAGE 1: BUILD STAGE 
+FROM ubuntu:22.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -187,10 +188,13 @@ RUN mkdir -p /app/lib && \
 ENV LD_LIBRARY_PATH=/app/lib:/usr/local/lib:/usr/local/helib_pack/helib_pack/lib:${LD_LIBRARY_PATH}
 
 
-# Build the Rust project
-RUN echo "=== Building Rust project ===" && \
-    cargo build --release && \
-    echo "Rust project built successfully"
+# Build the Rust project (both examples)
+RUN echo "=== Building Rust examples ===" && \
+    cargo build --release --example benchmark && \
+    cargo build --release --example medical_data && \
+    echo "Rust examples built successfully" && \
+    ls -lh /app/target/release/examples/benchmark && \
+    ls -lh /app/target/release/examples/medical_data
 
 # Verify all shared libraries are accessible
 RUN echo "=== Verifying wrapper libraries ===" && \
@@ -200,4 +204,65 @@ RUN echo "=== Verifying wrapper libraries ===" && \
     ldd /app/libopenfhe_wrapper.so && \
     echo "All wrappers verified successfully"
 
-CMD ["/bin/bash"]
+# STAGE 2: RUNTIME - Minimal production image
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install ONLY runtime libraries (NOT build tools!)
+RUN apt-get update && apt-get install -y \
+    libgmp10 \
+    libgomp1 \
+    libstdc++6 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create necessary directories
+RUN mkdir -p /app/lib \
+             /usr/local/lib \
+             /usr/local/helib_pack/helib_pack/lib \
+             /usr/local/lib/OpenFHE
+
+# Copy ONLY compiled libraries from builder stage
+# NTL libraries (required by HElib)
+COPY --from=builder /usr/local/lib/libntl.so* /usr/local/lib/
+
+# HElib libraries and configuration files
+COPY --from=builder /usr/local/helib_pack/helib_pack/lib/libhelib.so* /usr/local/helib_pack/helib_pack/lib/
+COPY --from=builder /usr/local/helib_pack/helib_pack/share /usr/local/helib_pack/helib_pack/share
+
+# SEAL libraries
+COPY --from=builder /usr/local/lib/libseal-4.1.so* /usr/local/lib/
+
+# OpenFHE libraries
+COPY --from=builder /usr/local/lib/libOPENFHEcore.so* /usr/local/lib/
+COPY --from=builder /usr/local/lib/libOPENFHEpke.so* /usr/local/lib/
+COPY --from=builder /usr/local/lib/libOPENFHEbinfhe.so* /usr/local/lib/
+COPY --from=builder /usr/local/lib/OpenFHE /usr/local/lib/OpenFHE
+
+# Copy wrapper libraries
+COPY --from=builder /app/lib/libseal_wrapper.so /app/lib/
+COPY --from=builder /app/lib/libhelib_wrapper.so /app/lib/
+COPY --from=builder /app/lib/libopenfhe_wrapper.so* /app/lib/
+
+# Copy the compiled Rust binaries
+COPY --from=builder /app/target/release/examples/benchmark /app/benchmark
+COPY --from=builder /app/target/release/examples/medical_data /app/medical_data
+
+# Update library cache so the system can find all .so files
+RUN ldconfig
+
+# Set environment variables for runtime
+ENV LD_LIBRARY_PATH=/app/lib:/usr/local/lib:/usr/local/helib_pack/helib_pack/lib:${LD_LIBRARY_PATH}
+ENV RUST_BACKTRACE=1
+
+WORKDIR /app
+
+# Available binaries:
+# - ./benchmark       (3-way HE library comparison)
+# - ./medical_data    (SEAL medical record demo)
+# 
+# Usage:
+#   docker run --rm <image> ./benchmark
+#   docker run --rm <image> ./medical_data
+#   docker run -it --rm <image> /bin/bash
