@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package he_service;
+
+// Main service for Homomorphic Encryption operations
+service HEService {
+  // Generate encryption keys for a specific HE library
+  rpc GenerateKeys(GenerateKeysRequest) returns (GenerateKeysResponse);
+  
+  // Encrypt a list of integers
+  rpc Encrypt(EncryptRequest) returns (EncryptResponse);
+  
+  // Decrypt a ciphertext
+  rpc Decrypt(DecryptRequest) returns (DecryptResponse);
+  
+  // Add two encrypted numbers
+  rpc Add(BinaryOpRequest) returns (BinaryOpResponse);
+  
+  // Multiply two encrypted numbers
+  rpc Multiply(BinaryOpRequest) returns (BinaryOpResponse);
+  
+  // Run a benchmark comparison
+  rpc RunBenchmark(BenchmarkRequest) returns (BenchmarkResponse);
+}
+
+// Request to generate keys
+message GenerateKeysRequest {
+  string library = 1;  // "SEAL", "HELib", or "OpenFHE"
+  int32 poly_modulus_degree = 2;  // Security parameter (e.g., 8192)
+}
+
+// Response with session ID and public key
+message GenerateKeysResponse {
+  string session_id = 1;  // Unique session identifier
+  bytes public_key = 2;   // Serialized public key
+  string status = 3;      // "success" or error message
+}
+
+// Request to encrypt data
+message EncryptRequest {
+  string session_id = 1;      // Session from GenerateKeys
+  repeated int64 values = 2;  // Values to encrypt
+}
+
+// Response with encrypted data
+message EncryptResponse {
+  bytes ciphertext = 1;  // Serialized ciphertext
+  string status = 2;
+}
+
+// Request to decrypt data
+message DecryptRequest {
+  string session_id = 1;  // Session ID
+  bytes ciphertext = 2;   // Ciphertext to decrypt
+}
+
+// Response with decrypted data
+message DecryptResponse {
+  repeated int64 values = 1;  // Decrypted values
+  string status = 2;
+}
+
+// Request for binary operations (add/multiply)
+message BinaryOpRequest {
+  string session_id = 1;
+  bytes ciphertext1 = 2;
+  bytes ciphertext2 = 3;
+}
+
+// Response for binary operations
+message BinaryOpResponse {
+  bytes result_ciphertext = 1;
+  string status = 2;
+}
+
+// Request to run benchmark
+message BenchmarkRequest {
+  string library = 1;          // Which library to benchmark
+  int32 num_operations = 2;    // Number of operations to run
+}
+
+// Benchmark results
+message BenchmarkResponse {
+  double key_gen_time_ms = 1;
+  double encryption_time_ms = 2;
+  double addition_time_ms = 3;
+  double multiplication_time_ms = 4;
+  double decryption_time_ms = 5;
+  string status = 6;
+}
