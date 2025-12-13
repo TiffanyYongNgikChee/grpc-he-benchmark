@@ -190,8 +190,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("╔════════════════════════════════════════════╗");
     println!("║   HE gRPC Server Starting...              ║");
     println!("╚════════════════════════════════════════════╝");
-    println!("🚀 Listening on: {}", addr);
-    println!("📡 Ready to accept gRPC connections");
+    println!(" Listening on: {}", addr);
+    println!(" Ready to accept gRPC connections");
     println!();
     println!("Available services:");
     println!("  - GenerateKeys");
