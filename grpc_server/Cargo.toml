@@ -1,0 +1,21 @@
+[package]
+name = "he-grpc-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# gRPC dependencies
+tonic = "0.11"
+prost = "0.12"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
+
+# Utilities
+uuid = { version = "1.0", features = ["v4"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# This gives access to SEAL, HELib, and OpenFHE wrappers
+he_benchmark = { path = ".." }
+
+[build-dependencies]
+tonic-build = "0.11"
