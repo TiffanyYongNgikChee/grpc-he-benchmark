@@ -132,8 +132,8 @@ RUN echo "=== Verifying HE libraries ===" && \
     echo "Libraries verified successfully"
 
 # Set environment variables
-ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/helib_pack/helib_pack/lib:${LD_LIBRARY_PATH}
-ENV PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH}
+ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/helib_pack/helib_pack/lib
+ENV PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
 ENV RUST_BACKTRACE=1
 
 WORKDIR /app
@@ -266,7 +266,7 @@ COPY --from=builder /app/grpc_server/target/release/he-grpc-server /app/he-grpc-
 RUN ldconfig
 
 # Set environment variables for runtime
-ENV LD_LIBRARY_PATH=/app/lib:/usr/local/lib:/usr/local/helib_pack/helib_pack/lib:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH=/app/lib:/usr/local/lib:/usr/local/helib_pack/helib_pack/lib
 ENV RUST_BACKTRACE=1
 
 WORKDIR /app
