@@ -19,8 +19,11 @@ service HEService {
   // Multiply two encrypted numbers
   rpc Multiply(BinaryOpRequest) returns (BinaryOpResponse);
   
-  // Run a benchmark comparison
+  // Run a benchmark for a single library
   rpc RunBenchmark(BenchmarkRequest) returns (BenchmarkResponse);
+  
+  // Run comparison benchmark for all three libraries
+  rpc RunComparisonBenchmark(BenchmarkRequest) returns (ComparisonBenchmarkResponse);
 }
 
 // Request to generate keys
@@ -75,11 +78,11 @@ message BinaryOpResponse {
 
 // Request to run benchmark
 message BenchmarkRequest {
-  string library = 1;          // Which library to benchmark
+  string library = 1;          // Which library to benchmark: "SEAL", "HELib", "OpenFHE", or "ALL"
   int32 num_operations = 2;    // Number of operations to run
 }
 
-// Benchmark results
+// Benchmark results for a single library
 message BenchmarkResponse {
   double key_gen_time_ms = 1;
   double encryption_time_ms = 2;
@@ -87,4 +90,15 @@ message BenchmarkResponse {
   double multiplication_time_ms = 4;
   double decryption_time_ms = 5;
   string status = 6;
+  double total_time_ms = 7;           // Total benchmark time
+  double encoding_time_ms = 8;        // Time spent encoding data
+}
+
+// Comparison benchmark results (all libraries)
+message ComparisonBenchmarkResponse {
+  BenchmarkResponse seal = 1;
+  BenchmarkResponse helib = 2;
+  BenchmarkResponse openfhe = 3;
+  string fastest_library = 4;         // Which library was fastest overall
+  string recommendation = 5;          // Usage recommendation based on results
 }

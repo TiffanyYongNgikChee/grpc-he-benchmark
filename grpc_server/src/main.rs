@@ -218,6 +218,7 @@ fn run_seal_benchmark(poly_modulus_degree: u64, num_operations: i32) -> Benchmar
         multiply as seal_multiply,
     };
 
+    let total_start = Instant::now();
     let plain_modulus = 1032193u64;
     
     let key_start = Instant::now();
@@ -227,6 +228,7 @@ fn run_seal_benchmark(poly_modulus_degree: u64, num_operations: i32) -> Benchmar
             key_gen_time_ms: 0.0, encryption_time_ms: 0.0, addition_time_ms: 0.0,
             multiplication_time_ms: 0.0, decryption_time_ms: 0.0,
             status: format!("Failed to create context: {}", e),
+            total_time_ms: 0.0, encoding_time_ms: 0.0,
         },
     };
     
@@ -236,6 +238,7 @@ fn run_seal_benchmark(poly_modulus_degree: u64, num_operations: i32) -> Benchmar
             key_gen_time_ms: 0.0, encryption_time_ms: 0.0, addition_time_ms: 0.0,
             multiplication_time_ms: 0.0, decryption_time_ms: 0.0,
             status: format!("Failed to create encoder: {}", e),
+            total_time_ms: 0.0, encoding_time_ms: 0.0,
         },
     };
     
@@ -245,6 +248,7 @@ fn run_seal_benchmark(poly_modulus_degree: u64, num_operations: i32) -> Benchmar
             key_gen_time_ms: 0.0, encryption_time_ms: 0.0, addition_time_ms: 0.0,
             multiplication_time_ms: 0.0, decryption_time_ms: 0.0,
             status: format!("Failed to create encryptor: {}", e),
+            total_time_ms: 0.0, encoding_time_ms: 0.0,
         },
     };
     
@@ -254,6 +258,7 @@ fn run_seal_benchmark(poly_modulus_degree: u64, num_operations: i32) -> Benchmar
             key_gen_time_ms: 0.0, encryption_time_ms: 0.0, addition_time_ms: 0.0,
             multiplication_time_ms: 0.0, decryption_time_ms: 0.0,
             status: format!("Failed to create decryptor: {}", e),
+            total_time_ms: 0.0, encoding_time_ms: 0.0,
         },
     };
     let key_gen_time = key_start.elapsed();
@@ -261,11 +266,20 @@ fn run_seal_benchmark(poly_modulus_degree: u64, num_operations: i32) -> Benchmar
     let slot_count = encoder.slot_count();
     let test_data: Vec<i64> = (0..slot_count as i64).collect();
     
-    let encrypt_start = Instant::now();
-    let mut ciphertexts = Vec::new();
+    // Encoding phase
+    let encode_start = Instant::now();
+    let mut plaintexts = Vec::new();
     for _ in 0..num_operations {
         let plain = encoder.encode(&test_data).unwrap();
-        let cipher = encryptor.encrypt(&plain).unwrap();
+        plaintexts.push(plain);
+    }
+    let encoding_time = encode_start.elapsed();
+    
+    // Encryption phase
+    let encrypt_start = Instant::now();
+    let mut ciphertexts = Vec::new();
+    for plain in &plaintexts {
+        let cipher = encryptor.encrypt(plain).unwrap();
         ciphertexts.push(cipher);
     }
     let encryption_time = encrypt_start.elapsed();
@@ -288,12 +302,16 @@ fn run_seal_benchmark(poly_modulus_degree: u64, num_operations: i32) -> Benchmar
     }
     let decryption_time = decrypt_start.elapsed();
     
+    let total_time = total_start.elapsed();
+
     BenchmarkResponse {
         key_gen_time_ms: key_gen_time.as_secs_f64() * 1000.0,
+        encoding_time_ms: encoding_time.as_secs_f64() * 1000.0 / num_operations as f64,
         encryption_time_ms: encryption_time.as_secs_f64() * 1000.0 / num_operations as f64,
         addition_time_ms: addition_time.as_secs_f64() * 1000.0 / (num_operations - 1).max(1) as f64,
         multiplication_time_ms: multiplication_time.as_secs_f64() * 1000.0 / (num_operations - 1).max(1) as f64,
         decryption_time_ms: decryption_time.as_secs_f64() * 1000.0 / num_operations as f64,
+        total_time_ms: total_time.as_secs_f64() * 1000.0,
         status: format!("SEAL benchmark complete: {} operations", num_operations),
     }
 }
@@ -403,6 +421,8 @@ fn run_helib_multiply(val1: i64, val2: i64) -> Result<Vec<i64>, String> {
 fn run_helib_benchmark(num_operations: i32) -> BenchmarkResponse {
     use he_benchmark::{HEContext, HESecretKey, HEPlaintext};
     
+    let total_start = Instant::now();
+    
     let key_start = Instant::now();
     let context = match HEContext::new(HELIB_M, HELIB_P, HELIB_R) {
         Ok(ctx) => ctx,
@@ -410,6 +430,7 @@ fn run_helib_benchmark(num_operations: i32) -> BenchmarkResponse {
             key_gen_time_ms: 0.0, encryption_time_ms: 0.0, addition_time_ms: 0.0,
             multiplication_time_ms: 0.0, decryption_time_ms: 0.0,
             status: format!("HELib context failed: {}", e),
+            total_time_ms: 0.0, encoding_time_ms: 0.0,
         },
     };
     
@@ -419,6 +440,7 @@ fn run_helib_benchmark(num_operations: i32) -> BenchmarkResponse {
             key_gen_time_ms: 0.0, encryption_time_ms: 0.0, addition_time_ms: 0.0,
             multiplication_time_ms: 0.0, decryption_time_ms: 0.0,
             status: format!("HELib key gen failed: {}", e),
+            total_time_ms: 0.0, encoding_time_ms: 0.0,
         },
     };
     
@@ -428,18 +450,26 @@ fn run_helib_benchmark(num_operations: i32) -> BenchmarkResponse {
             key_gen_time_ms: 0.0, encryption_time_ms: 0.0, addition_time_ms: 0.0,
             multiplication_time_ms: 0.0, decryption_time_ms: 0.0,
             status: format!("HELib public key failed: {}", e),
+            total_time_ms: 0.0, encoding_time_ms: 0.0,
         },
     };
     let key_gen_time = key_start.elapsed();
     
+    // Encoding phase (HELib encoding is simpler - just create plaintexts)
+    let encode_start = Instant::now();
+    let mut plaintexts = Vec::new();
+    for i in 0..num_operations {
+        if let Ok(pt) = HEPlaintext::new(&context, i as i64) {
+            plaintexts.push(pt);
+        }
+    }
+    let encoding_time = encode_start.elapsed();
+    
+    // Encryption phase
     let encrypt_start = Instant::now();
     let mut ciphertexts = Vec::new();
-    for i in 0..num_operations {
-        let pt = match HEPlaintext::new(&context, i as i64) {
-            Ok(p) => p,
-            Err(_) => continue,
-        };
-        if let Ok(ct) = public_key.encrypt(&pt) {
+    for pt in &plaintexts {
+        if let Ok(ct) = public_key.encrypt(pt) {
             ciphertexts.push(ct);
         }
     }
@@ -463,12 +493,16 @@ fn run_helib_benchmark(num_operations: i32) -> BenchmarkResponse {
     }
     let decryption_time = decrypt_start.elapsed();
     
+    let total_time = total_start.elapsed();
+    
     BenchmarkResponse {
         key_gen_time_ms: key_gen_time.as_secs_f64() * 1000.0,
+        encoding_time_ms: encoding_time.as_secs_f64() * 1000.0 / num_operations as f64,
         encryption_time_ms: encryption_time.as_secs_f64() * 1000.0 / num_operations as f64,
         addition_time_ms: addition_time.as_secs_f64() * 1000.0 / (num_operations - 1).max(1) as f64,
         multiplication_time_ms: multiplication_time.as_secs_f64() * 1000.0 / (num_operations - 1).max(1) as f64,
         decryption_time_ms: decryption_time.as_secs_f64() * 1000.0 / num_operations as f64,
+        total_time_ms: total_time.as_secs_f64() * 1000.0,
         status: format!("HELib benchmark complete: {} operations", num_operations),
     }
 }
@@ -579,6 +613,8 @@ fn run_openfhe_multiply(values1: &[i64], values2: &[i64]) -> Result<Vec<i64>, St
 fn run_openfhe_benchmark(num_operations: i32) -> BenchmarkResponse {
     use he_benchmark::{OpenFHEContext, OpenFHEKeyPair, OpenFHEPlaintext, OpenFHECiphertext};
     
+    let total_start = Instant::now();
+    
     // Key generation timing
     let key_start = Instant::now();
     let context = match OpenFHEContext::new_bfv(OPENFHE_PLAINTEXT_MOD, OPENFHE_MULT_DEPTH) {
@@ -587,6 +623,7 @@ fn run_openfhe_benchmark(num_operations: i32) -> BenchmarkResponse {
             key_gen_time_ms: 0.0, encryption_time_ms: 0.0, addition_time_ms: 0.0,
             multiplication_time_ms: 0.0, decryption_time_ms: 0.0,
             status: format!("OpenFHE context failed: {}", e),
+            total_time_ms: 0.0, encoding_time_ms: 0.0,
         },
     };
     
@@ -596,6 +633,7 @@ fn run_openfhe_benchmark(num_operations: i32) -> BenchmarkResponse {
             key_gen_time_ms: 0.0, encryption_time_ms: 0.0, addition_time_ms: 0.0,
             multiplication_time_ms: 0.0, decryption_time_ms: 0.0,
             status: format!("OpenFHE keypair failed: {}", e),
+            total_time_ms: 0.0, encoding_time_ms: 0.0,
         },
     };
     let key_gen_time = key_start.elapsed();
@@ -603,15 +641,21 @@ fn run_openfhe_benchmark(num_operations: i32) -> BenchmarkResponse {
     // Test data
     let test_data: Vec<i64> = (0..64).collect();
     
+    // Encoding timing
+    let encode_start = Instant::now();
+    let mut plaintexts = Vec::new();
+    for _ in 0..num_operations {
+        if let Ok(pt) = OpenFHEPlaintext::from_vec(&context, &test_data) {
+            plaintexts.push(pt);
+        }
+    }
+    let encoding_time = encode_start.elapsed();
+    
     // Encryption timing
     let encrypt_start = Instant::now();
     let mut ciphertexts = Vec::new();
-    for _ in 0..num_operations {
-        let pt = match OpenFHEPlaintext::from_vec(&context, &test_data) {
-            Ok(p) => p,
-            Err(_) => continue,
-        };
-        if let Ok(ct) = OpenFHECiphertext::encrypt(&context, &keypair, &pt) {
+    for pt in &plaintexts {
+        if let Ok(ct) = OpenFHECiphertext::encrypt(&context, &keypair, pt) {
             ciphertexts.push(ct);
         }
     }
@@ -638,12 +682,16 @@ fn run_openfhe_benchmark(num_operations: i32) -> BenchmarkResponse {
     }
     let decryption_time = decrypt_start.elapsed();
     
+    let total_time = total_start.elapsed();
+
     BenchmarkResponse {
         key_gen_time_ms: key_gen_time.as_secs_f64() * 1000.0,
+        encoding_time_ms: encoding_time.as_secs_f64() * 1000.0 / num_operations as f64,
         encryption_time_ms: encryption_time.as_secs_f64() * 1000.0 / num_operations as f64,
         addition_time_ms: addition_time.as_secs_f64() * 1000.0 / (num_operations - 1).max(1) as f64,
         multiplication_time_ms: multiplication_time.as_secs_f64() * 1000.0 / (num_operations - 1).max(1) as f64,
         decryption_time_ms: decryption_time.as_secs_f64() * 1000.0 / num_operations as f64,
+        total_time_ms: total_time.as_secs_f64() * 1000.0,
         status: format!("OpenFHE benchmark complete: {} operations", num_operations),
     }
 }
@@ -931,6 +979,69 @@ impl HeService for HEServiceImpl {
         
         Ok(Response::new(response))
     }
+
+    async fn run_comparison_benchmark(
+        &self,
+        request: Request<BenchmarkRequest>,
+    ) -> Result<Response<ComparisonBenchmarkResponse>, Status> {
+        let req = request.into_inner();
+        let num_ops = req.num_operations;
+        
+        println!("📥 Comparison benchmark request ({} ops per library)", num_ops);
+        println!("   Running SEAL benchmark...");
+        
+        // Run all three benchmarks
+        let seal_ops = num_ops;
+        let seal_result = tokio::task::spawn_blocking(move || {
+            run_seal_benchmark(8192, seal_ops)
+        }).await.map_err(|e| Status::internal(format!("SEAL benchmark failed: {}", e)))?;
+        
+        println!("   Running HELib benchmark...");
+        let helib_ops = num_ops;
+        let helib_result = tokio::task::spawn_blocking(move || {
+            run_helib_benchmark(helib_ops)
+        }).await.map_err(|e| Status::internal(format!("HELib benchmark failed: {}", e)))?;
+        
+        println!("   Running OpenFHE benchmark...");
+        let openfhe_ops = num_ops;
+        let openfhe_result = tokio::task::spawn_blocking(move || {
+            run_openfhe_benchmark(openfhe_ops)
+        }).await.map_err(|e| Status::internal(format!("OpenFHE benchmark failed: {}", e)))?;
+        
+        // Determine fastest library based on total time
+        let seal_total = seal_result.total_time_ms;
+        let helib_total = helib_result.total_time_ms;
+        let openfhe_total = openfhe_result.total_time_ms;
+        
+        let fastest_library = if seal_total <= helib_total && seal_total <= openfhe_total {
+            "SEAL".to_string()
+        } else if helib_total <= seal_total && helib_total <= openfhe_total {
+            "HELib".to_string()
+        } else {
+            "OpenFHE".to_string()
+        };
+        
+        // Generate recommendation
+        let recommendation = if seal_result.encryption_time_ms < helib_result.encryption_time_ms 
+            && seal_result.encryption_time_ms < openfhe_result.encryption_time_ms {
+            "SEAL recommended for encryption-heavy workloads (batching support)".to_string()
+        } else if helib_result.multiplication_time_ms < seal_result.multiplication_time_ms 
+            && helib_result.multiplication_time_ms < openfhe_result.multiplication_time_ms {
+            "HELib recommended for multiplication-heavy workloads (BGV optimizations)".to_string()
+        } else {
+            "OpenFHE recommended for general-purpose HE (flexible API)".to_string()
+        };
+        
+        println!("   ✓ Comparison complete - Fastest: {}", fastest_library);
+        
+        Ok(Response::new(ComparisonBenchmarkResponse {
+            seal: Some(seal_result),
+            helib: Some(helib_result),
+            openfhe: Some(openfhe_result),
+            fastest_library,
+            recommendation,
+        }))
+    }
 }
 
 #[tokio::main]
@@ -939,19 +1050,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let service = HEServiceImpl::new();
 
     println!("╔════════════════════════════════════════════════════════════╗");
-    println!("║   🔐 Homomorphic Encryption gRPC Server                    ║");
+    println!("║      Homomorphic Encryption gRPC Server                    ║");
     println!("╚════════════════════════════════════════════════════════════╝");
     println!();
-    println!("  📍 Listening on: {}", addr);
-    println!("  🔧 Libraries: Microsoft SEAL (BFV), HELib (BGV), OpenFHE (BFV)");
+    println!("   Listening on: {}", addr);
+    println!("   Libraries: Microsoft SEAL (BFV), HELib (BGV), OpenFHE (BFV)");
     println!();
     println!("  Available services:");
-    println!("    • GenerateKeys  - Create encryption context and keys");
-    println!("    • Encrypt       - Encrypt integer vectors");
-    println!("    • Decrypt       - Decrypt ciphertext");
-    println!("    • Add           - Homomorphic addition");
-    println!("    • Multiply      - Homomorphic multiplication");
-    println!("    • RunBenchmark  - Performance benchmarking");
+    println!("    • GenerateKeys           - Create encryption context and keys");
+    println!("    • Encrypt                - Encrypt integer vectors");
+    println!("    • Decrypt                - Decrypt ciphertext");
+    println!("    • Add                    - Homomorphic addition");
+    println!("    • Multiply               - Homomorphic multiplication");
+    println!("    • RunBenchmark           - Benchmark single library");
+    println!("    • RunComparisonBenchmark - Compare all three libraries");
     println!();
     println!("  Ready to accept connections! 🚀");
     println!();

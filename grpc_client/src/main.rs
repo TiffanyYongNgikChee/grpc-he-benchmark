@@ -32,9 +32,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     test_seal(&mut client).await?;
     test_helib(&mut client).await?;
     test_openfhe(&mut client).await?;
+    
+    // Test comparison benchmark
+    test_comparison_benchmark(&mut client).await?;
 
     println!("\n╔═══════════════════════════════════════════════════════════════╗");
-    println!("║   ✅ ALL TESTS PASSED - All three libraries working!         ║");
+    println!("║       ALL TESTS PASSED - All three libraries working!         ║");
     println!("╚═══════════════════════════════════════════════════════════════╝\n");
 
     Ok(())
@@ -42,11 +45,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn test_seal(client: &mut HeServiceClient<tonic::transport::Channel>) -> Result<(), Box<dyn std::error::Error>> {
     println!("╔═══════════════════════════════════════════════════════════════╗");
-    println!("║   🔷 Testing SEAL Library (Microsoft SEAL - BFV Scheme)      ║");
+    println!("║       Testing SEAL Library (Microsoft SEAL - BFV Scheme)      ║");
     println!("╚═══════════════════════════════════════════════════════════════╝\n");
 
     // 1. Generate Keys
-    println!("📝 Test 1: Generating SEAL keys (poly_modulus_degree=8192)...");
+    println!(" Test 1: Generating SEAL keys (poly_modulus_degree=8192)...");
     let request = Request::new(GenerateKeysRequest {
         library: "SEAL".to_string(),
         poly_modulus_degree: 8192,
@@ -58,7 +61,7 @@ async fn test_seal(client: &mut HeServiceClient<tonic::transport::Channel>) -> R
     println!("   ✓ Status: {}\n", keys_response.status);
 
     // 2. Encrypt
-    println!("📝 Test 2: Encrypting vector [10, 20, 30, 40, 50]...");
+    println!(" Test 2: Encrypting vector [10, 20, 30, 40, 50]...");
     let request = Request::new(EncryptRequest {
         session_id: session_id.clone(),
         values: vec![10, 20, 30, 40, 50],
@@ -69,7 +72,7 @@ async fn test_seal(client: &mut HeServiceClient<tonic::transport::Channel>) -> R
     println!("   ✓ Status: {}\n", encrypt_response.status);
 
     // 3. Decrypt
-    println!("📝 Test 3: Decrypting ciphertext...");
+    println!(" Test 3: Decrypting ciphertext...");
     let request = Request::new(DecryptRequest {
         session_id: session_id.clone(),
         ciphertext: vec![],
@@ -80,7 +83,7 @@ async fn test_seal(client: &mut HeServiceClient<tonic::transport::Channel>) -> R
     println!("   ✓ Status: {}\n", decrypt_response.status);
 
     // 4. Addition
-    println!("📝 Test 4: Homomorphic addition...");
+    println!(" Test 4: Homomorphic addition...");
     let request = Request::new(BinaryOpRequest {
         session_id: session_id.clone(),
         ciphertext1: vec![],
@@ -91,7 +94,7 @@ async fn test_seal(client: &mut HeServiceClient<tonic::transport::Channel>) -> R
     println!("   ✓ Status: {}\n", add_response.status);
 
     // 5. Multiplication
-    println!("📝 Test 5: Homomorphic multiplication...");
+    println!(" Test 5: Homomorphic multiplication...");
     let request = Request::new(BinaryOpRequest {
         session_id: session_id.clone(),
         ciphertext1: vec![],
@@ -102,14 +105,14 @@ async fn test_seal(client: &mut HeServiceClient<tonic::transport::Channel>) -> R
     println!("   ✓ Status: {}\n", multiply_response.status);
 
     // 6. Benchmark
-    println!("📝 Test 6: Running SEAL benchmark (50 operations)...");
+    println!(" Test 6: Running SEAL benchmark (50 operations)...");
     let request = Request::new(BenchmarkRequest {
         library: "SEAL".to_string(),
         num_operations: 50,
     });
     let response = client.run_benchmark(request).await?;
     let benchmark = response.into_inner();
-    println!("   📊 Benchmark Results:");
+    println!("      Benchmark Results:");
     println!("      • Key Generation:  {:.2} ms", benchmark.key_gen_time_ms);
     println!("      • Encryption:      {:.2} ms/op", benchmark.encryption_time_ms);
     println!("      • Addition:        {:.2} ms/op", benchmark.addition_time_ms);
@@ -117,17 +120,17 @@ async fn test_seal(client: &mut HeServiceClient<tonic::transport::Channel>) -> R
     println!("      • Decryption:      {:.2} ms/op", benchmark.decryption_time_ms);
     println!("   ✓ {}\n", benchmark.status);
 
-    println!("✅ SEAL tests completed successfully!\n");
+    println!(".  SEAL tests completed successfully!\n");
     Ok(())
 }
 
 async fn test_helib(client: &mut HeServiceClient<tonic::transport::Channel>) -> Result<(), Box<dyn std::error::Error>> {
     println!("╔═══════════════════════════════════════════════════════════════╗");
-    println!("║   🔶 Testing HELib Library (IBM HELib - BGV Scheme)          ║");
+    println!("║       Testing HELib Library (IBM HELib - BGV Scheme)          ║");
     println!("╚═══════════════════════════════════════════════════════════════╝\n");
 
     // 1. Generate Keys
-    println!("📝 Test 1: Generating HELib keys (m=4095, p=2, r=1)...");
+    println!("   Test 1: Generating HELib keys (m=4095, p=2, r=1)...");
     let request = Request::new(GenerateKeysRequest {
         library: "HELib".to_string(),
         poly_modulus_degree: 4096,
@@ -139,7 +142,7 @@ async fn test_helib(client: &mut HeServiceClient<tonic::transport::Channel>) -> 
     println!("   ✓ Status: {}\n", keys_response.status);
 
     // 2. Encrypt
-    println!("📝 Test 2: Encrypting value [42] (HELib uses single values)...");
+    println!("   Test 2: Encrypting value [42] (HELib uses single values)...");
     let request = Request::new(EncryptRequest {
         session_id: session_id.clone(),
         values: vec![42],
@@ -150,7 +153,7 @@ async fn test_helib(client: &mut HeServiceClient<tonic::transport::Channel>) -> 
     println!("   ✓ Status: {}\n", encrypt_response.status);
 
     // 3. Decrypt
-    println!("📝 Test 3: Decrypting ciphertext...");
+    println!("   Test 3: Decrypting ciphertext...");
     let request = Request::new(DecryptRequest {
         session_id: session_id.clone(),
         ciphertext: vec![],
@@ -161,7 +164,7 @@ async fn test_helib(client: &mut HeServiceClient<tonic::transport::Channel>) -> 
     println!("   ✓ Status: {}\n", decrypt_response.status);
 
     // 4. Addition
-    println!("📝 Test 4: Homomorphic addition...");
+    println!("  Test 4: Homomorphic addition...");
     let request = Request::new(BinaryOpRequest {
         session_id: session_id.clone(),
         ciphertext1: vec![],
@@ -172,7 +175,7 @@ async fn test_helib(client: &mut HeServiceClient<tonic::transport::Channel>) -> 
     println!("   ✓ Status: {}\n", add_response.status);
 
     // 5. Multiplication
-    println!("📝 Test 5: Homomorphic multiplication...");
+    println!("   Test 5: Homomorphic multiplication...");
     let request = Request::new(BinaryOpRequest {
         session_id: session_id.clone(),
         ciphertext1: vec![],
@@ -183,14 +186,14 @@ async fn test_helib(client: &mut HeServiceClient<tonic::transport::Channel>) -> 
     println!("   ✓ Status: {}\n", multiply_response.status);
 
     // 6. Benchmark
-    println!("📝 Test 6: Running HELib benchmark (50 operations)...");
+    println!("   Test 6: Running HELib benchmark (50 operations)...");
     let request = Request::new(BenchmarkRequest {
         library: "HELib".to_string(),
         num_operations: 50,
     });
     let response = client.run_benchmark(request).await?;
     let benchmark = response.into_inner();
-    println!("   📊 Benchmark Results:");
+    println!("      Benchmark Results:");
     println!("      • Key Generation:  {:.2} ms", benchmark.key_gen_time_ms);
     println!("      • Encryption:      {:.2} ms/op", benchmark.encryption_time_ms);
     println!("      • Addition:        {:.2} ms/op", benchmark.addition_time_ms);
@@ -198,17 +201,17 @@ async fn test_helib(client: &mut HeServiceClient<tonic::transport::Channel>) -> 
     println!("      • Decryption:      {:.2} ms/op", benchmark.decryption_time_ms);
     println!("   ✓ {}\n", benchmark.status);
 
-    println!("✅ HELib tests completed successfully!\n");
+    println!("   HELib tests completed successfully!\n");
     Ok(())
 }
 
 async fn test_openfhe(client: &mut HeServiceClient<tonic::transport::Channel>) -> Result<(), Box<dyn std::error::Error>> {
     println!("╔═══════════════════════════════════════════════════════════════╗");
-    println!("║   🔷 Testing OpenFHE Library (OpenFHE - BFV Scheme)          ║");
+    println!("║       Testing OpenFHE Library (OpenFHE - BFV Scheme)          ║");
     println!("╚═══════════════════════════════════════════════════════════════╝\n");
 
     // 1. Generate Keys
-    println!("📝 Test 1: Generating OpenFHE keys (plaintext_mod=65537)...");
+    println!("  Test 1: Generating OpenFHE keys (plaintext_mod=65537)...");
     let request = Request::new(GenerateKeysRequest {
         library: "OpenFHE".to_string(),
         poly_modulus_degree: 4096,
@@ -220,7 +223,7 @@ async fn test_openfhe(client: &mut HeServiceClient<tonic::transport::Channel>) -
     println!("   ✓ Status: {}\n", keys_response.status);
 
     // 2. Encrypt
-    println!("📝 Test 2: Encrypting vector [100, 200, 300, 400]...");
+    println!("   Test 2: Encrypting vector [100, 200, 300, 400]...");
     let request = Request::new(EncryptRequest {
         session_id: session_id.clone(),
         values: vec![100, 200, 300, 400],
@@ -231,7 +234,7 @@ async fn test_openfhe(client: &mut HeServiceClient<tonic::transport::Channel>) -
     println!("   ✓ Status: {}\n", encrypt_response.status);
 
     // 3. Decrypt
-    println!("📝 Test 3: Decrypting ciphertext...");
+    println!("   Test 3: Decrypting ciphertext...");
     let request = Request::new(DecryptRequest {
         session_id: session_id.clone(),
         ciphertext: vec![],
@@ -242,7 +245,7 @@ async fn test_openfhe(client: &mut HeServiceClient<tonic::transport::Channel>) -
     println!("   ✓ Status: {}\n", decrypt_response.status);
 
     // 4. Addition
-    println!("📝 Test 4: Homomorphic addition...");
+    println!("  Test 4: Homomorphic addition...");
     let request = Request::new(BinaryOpRequest {
         session_id: session_id.clone(),
         ciphertext1: vec![],
@@ -253,7 +256,7 @@ async fn test_openfhe(client: &mut HeServiceClient<tonic::transport::Channel>) -
     println!("   ✓ Status: {}\n", add_response.status);
 
     // 5. Multiplication
-    println!("📝 Test 5: Homomorphic multiplication...");
+    println!("   Test 5: Homomorphic multiplication...");
     let request = Request::new(BinaryOpRequest {
         session_id: session_id.clone(),
         ciphertext1: vec![],
@@ -264,14 +267,14 @@ async fn test_openfhe(client: &mut HeServiceClient<tonic::transport::Channel>) -
     println!("   ✓ Status: {}\n", multiply_response.status);
 
     // 6. Benchmark
-    println!("📝 Test 6: Running OpenFHE benchmark (50 operations)...");
+    println!("   Test 6: Running OpenFHE benchmark (50 operations)...");
     let request = Request::new(BenchmarkRequest {
         library: "OpenFHE".to_string(),
         num_operations: 50,
     });
     let response = client.run_benchmark(request).await?;
     let benchmark = response.into_inner();
-    println!("   📊 Benchmark Results:");
+    println!("      Benchmark Results:");
     println!("      • Key Generation:  {:.2} ms", benchmark.key_gen_time_ms);
     println!("      • Encryption:      {:.2} ms/op", benchmark.encryption_time_ms);
     println!("      • Addition:        {:.2} ms/op", benchmark.addition_time_ms);
@@ -279,6 +282,80 @@ async fn test_openfhe(client: &mut HeServiceClient<tonic::transport::Channel>) -
     println!("      • Decryption:      {:.2} ms/op", benchmark.decryption_time_ms);
     println!("   ✓ {}\n", benchmark.status);
 
-    println!("✅ OpenFHE tests completed successfully!\n");
+    println!("   OpenFHE tests completed successfully!\n");
+    Ok(())
+}
+
+async fn test_comparison_benchmark(client: &mut HeServiceClient<tonic::transport::Channel>) -> Result<(), Box<dyn std::error::Error>> {
+    println!("╔═══════════════════════════════════════════════════════════════╗");
+    println!("║       Running Comparison Benchmark (All Three Libraries)      ║");
+    println!("╚═══════════════════════════════════════════════════════════════╝\n");
+
+    println!("   Benchmarking all libraries with 20 operations each...\n");
+    
+    let request = Request::new(BenchmarkRequest {
+        library: "ALL".to_string(),
+        num_operations: 20,
+    });
+    
+    let response = client.run_comparison_benchmark(request).await?;
+    let comparison = response.into_inner();
+    
+    // Display SEAL results
+    if let Some(seal) = comparison.seal {
+        println!("┌─────────────────────────────────────────────────────────────────┐");
+        println!("│     SEAL Results                                                │");
+        println!("├─────────────────────────────────────────────────────────────────┤");
+        println!("│  Key Generation:  {:>10.2} ms                                │", seal.key_gen_time_ms);
+        println!("│  Encoding:        {:>10.2} ms/op                             │", seal.encoding_time_ms);
+        println!("│  Encryption:      {:>10.2} ms/op                             │", seal.encryption_time_ms);
+        println!("│  Addition:        {:>10.2} ms/op                             │", seal.addition_time_ms);
+        println!("│  Multiplication:  {:>10.2} ms/op                             │", seal.multiplication_time_ms);
+        println!("│  Decryption:      {:>10.2} ms/op                             │", seal.decryption_time_ms);
+        println!("│  Total Time:      {:>10.2} ms                                │", seal.total_time_ms);
+        println!("└─────────────────────────────────────────────────────────────────┘\n");
+    }
+    
+    // Display HELib results
+    if let Some(helib) = comparison.helib {
+        println!("┌─────────────────────────────────────────────────────────────────┐");
+        println!("│     HELib Results                                               │");
+        println!("├─────────────────────────────────────────────────────────────────┤");
+        println!("│  Key Generation:  {:>10.2} ms                                │", helib.key_gen_time_ms);
+        println!("│  Encoding:        {:>10.2} ms/op                             │", helib.encoding_time_ms);
+        println!("│  Encryption:      {:>10.2} ms/op                             │", helib.encryption_time_ms);
+        println!("│  Addition:        {:>10.2} ms/op                             │", helib.addition_time_ms);
+        println!("│  Multiplication:  {:>10.2} ms/op                             │", helib.multiplication_time_ms);
+        println!("│  Decryption:      {:>10.2} ms/op                             │", helib.decryption_time_ms);
+        println!("│  Total Time:      {:>10.2} ms                                │", helib.total_time_ms);
+        println!("└─────────────────────────────────────────────────────────────────┘\n");
+    }
+    
+    // Display OpenFHE results
+    if let Some(openfhe) = comparison.openfhe {
+        println!("┌─────────────────────────────────────────────────────────────────┐");
+        println!("│     OpenFHE Results                                             │");
+        println!("├─────────────────────────────────────────────────────────────────┤");
+        println!("│  Key Generation:  {:>10.2} ms                                │", openfhe.key_gen_time_ms);
+        println!("│  Encoding:        {:>10.2} ms/op                             │", openfhe.encoding_time_ms);
+        println!("│  Encryption:      {:>10.2} ms/op                             │", openfhe.encryption_time_ms);
+        println!("│  Addition:        {:>10.2} ms/op                             │", openfhe.addition_time_ms);
+        println!("│  Multiplication:  {:>10.2} ms/op                             │", openfhe.multiplication_time_ms);
+        println!("│  Decryption:      {:>10.2} ms/op                             │", openfhe.decryption_time_ms);
+        println!("│  Total Time:      {:>10.2} ms                                │", openfhe.total_time_ms);
+        println!("└─────────────────────────────────────────────────────────────────┘\n");
+    }
+    
+    // Display comparison summary
+    println!("╔═══════════════════════════════════════════════════════════════╗");
+    println!("║     COMPARISON RESULTS                                        ║");
+    println!("╠═══════════════════════════════════════════════════════════════╣");
+    println!("║  Fastest Library: {:43}  ║", comparison.fastest_library);
+    println!("╠═══════════════════════════════════════════════════════════════╣");
+    println!("║  Recommendation:                                              ║");
+    println!("║  {}  ║", format!("{:60}", comparison.recommendation));
+    println!("╚═══════════════════════════════════════════════════════════════╝\n");
+    
+    println!("   Comparison benchmark completed successfully!\n");
     Ok(())
 }
