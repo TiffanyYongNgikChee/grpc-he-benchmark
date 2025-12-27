@@ -2,6 +2,7 @@ package com.example.hegrpc.menu;
 
 import java.util.Scanner;
 
+import com.example.hegrpc.data.PatientDataEntry;
 import com.example.hegrpc.manager.HospitalManager;
 import com.example.hegrpc.model.Hospital;
 import com.example.hegrpc.service.HEClientService;
@@ -16,12 +17,14 @@ public class MenuSystem {
     private final Scanner scanner;
     private final HEClientService heClient;
     private final HospitalManager hospitalManager;
+    private final PatientDataEntry patientDataEntry;
     private boolean running;
     
     public MenuSystem(HEClientService heClient) {
         this.scanner = new Scanner(System.in);
         this.heClient = heClient;
         this.hospitalManager = new HospitalManager(heClient);
+        this.patientDataEntry = new PatientDataEntry(scanner, heClient, hospitalManager);
         this.running = true;
     }
     
@@ -47,7 +50,7 @@ public class MenuSystem {
         System.out.println();
         System.out.println("╔══════════════════════════════════════════════════════════════════════════════╗");
         System.out.println("║                                                                              ║");
-        System.out.println("║   🏥  PRIVACY-PRESERVING HEALTHCARE DATA MANAGEMENT SYSTEM  🔐              ║");
+        System.out.println("║        PRIVACY-PRESERVING HEALTHCARE DATA MANAGEMENT SYSTEM                  ║");
         System.out.println("║                                                                              ║");
         System.out.println("║   Powered by Homomorphic Encryption (SEAL/HELib/OpenFHE)                     ║");
         System.out.println("║                                                                              ║");
@@ -62,18 +65,18 @@ public class MenuSystem {
      */
     private void printMainMenu() {
         System.out.println("┌──────────────────────────────────────────────────────────────────────────────┐");
-        System.out.println("│                              📋 MAIN MENU                                    │");
+        System.out.println("│                                 MAIN MENU                                    │");
         System.out.println("├──────────────────────────────────────────────────────────────────────────────┤");
         System.out.println("│                                                                              │");
-        System.out.println("│   [1] 🏥 Hospital Management     - Create, view, manage hospitals            │");
-        System.out.println("│   [2] 📊 Patient Data Entry      - Add encrypted department statistics       │");
-        System.out.println("│   [3] 🔢 Regional Analytics      - Compute on encrypted data across regions  │");
-        System.out.println("│   [4] 💾 Save/Load Data          - Persist encrypted data to files           │");
-        System.out.println("│   [5] 🔒 Security Demo           - Visualize encryption, simulate attacks    │");
-        System.out.println("│   [6] ⚡ Benchmark Libraries      - Compare SEAL, HELib, OpenFHE             │");
-        System.out.println("│   [7] ❓ Help & About            - Learn about homomorphic encryption        │");
+        System.out.println("│   [1]    Hospital Management     - Create, view, manage hospitals            │");
+        System.out.println("│   [2]    Patient Data Entry      - Add encrypted department statistics       │");
+        System.out.println("│   [3]    Regional Analytics      - Compute on encrypted data across regions  │");
+        System.out.println("│   [4]    Save/Load Data          - Persist encrypted data to files           │");
+        System.out.println("│   [5]    Security Demo           - Visualize encryption, simulate attacks    │");
+        System.out.println("│   [6]    Benchmark Libraries      - Compare SEAL, HELib, OpenFHE             │");
+        System.out.println("│   [7]    Help & About            - Learn about homomorphic encryption        │");
         System.out.println("│                                                                              │");
-        System.out.println("│   [0] 🚪 Exit                                                                │");
+        System.out.println("│   [0]    Exit                                                                │");
         System.out.println("│                                                                              │");
         System.out.println("└──────────────────────────────────────────────────────────────────────────────┘");
         System.out.print("   Enter your choice: ");
@@ -92,7 +95,7 @@ public class MenuSystem {
             case 6 -> benchmarkMenu();
             case 7 -> helpMenu();
             case 0 -> running = false;
-            default -> System.out.println("   ❌ Invalid choice. Please try again.");
+            default -> System.out.println("      Invalid choice. Please try again.");
         }
     }
     
@@ -104,7 +107,7 @@ public class MenuSystem {
         while (inSubmenu) {
             System.out.println();
             System.out.println("┌──────────────────────────────────────────────────────────────────────────────┐");
-            System.out.println("│                        🏥 HOSPITAL MANAGEMENT                                │");
+            System.out.println("│                           HOSPITAL MANAGEMENT                                │");
             System.out.println("├──────────────────────────────────────────────────────────────────────────────┤");
             System.out.println("│   [1] Create New Hospital                                                    │");
             System.out.println("│   [2] View All Hospitals                                                     │");
@@ -131,14 +134,14 @@ public class MenuSystem {
     private void createNewHospital() {
         System.out.println();
         System.out.println("   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        System.out.println("   📝 CREATE NEW HOSPITAL");
+        System.out.println("      CREATE NEW HOSPITAL");
         System.out.println("   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         
         // Get hospital name
         System.out.print("   Enter hospital name: ");
         String name = scanner.nextLine().trim();
         if (name.isEmpty()) {
-            System.out.println("   ❌ Hospital name cannot be empty.");
+            System.out.println("      Hospital name cannot be empty.");
             return;
         }
         
@@ -153,16 +156,16 @@ public class MenuSystem {
         String region = HospitalManager.REGIONS[regionChoice - 1];
         
         // Create hospital
-        System.out.println("\n   🔄 Creating hospital and generating encryption keys...");
+        System.out.println("\n      Creating hospital and generating encryption keys...");
         Hospital hospital = hospitalManager.createHospital(name, region);
         
         System.out.println();
-        System.out.println("   ✅ Hospital created successfully!");
+        System.out.println("      Hospital created successfully!");
         System.out.println("   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        System.out.printf("   🆔 Hospital ID: %s%n", hospital.getId());
-        System.out.printf("   🏥 Name: %s%n", hospital.getName());
-        System.out.printf("   📍 Region: %s%n", hospital.getRegion());
-        System.out.printf("   🔑 Session ID: %s%n", hospital.getSessionId());
+        System.out.printf("      Hospital ID: %s%n", hospital.getId());
+        System.out.printf("      Name: %s%n", hospital.getName());
+        System.out.printf("      Region: %s%n", hospital.getRegion());
+        System.out.printf("      Session ID: %s%n", hospital.getSessionId());
         System.out.println("   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         System.out.println();
         
@@ -171,7 +174,7 @@ public class MenuSystem {
     
     private void viewHospitalDetails() {
         if (hospitalManager.getHospitalCount() == 0) {
-            System.out.println("\n   📭 No hospitals registered yet. Create one first!");
+            System.out.println("\n      No hospitals registered yet. Create one first!");
             return;
         }
         
@@ -181,7 +184,7 @@ public class MenuSystem {
         
         Hospital hospital = hospitalManager.getHospital(id);
         if (hospital == null) {
-            System.out.println("   ❌ Hospital not found: " + id);
+            System.out.println("      Hospital not found: " + id);
             return;
         }
         
@@ -193,29 +196,23 @@ public class MenuSystem {
     }
     
     private void createDemoHospitals() {
-        System.out.println("\n   🔄 Creating demo hospitals with encryption keys...\n");
+        System.out.println("\n      Creating demo hospitals with encryption keys...\n");
         hospitalManager.createDemoHospitals();
-        System.out.println("   ✅ Created 5 demo hospitals!\n");
+        System.out.println("      Created 5 demo hospitals!\n");
         hospitalManager.displayAllHospitals();
     }
     
-    // ==================== OPTION 2: Patient Data Entry (Placeholder) ====================
+    // ==================== OPTION 2: Patient Data Entry ====================
     
     private void patientDataEntryMenu() {
-        System.out.println();
-        System.out.println("   🚧 COMING IN PHASE 2: Patient Data Entry");
-        System.out.println("   - Add patient counts per department");
-        System.out.println("   - Encrypt data before storage");
-        System.out.println("   - View encrypted data visualization");
-        System.out.println();
-        pressEnterToContinue();
+        patientDataEntry.showMenu();
     }
     
     // ==================== OPTION 3: Regional Analytics (Placeholder) ====================
     
     private void regionalAnalyticsMenu() {
         System.out.println();
-        System.out.println("   🚧 COMING IN PHASE 3: Regional Analytics");
+        System.out.println("      COMING IN PHASE 3: Regional Analytics");
         System.out.println("   - Sum encrypted data across hospitals");
         System.out.println("   - Compute regional statistics");
         System.out.println("   - Privacy-preserving aggregation");
@@ -227,7 +224,7 @@ public class MenuSystem {
     
     private void saveLoadDataMenu() {
         System.out.println();
-        System.out.println("   🚧 COMING IN PHASE 4: Data Persistence");
+        System.out.println("      COMING IN PHASE 4: Data Persistence");
         System.out.println("   - Save encrypted data to JSON files");
         System.out.println("   - Load previous sessions");
         System.out.println("   - Export/import hospital data");
@@ -239,7 +236,7 @@ public class MenuSystem {
     
     private void securityDemoMenu() {
         System.out.println();
-        System.out.println("   🚧 COMING IN PHASE 5: Security Demo");
+        System.out.println("      COMING IN PHASE 5: Security Demo");
         System.out.println("   - Visualize encrypted data (hex dump)");
         System.out.println("   - Show encryption randomness");
         System.out.println("   - Simulate interception attacks");
@@ -251,7 +248,7 @@ public class MenuSystem {
     
     private void benchmarkMenu() {
         System.out.println();
-        System.out.println("   🚧 COMING IN PHASE 6: Benchmark");
+        System.out.println("      COMING IN PHASE 6: Benchmark");
         System.out.println("   - Compare SEAL, HELib, OpenFHE");
         System.out.println("   - Performance metrics");
         System.out.println("   - Visual charts");
@@ -264,10 +261,10 @@ public class MenuSystem {
     private void helpMenu() {
         System.out.println();
         System.out.println("╔══════════════════════════════════════════════════════════════════════════════╗");
-        System.out.println("║                          ❓ ABOUT THIS SYSTEM                                ║");
+        System.out.println("║                             ABOUT THIS SYSTEM                                ║");
         System.out.println("╠══════════════════════════════════════════════════════════════════════════════╣");
         System.out.println("║                                                                              ║");
-        System.out.println("║  🔐 WHAT IS HOMOMORPHIC ENCRYPTION?                                          ║");
+        System.out.println("║     WHAT IS HOMOMORPHIC ENCRYPTION?                                          ║");
         System.out.println("║     Homomorphic encryption allows computations on encrypted data             ║");
         System.out.println("║     without decrypting it first. This means:                                 ║");
         System.out.println("║                                                                              ║");
@@ -275,14 +272,14 @@ public class MenuSystem {
         System.out.println("║     • Regional health authorities can compute totals                         ║");
         System.out.println("║     • Nobody sees the actual numbers except the data owner                   ║");
         System.out.println("║                                                                              ║");
-        System.out.println("║  🏥 HEALTHCARE USE CASE                                                      ║");
+        System.out.println("║     HEALTHCARE USE CASE                                                      ║");
         System.out.println("║     In this demo, multiple hospitals can:                                    ║");
         System.out.println("║     1. Encrypt their patient counts (ER, ICU, Surgery, etc.)                 ║");
         System.out.println("║     2. Share the encrypted data with health authorities                      ║");
         System.out.println("║     3. Authorities sum the encrypted data to get regional totals             ║");
         System.out.println("║     4. No hospital reveals its actual patient counts!                        ║");
         System.out.println("║                                                                              ║");
-        System.out.println("║  📚 LIBRARIES USED                                                           ║");
+        System.out.println("║     LIBRARIES USED                                                           ║");
         System.out.println("║     • Microsoft SEAL - Fast BFV/CKKS schemes                                 ║");
         System.out.println("║     • HELib - IBM's BGV scheme implementation                                ║");
         System.out.println("║     • OpenFHE - Flexible multi-scheme library                                ║");
@@ -302,9 +299,9 @@ public class MenuSystem {
                 if (choice >= min && choice <= max) {
                     return choice;
                 }
-                System.out.printf("   ❌ Please enter a number between %d and %d: ", min, max);
+                System.out.printf("      Please enter a number between %d and %d: ", min, max);
             } catch (NumberFormatException e) {
-                System.out.printf("   ❌ Invalid input. Please enter a number: ");
+                System.out.printf("      Invalid input. Please enter a number: ");
             }
         }
     }
@@ -318,10 +315,10 @@ public class MenuSystem {
         System.out.println();
         System.out.println("╔══════════════════════════════════════════════════════════════════════════════╗");
         System.out.println("║                                                                              ║");
-        System.out.println("║   👋 Thank you for using the Privacy-Preserving Healthcare System!          ║");
+        System.out.println("║       Thank you for using the Privacy-Preserving Healthcare System!          ║");
         System.out.println("║                                                                              ║");
-        System.out.println("║   🔐 Remember: With homomorphic encryption, data stays private even         ║");
-        System.out.println("║      during computation. The future of healthcare data privacy!             ║");
+        System.out.println("║       Remember: With homomorphic encryption, data stays private even         ║");
+        System.out.println("║       during computation. The future of healthcare data privacy!             ║");
         System.out.println("║                                                                              ║");
         System.out.println("╚══════════════════════════════════════════════════════════════════════════════╝");
         System.out.println();
