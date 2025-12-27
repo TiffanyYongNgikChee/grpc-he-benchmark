@@ -5,10 +5,10 @@ import java.util.List;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
+import com.example.hegrpc.menu.MenuSystem;
 import com.example.hegrpc.service.HEClientService;
 import com.google.protobuf.ByteString;
 
-import he_service.HeService.*;
 import he_service.HeService.BinaryOpResponse;
 import he_service.HeService.ComparisonBenchmarkResponse;
 import he_service.HeService.DecryptResponse;
@@ -17,7 +17,8 @@ import he_service.HeService.GenerateKeysResponse;
 
 /**
  * Demo runner that executes when Spring Boot starts.
- * Shows all available HE operations.
+ * Provides interactive menu for hospital privacy demo
+ * or runs quick demo based on command line arguments.
  */
 @Component
 public class HEClientDemo implements CommandLineRunner {
@@ -30,12 +31,26 @@ public class HEClientDemo implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        System.out.println("\n🔐 Homomorphic Encryption gRPC Client Demo\n");
+        // Check for --quick flag to run non-interactive demo
+        boolean quickDemo = false;
+        for (String arg : args) {
+            if ("--quick".equals(arg) || "-q".equals(arg)) {
+                quickDemo = true;
+                break;
+            }
+        }
         
-        demoSEAL();
-        demoComparisonBenchmark();
-        
-        System.out.println("\n✅ Demo completed!\n");
+        if (quickDemo) {
+            // Run non-interactive quick demo
+            System.out.println("\n🔐 Homomorphic Encryption gRPC Client - Quick Demo\n");
+            demoSEAL();
+            demoComparisonBenchmark();
+            System.out.println("\n✅ Demo completed!\n");
+        } else {
+            // Run interactive menu system
+            MenuSystem menu = new MenuSystem(heClient);
+            menu.start();
+        }
     }
 
     private void demoSEAL() {
