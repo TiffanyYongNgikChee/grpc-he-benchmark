@@ -3,6 +3,7 @@ package com.example.hegrpc.menu;
 import java.util.Scanner;
 
 import com.example.hegrpc.analytics.RegionalAnalytics;
+import com.example.hegrpc.benchmark.BenchmarkDemo;
 import com.example.hegrpc.data.PatientDataEntry;
 import com.example.hegrpc.manager.HospitalManager;
 import com.example.hegrpc.model.Hospital;
@@ -24,6 +25,7 @@ public class MenuSystem {
     private final RegionalAnalytics regionalAnalytics;
     private final DataPersistence dataPersistence;
     private final SecurityDemo securityDemo;
+    private final BenchmarkDemo benchmarkDemo;
     private boolean running;
     
     public MenuSystem(HEClientService heClient) {
@@ -34,6 +36,7 @@ public class MenuSystem {
         this.regionalAnalytics = new RegionalAnalytics(scanner, heClient, hospitalManager);
         this.dataPersistence = new DataPersistence(scanner, heClient, hospitalManager);
         this.securityDemo = new SecurityDemo(scanner, heClient, hospitalManager);
+        this.benchmarkDemo = new BenchmarkDemo(scanner, heClient);
         this.running = true;
     }
     
@@ -235,16 +238,10 @@ public class MenuSystem {
         securityDemo.showMenu();
     }
     
-    // ==================== OPTION 6: Benchmark (Placeholder) ====================
+    // ==================== OPTION 6: Benchmark Libraries ====================
     
     private void benchmarkMenu() {
-        System.out.println();
-        System.out.println("      COMING IN PHASE 6: Benchmark");
-        System.out.println("   - Compare SEAL, HELib, OpenFHE");
-        System.out.println("   - Performance metrics");
-        System.out.println("   - Visual charts");
-        System.out.println();
-        pressEnterToContinue();
+        benchmarkDemo.showMenu();
     }
     
     // ==================== OPTION 7: Help Menu ====================
