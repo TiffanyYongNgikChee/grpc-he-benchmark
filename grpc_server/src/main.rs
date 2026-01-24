@@ -871,7 +871,7 @@ impl HeService for HEServiceImpl {
         let req = request.into_inner();
         let sid = &req.session_id[..8.min(req.session_id.len())];
         
-        println!("📥 Add request for session: {}", sid);
+        println!(" Add request for session: {}", sid);
         
         let (library, poly_degree, plain_modulus, all_values) = {
             let sessions = self.sessions.lock().unwrap();
@@ -958,7 +958,7 @@ impl HeService for HEServiceImpl {
     ) -> Result<Response<BenchmarkResponse>, Status> {
         let req = request.into_inner();
         
-        println!("📥 Benchmark request for library: {} ({} ops)", req.library, req.num_operations);
+        println!(" Benchmark request for library: {} ({} ops)", req.library, req.num_operations);
         
         let library = req.library.clone();
         let num_ops = req.num_operations;

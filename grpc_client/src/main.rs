@@ -21,10 +21,10 @@ use he_service::{
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n╔═══════════════════════════════════════════════════════════════╗");
-    println!("║   🧪 HE gRPC Server - Comprehensive Test Suite               ║");
+    println!("║       HE gRPC Server - Comprehensive Test Suite               ║");
     println!("╚═══════════════════════════════════════════════════════════════╝\n");
     
-    println!("🔌 Connecting to HE gRPC Server at [::1]:50051...");
+    println!("   Connecting to HE gRPC Server at [::1]:50051...");
     let mut client = HeServiceClient::connect("http://[::1]:50051").await?;
     println!("✓ Connected!\n");
 
