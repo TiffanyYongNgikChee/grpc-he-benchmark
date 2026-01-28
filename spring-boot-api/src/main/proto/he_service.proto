@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package he_service;
 
-option java_multiple_files = true;
-option java_package = "com.fyp.hebench.grpc";
-option java_outer_classname = "HeServiceProto";
+option java_multiple_files = true; //  Generate separate .java files for each message - like request, response, grpc service
+option java_package = "com.fyp.hebench.grpc"; // Generated file starts with:
+option java_outer_classname = "HeServiceProto"; // Name of the "wrapper" class that holds protobuf metadata
 
 // Main service for Homomorphic Encryption operations
 service HEService {
