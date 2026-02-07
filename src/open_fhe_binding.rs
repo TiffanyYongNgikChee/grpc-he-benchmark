@@ -91,4 +91,57 @@ unsafe extern "C" {
     
     // Error handling
     pub fn openfhe_get_last_error() -> *const c_char;
+    
+    // CNN Operations (from openfhe_cnn_ops.h)
+    /// Matrix multiplication for fully connected layers
+    /// weights: flattened row-major matrix (rows × cols)
+    /// input: encrypted vector (cols elements)
+    /// returns: encrypted vector (rows elements)
+    pub fn openfhe_matmul(
+        ctx: *mut OpenFHEContext,
+        weights: *mut OpenFHEPlaintext,
+        input: *mut OpenFHECiphertext,
+        rows: usize,
+        cols: usize,
+    ) -> *mut OpenFHECiphertext;
+    
+    /// 2D convolution for CNN layers
+    /// input: encrypted image (flattened height × width)
+    /// kernel: plaintext filter (flattened kernel_height × kernel_width)
+    /// returns: encrypted feature map (out_height × out_width)
+    pub fn openfhe_conv2d(
+        ctx: *mut OpenFHEContext,
+        input: *mut OpenFHECiphertext,
+        kernel: *mut OpenFHEPlaintext,
+        input_height: usize,
+        input_width: usize,
+        kernel_height: usize,
+        kernel_width: usize,
+    ) -> *mut OpenFHECiphertext;
+    
+    /// Polynomial ReLU approximation
+    /// degree: 3, 5, or 7 (currently only 3 is implemented)
+    /// returns: encrypted activated values
+    pub fn openfhe_poly_relu(
+        ctx: *mut OpenFHEContext,
+        input: *mut OpenFHECiphertext,
+        degree: i32,
+    ) -> *mut OpenFHECiphertext;
+    
+    /// Average pooling for downsampling
+    /// input: encrypted feature map (flattened input_height × input_width)
+    /// pool_size: pooling window size (e.g., 2 for 2×2)
+    /// stride: stride for pooling
+    /// returns: encrypted downsampled feature map
+    pub fn openfhe_avgpool(
+        ctx: *mut OpenFHEContext,
+        input: *mut OpenFHECiphertext,
+        input_height: usize,
+        input_width: usize,
+        pool_size: usize,
+        stride: usize,
+    ) -> *mut OpenFHECiphertext;
+    
+    /// Get last error from CNN operations
+    pub fn openfhe_cnn_get_last_error() -> *const c_char;
 }

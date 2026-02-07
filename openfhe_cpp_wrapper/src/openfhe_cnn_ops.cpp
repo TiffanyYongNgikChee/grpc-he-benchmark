@@ -1,7 +1,8 @@
 // openfhe_cnn_ops.cpp
 // CNN operations for OpenFHE: matmul, conv2d, poly_relu, avgpool
 
-#include "../../openfhe_cpp_wrapper/include/openfhe_wrapper.h"
+#include "../include/openfhe_cnn_ops.h"
+#include "../include/openfhe_wrapper.h"
 #include "openfhe/core/lattice/hal/lat-backend.h"
 #include "openfhe/pke/openfhe.h"
 #include "openfhe/pke/encoding/plaintext.h"

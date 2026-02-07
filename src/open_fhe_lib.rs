@@ -267,6 +267,181 @@ pub fn subtract(&self, _context: &OpenFHEContext, other: &OpenFHECiphertext) -> 
         .map(|ptr| OpenFHECiphertext { ptr })
         .ok_or(OpenFHEError::OperationFailed)
 }
+
+// CNN Operations
+/// Matrix multiplication with plaintext weights (for fully connected layers)
+/// 
+/// # Parameters
+/// - context: OpenFHE context
+/// - weights: Plaintext weight matrix (flattened row-major)
+/// - rows: Number of output rows
+/// - cols: Number of input columns
+/// 
+/// # Returns
+/// Encrypted result vector (size: rows)
+pub fn matmul(
+    context: &OpenFHEContext,
+    weights: &OpenFHEPlaintext,
+    input: &OpenFHECiphertext,
+    rows: usize,
+    cols: usize,
+) -> Result<OpenFHECiphertext> {
+    let ptr = unsafe {
+        open_fhe_binding::openfhe_matmul(
+            context.as_ptr(),
+            weights.as_ptr(),
+            input.ptr.as_ptr(),
+            rows,
+            cols,
+        )
+    };
+    
+    NonNull::new(ptr)
+        .map(|ptr| OpenFHECiphertext { ptr })
+        .ok_or_else(|| {
+            let err = unsafe {
+                let err_ptr = open_fhe_binding::openfhe_cnn_get_last_error();
+                if !err_ptr.is_null() {
+                    CStr::from_ptr(err_ptr).to_string_lossy().into_owned()
+                } else {
+                    String::from("Matrix multiplication failed")
+                }
+            };
+            OpenFHEError::Unknown(err)
+        })
+}
+
+/// 2D convolution with plaintext kernel (for CNN layers)
+/// 
+/// # Parameters
+/// - context: OpenFHE context
+/// - kernel: Plaintext convolution filter (flattened)
+/// - input_height: Height of input image
+/// - input_width: Width of input image
+/// - kernel_height: Height of convolution kernel
+/// - kernel_width: Width of convolution kernel
+/// 
+/// # Returns
+/// Encrypted feature map with dimensions:
+/// - out_height = input_height - kernel_height + 1
+/// - out_width = input_width - kernel_width + 1
+pub fn conv2d(
+    &self,
+    context: &OpenFHEContext,
+    kernel: &OpenFHEPlaintext,
+    input_height: usize,
+    input_width: usize,
+    kernel_height: usize,
+    kernel_width: usize,
+) -> Result<OpenFHECiphertext> {
+    let ptr = unsafe {
+        open_fhe_binding::openfhe_conv2d(
+            context.as_ptr(),
+            self.ptr.as_ptr(),
+            kernel.as_ptr(),
+            input_height,
+            input_width,
+            kernel_height,
+            kernel_width,
+        )
+    };
+    
+    NonNull::new(ptr)
+        .map(|ptr| OpenFHECiphertext { ptr })
+        .ok_or_else(|| {
+            let err = unsafe {
+                let err_ptr = open_fhe_binding::openfhe_cnn_get_last_error();
+                if !err_ptr.is_null() {
+                    CStr::from_ptr(err_ptr).to_string_lossy().into_owned()
+                } else {
+                    String::from("Convolution failed")
+                }
+            };
+            OpenFHEError::Unknown(err)
+        })
+}
+
+/// Polynomial ReLU activation approximation
+/// 
+/// # Parameters
+/// - context: OpenFHE context
+/// - degree: Polynomial degree (3, 5, or 7). Currently only 3 is supported.
+/// 
+/// # Returns
+/// Encrypted activated values (approximates ReLU)
+/// 
+/// # Notes
+/// Degree-3 polynomial: 0.125*x³ + 0.5*x + 0.5
+pub fn poly_relu(&self, context: &OpenFHEContext, degree: i32) -> Result<OpenFHECiphertext> {
+    let ptr = unsafe {
+        open_fhe_binding::openfhe_poly_relu(
+            context.as_ptr(),
+            self.ptr.as_ptr(),
+            degree,
+        )
+    };
+    
+    NonNull::new(ptr)
+        .map(|ptr| OpenFHECiphertext { ptr })
+        .ok_or_else(|| {
+            let err = unsafe {
+                let err_ptr = open_fhe_binding::openfhe_cnn_get_last_error();
+                if !err_ptr.is_null() {
+                    CStr::from_ptr(err_ptr).to_string_lossy().into_owned()
+                } else {
+                    String::from("Polynomial ReLU failed")
+                }
+            };
+            OpenFHEError::Unknown(err)
+        })
+}
+
+/// Average pooling for downsampling feature maps
+/// 
+/// # Parameters
+/// - context: OpenFHE context
+/// - input_height: Height of input feature map
+/// - input_width: Width of input feature map
+/// - pool_size: Pooling window size (e.g., 2 for 2×2 pooling)
+/// - stride: Stride for pooling (typically same as pool_size)
+/// 
+/// # Returns
+/// Encrypted downsampled feature map with dimensions:
+/// - out_height = (input_height - pool_size) / stride + 1
+/// - out_width = (input_width - pool_size) / stride + 1
+pub fn avgpool(
+    &self,
+    context: &OpenFHEContext,
+    input_height: usize,
+    input_width: usize,
+    pool_size: usize,
+    stride: usize,
+) -> Result<OpenFHECiphertext> {
+    let ptr = unsafe {
+        open_fhe_binding::openfhe_avgpool(
+            context.as_ptr(),
+            self.ptr.as_ptr(),
+            input_height,
+            input_width,
+            pool_size,
+            stride,
+        )
+    };
+    
+    NonNull::new(ptr)
+        .map(|ptr| OpenFHECiphertext { ptr })
+        .ok_or_else(|| {
+            let err = unsafe {
+                let err_ptr = open_fhe_binding::openfhe_cnn_get_last_error();
+                if !err_ptr.is_null() {
+                    CStr::from_ptr(err_ptr).to_string_lossy().into_owned()
+                } else {
+                    String::from("Average pooling failed")
+                }
+            };
+            OpenFHEError::Unknown(err)
+        })
+}
 }
 
 impl Drop for OpenFHECiphertext {

@@ -13,10 +13,7 @@ typedef struct OpenFHEContext OpenFHEContext;
 typedef struct OpenFHECiphertext OpenFHECiphertext;
 typedef struct OpenFHEPlaintext OpenFHEPlaintext;
 
-// ============================================
 // CNN Operations for Encrypted Neural Networks
-// ============================================
-
 /// Matrix multiplication for fully connected layers
 /// Multiplies plaintext weight matrix with encrypted input vector
 /// @param ctx: OpenFHE context
