@@ -19,7 +19,9 @@ services:
 
   # Development/Benchmark service
   he-benchmark:
-    build: .
+    build:
+      context: .
+      target: builder
     volumes:
       # Mount source files only, not the compiled libraries
       - ./src:/app/src
@@ -32,6 +34,10 @@ services:
       - ./Cargo.toml:/app/Cargo.toml
       - ./Cargo.lock:/app/Cargo.lock
       - ./build.rs:/app/build.rs
+      # Mount helper scripts
+      - ./rebuild_and_run.sh:/app/rebuild_and_run.sh
+      - ./rebuild_cpp.sh:/app/rebuild_cpp.sh
+      - ./test_cnn_ops_simple.sh:/app/test_cnn_ops_simple.sh
       # Cache volumes
       - cargo-cache:/root/.cargo/registry
       - target-cache:/app/target
@@ -42,6 +48,7 @@ services:
     environment:
       - RUST_BACKTRACE=1
       - LD_LIBRARY_PATH=/app/lib:/usr/local/lib:/usr/local/helib_pack/helib_pack/lib
+      - PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 volumes:
   cargo-cache:
