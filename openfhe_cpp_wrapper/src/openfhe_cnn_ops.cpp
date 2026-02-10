@@ -77,15 +77,10 @@ extern "C" OpenFHECiphertext* openfhe_matmul(
         // and multiply with rotated input vector
         
         // Get slot count for proper packing
-        size_t slot_count = ctx->cryptoContext->GetEncodingParams()->GetBatchSize();
+        size_t slot_count = input->ctx->cryptoContext->GetEncodingParams()->GetBatchSize();
         
-        // Result accumulator - start with zeros
-        std::vector<int64_t> zero_vec(slot_count, 0);
-        auto zero_pt = ctx->cryptoContext->MakePackedPlaintext(zero_vec);
-        auto result_ct = ctx->cryptoContext->Encrypt(
-            ctx->cryptoContext->KeyGen().publicKey, // Temporary - need proper key
-            zero_pt
-        );
+        // Result accumulator - start with zeros by subtracting input from itself
+        auto result_ct = input->ctx->cryptoContext->EvalSub(input->ciphertext, input->ciphertext);
         
         // For each output row
         for (size_t i = 0; i < rows && i < slot_count; i++) {
@@ -96,22 +91,22 @@ extern "C" OpenFHECiphertext* openfhe_matmul(
             }
             
             // Create plaintext from row weights
-            auto row_pt = ctx->cryptoContext->MakePackedPlaintext(row_weights);
+            auto row_pt = input->ctx->cryptoContext->MakePackedPlaintext(row_weights);
             
             // Multiply encrypted input with this row's weights
-            auto mult_result = ctx->cryptoContext->EvalMult(input->ciphertext, row_pt);
+            auto mult_result = input->ctx->cryptoContext->EvalMult(input->ciphertext, row_pt);
             
             // Sum all elements in the slot (this gives dot product)
             // Note: Without EvalSum, we approximate by keeping element-wise products
             // TODO: Enable rotation keys and use EvalSum for proper reduction
             
             // Add to result
-            result_ct = ctx->cryptoContext->EvalAdd(result_ct, mult_result);
+            result_ct = input->ctx->cryptoContext->EvalAdd(result_ct, mult_result);
         }
         
         OpenFHECiphertext* result = new OpenFHECiphertext();
         result->ciphertext = result_ct;
-        result->ctx = ctx;
+        result->ctx = input->ctx;  // Use the input's context
         
         set_cnn_error("");
         return result;
@@ -156,15 +151,10 @@ extern "C" OpenFHECiphertext* openfhe_conv2d(
         
         // Sliding window convolution using rotation
         // For each position in the output feature map
-        size_t slot_count = ctx->cryptoContext->GetEncodingParams()->GetBatchSize();
+        size_t slot_count = input->ctx->cryptoContext->GetEncodingParams()->GetBatchSize();
         
-        // Initialize result with zeros
-        std::vector<int64_t> zero_vec(slot_count, 0);
-        auto zero_pt = ctx->cryptoContext->MakePackedPlaintext(zero_vec);
-        auto result_ct = ctx->cryptoContext->Encrypt(
-            ctx->cryptoContext->KeyGen().publicKey,
-            zero_pt
-        );
+        // Initialize result with zeros by subtracting input from itself
+        auto result_ct = input->ctx->cryptoContext->EvalSub(input->ciphertext, input->ciphertext);
         
         // Iterate over kernel window
         for (size_t kh = 0; kh < kernel_height; kh++) {
@@ -194,20 +184,20 @@ extern "C" OpenFHECiphertext* openfhe_conv2d(
                 }
                 
                 // Create plaintext from mask
-                auto mask_pt = ctx->cryptoContext->MakePackedPlaintext(mask);
+                auto mask_pt = input->ctx->cryptoContext->MakePackedPlaintext(mask);
                 
                 // Multiply input with masked kernel weight
-                auto weighted = ctx->cryptoContext->EvalMult(input->ciphertext, mask_pt);
+                auto weighted = input->ctx->cryptoContext->EvalMult(input->ciphertext, mask_pt);
                 
                 // Accumulate into result
                 // Note: Proper implementation would rotate and sum here
-                result_ct = ctx->cryptoContext->EvalAdd(result_ct, weighted);
+                result_ct = input->ctx->cryptoContext->EvalAdd(result_ct, weighted);
             }
         }
         
         OpenFHECiphertext* result = new OpenFHECiphertext();
         result->ciphertext = result_ct;
-        result->ctx = ctx;
+        result->ctx = input->ctx;  // Use the input's context
         
         set_cnn_error("");
         return result;
@@ -237,13 +227,13 @@ extern "C" OpenFHECiphertext* openfhe_poly_relu(
         
         if (degree == 3) {
             // Compute x^2
-            auto x_squared = ctx->cryptoContext->EvalMult(
+            auto x_squared = input->ctx->cryptoContext->EvalMult(
                 input->ciphertext,
                 input->ciphertext
             );
             
             // Compute x^3 = x^2 * x
-            auto x_cubed = ctx->cryptoContext->EvalMult(
+            auto x_cubed = input->ctx->cryptoContext->EvalMult(
                 x_squared,
                 input->ciphertext
             );
@@ -253,23 +243,23 @@ extern "C" OpenFHECiphertext* openfhe_poly_relu(
             std::vector<int64_t> coeff_linear(1, 500); // 0.5 scaled by 1000
             std::vector<int64_t> coeff_const(1, 500);  // 0.5 scaled by 1000
             
-            auto pt_cubic = ctx->cryptoContext->MakePackedPlaintext(coeff_cubic);
-            auto pt_linear = ctx->cryptoContext->MakePackedPlaintext(coeff_linear);
-            auto pt_const = ctx->cryptoContext->MakePackedPlaintext(coeff_const);
+            auto pt_cubic = input->ctx->cryptoContext->MakePackedPlaintext(coeff_cubic);
+            auto pt_linear = input->ctx->cryptoContext->MakePackedPlaintext(coeff_linear);
+            auto pt_const = input->ctx->cryptoContext->MakePackedPlaintext(coeff_const);
             
             // Compute: 0.125*x^3
-            auto term1 = ctx->cryptoContext->EvalMult(x_cubed, pt_cubic);
+            auto term1 = input->ctx->cryptoContext->EvalMult(x_cubed, pt_cubic);
             
             // Compute: 0.5*x
-            auto term2 = ctx->cryptoContext->EvalMult(input->ciphertext, pt_linear);
+            auto term2 = input->ctx->cryptoContext->EvalMult(input->ciphertext, pt_linear);
             
             // Add constant: 0.5
-            auto result_ct = ctx->cryptoContext->EvalAdd(term1, term2);
-            result_ct = ctx->cryptoContext->EvalAdd(result_ct, pt_const);
+            auto result_ct = input->ctx->cryptoContext->EvalAdd(term1, term2);
+            result_ct = input->ctx->cryptoContext->EvalAdd(result_ct, pt_const);
             
             OpenFHECiphertext* result = new OpenFHECiphertext();
             result->ciphertext = result_ct;
-            result->ctx = ctx;
+            result->ctx = input->ctx;  // Use the input's context
             
             set_cnn_error("");
             return result;
@@ -310,15 +300,10 @@ extern "C" OpenFHECiphertext* openfhe_avgpool(
         size_t out_height = (input_height - pool_size) / stride + 1;
         size_t out_width = (input_width - pool_size) / stride + 1;
         
-        size_t slot_count = ctx->cryptoContext->GetEncodingParams()->GetBatchSize();
+        size_t slot_count = input->ctx->cryptoContext->GetEncodingParams()->GetBatchSize();
         
-        // Initialize result with zeros
-        std::vector<int64_t> zero_vec(slot_count, 0);
-        auto zero_pt = ctx->cryptoContext->MakePackedPlaintext(zero_vec);
-        auto result_ct = ctx->cryptoContext->Encrypt(
-            ctx->cryptoContext->KeyGen().publicKey,
-            zero_pt
-        );
+        // Initialize result with zeros by subtracting input from itself
+        auto result_ct = input->ctx->cryptoContext->EvalSub(input->ciphertext, input->ciphertext);
         
         // For each pooling window
         for (size_t ph = 0; ph < pool_size; ph++) {
@@ -344,13 +329,13 @@ extern "C" OpenFHECiphertext* openfhe_avgpool(
                 }
                 
                 // Create plaintext mask
-                auto mask_pt = ctx->cryptoContext->MakePackedPlaintext(mask);
+                auto mask_pt = input->ctx->cryptoContext->MakePackedPlaintext(mask);
                 
                 // Multiply input by mask to select pooling region
-                auto masked = ctx->cryptoContext->EvalMult(input->ciphertext, mask_pt);
+                auto masked = input->ctx->cryptoContext->EvalMult(input->ciphertext, mask_pt);
                 
                 // Accumulate (sum all values in pooling window)
-                result_ct = ctx->cryptoContext->EvalAdd(result_ct, masked);
+                result_ct = input->ctx->cryptoContext->EvalAdd(result_ct, masked);
             }
         }
         
@@ -362,14 +347,14 @@ extern "C" OpenFHECiphertext* openfhe_avgpool(
         int64_t scale_int = static_cast<int64_t>(scale * 1000);
         
         std::vector<int64_t> scale_vec(slot_count, scale_int);
-        auto scale_pt = ctx->cryptoContext->MakePackedPlaintext(scale_vec);
+        auto scale_pt = input->ctx->cryptoContext->MakePackedPlaintext(scale_vec);
         
         // Multiply result by scale factor
-        result_ct = ctx->cryptoContext->EvalMult(result_ct, scale_pt);
+        result_ct = input->ctx->cryptoContext->EvalMult(result_ct, scale_pt);
         
         OpenFHECiphertext* result = new OpenFHECiphertext();
         result->ciphertext = result_ct;
-        result->ctx = ctx;
+        result->ctx = input->ctx;  // Use the input's context
         
         set_cnn_error("");
         return result;
