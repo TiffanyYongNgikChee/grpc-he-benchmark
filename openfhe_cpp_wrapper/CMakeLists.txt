@@ -33,6 +33,7 @@ link_directories(${OpenFHE_LIBDIR})
 # Create shared library
 add_library(openfhe_wrapper SHARED
     src/openfhe_wrapper.cpp
+    src/openfhe_cnn_ops.cpp
 )
 
 # Link against OpenFHE libraries
@@ -47,7 +48,7 @@ set_target_properties(openfhe_wrapper PROPERTIES
     VERSION 1.0
     SOVERSION 1
     POSITION_INDEPENDENT_CODE ON
-    PUBLIC_HEADER include/openfhe_wrapper.h
+    PUBLIC_HEADER "include/openfhe_wrapper.h;include/openfhe_cnn_ops.h"
 )
 
 # Installation rules
