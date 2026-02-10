@@ -98,15 +98,13 @@ extern "C" OpenFHEKeyPair* openfhe_generate_keypair(OpenFHEContext* ctx) {
         // Generate key pair
         KeyPair<DCRTPoly> keyPair = ctx->cryptoContext->KeyGen();
         
-        // Generate evaluation key for multiplication ONLY
-        // DO NOT generate rotation/sum keys - they cause symbol errors
+        // Generate evaluation keys for multiplication
         ctx->cryptoContext->EvalMultKeyGen(keyPair.secretKey);
         
-        // Note: We explicitly do NOT call:
-        // - EvalSumKeyGen() 
-        // - EvalRotateKeyGen()
-        // - EvalSumRowsKeyGen()
-        // These functions may not be available in all OpenFHE versions
+        // Note: Rotation keys not generated due to memory constraints
+        // For production use, generate specific rotation indices as needed:
+        // std::vector<int32_t> indexList = {1, -1, 2, -2, ...};
+        // ctx->cryptoContext->EvalRotateKeyGen(keyPair.secretKey, indexList);
         
         // Allocate and return
         OpenFHEKeyPair* kp = new OpenFHEKeyPair();
