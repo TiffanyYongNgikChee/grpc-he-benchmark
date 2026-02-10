@@ -51,10 +51,8 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     println!("   Got:      {:?}", &result_vec[..3]);
     println!("   Matrix multiplication completed\n");
     
-    // ============================================
     // Example 2: Polynomial ReLU Activation
-    // ============================================
-    println!("🎯 Example 2: Polynomial ReLU Activation");
+    println!("   Example 2: Polynomial ReLU Activation");
     println!("   Approximating ReLU(x) with degree-3 polynomial");
     
     // Test values: some negative, some positive
@@ -120,7 +118,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     println!("   Average pooling completed\n");
     
     // Example 5: Full CNN Forward Pass Simulation
-    println!("🚀 Example 5: Simulated CNN Forward Pass");
+    println!("   Example 5: Simulated CNN Forward Pass");
     println!("   Input → Conv → ReLU → Pool → FC");
     
     // Start with encrypted 4×4 image
@@ -149,13 +147,6 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let final_vec = final_plain.to_vec()?;
     println!("   Output: {:?}", &final_vec[..1]);
     println!("  Full CNN pass completed\n");
-    
-    println!("  All examples completed successfully!");
-    println!("\n  Next steps:");
-    println!("   - Train a real MNIST model");
-    println!("   - Export model weights");
-    println!("   - Load weights and run encrypted inference");
-    println!("   - Benchmark performance across OpenFHE/SEAL/HELib");
     
     Ok(())
 }
