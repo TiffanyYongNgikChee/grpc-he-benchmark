@@ -111,6 +111,7 @@ unsafe extern "C" {
     /// returns: encrypted feature map (out_height × out_width)
     pub fn openfhe_conv2d(
         ctx: *mut OpenFHEContext,
+        keypair: *mut OpenFHEKeyPair,
         input: *mut OpenFHECiphertext,
         kernel: *mut OpenFHEPlaintext,
         input_height: usize,
@@ -135,6 +136,7 @@ unsafe extern "C" {
     /// returns: encrypted downsampled feature map
     pub fn openfhe_avgpool(
         ctx: *mut OpenFHEContext,
+        keypair: *mut OpenFHEKeyPair,
         input: *mut OpenFHECiphertext,
         input_height: usize,
         input_width: usize,

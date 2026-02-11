@@ -10,6 +10,7 @@ extern "C" {
 
 // Opaque pointer types (must match openfhe_wrapper.h)
 typedef struct OpenFHEContext OpenFHEContext;
+typedef struct OpenFHEKeyPair OpenFHEKeyPair;
 typedef struct OpenFHECiphertext OpenFHECiphertext;
 typedef struct OpenFHEPlaintext OpenFHEPlaintext;
 
@@ -33,6 +34,7 @@ OpenFHECiphertext* openfhe_matmul(
 /// 2D convolution for CNN layers
 /// Applies convolution filter to encrypted image using sliding window
 /// @param ctx: OpenFHE context
+/// @param keypair: Key pair for encrypt/decrypt of intermediate values
 /// @param input: Encrypted input image (flattened, size: input_height × input_width)
 /// @param kernel: Plaintext convolution kernel (flattened, size: kernel_height × kernel_width)
 /// @param input_height: Height of input image
@@ -44,6 +46,7 @@ OpenFHECiphertext* openfhe_matmul(
 ///               out_width = input_width - kernel_width + 1
 OpenFHECiphertext* openfhe_conv2d(
     OpenFHEContext* ctx,
+    OpenFHEKeyPair* keypair,
     OpenFHECiphertext* input,
     OpenFHEPlaintext* kernel,
     size_t input_height,
@@ -70,17 +73,16 @@ OpenFHECiphertext* openfhe_poly_relu(
 /// Average pooling for downsampling feature maps
 /// Performs pooling by averaging values in each pooling window
 /// @param ctx: OpenFHE context
+/// @param keypair: Key pair for encrypt/decrypt of intermediate values
 /// @param input: Encrypted feature map (flattened, size: input_height × input_width)
 /// @param input_height: Height of input feature map
 /// @param input_width: Width of input feature map
 /// @param pool_size: Size of pooling window (e.g., 2 for 2×2 pooling)
 /// @param stride: Stride for pooling (typically same as pool_size)
 /// @return Encrypted downsampled feature map or NULL on failure
-///         Output size: out_height × out_width
-///         where out_height = (input_height - pool_size) / stride + 1
-///               out_width = (input_width - pool_size) / stride + 1
 OpenFHECiphertext* openfhe_avgpool(
     OpenFHEContext* ctx,
+    OpenFHEKeyPair* keypair,
     OpenFHECiphertext* input,
     size_t input_height,
     size_t input_width,

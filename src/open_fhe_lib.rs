@@ -328,6 +328,7 @@ pub fn matmul(
 pub fn conv2d(
     &self,
     context: &OpenFHEContext,
+    keypair: &OpenFHEKeyPair,
     kernel: &OpenFHEPlaintext,
     input_height: usize,
     input_width: usize,
@@ -337,6 +338,7 @@ pub fn conv2d(
     let ptr = unsafe {
         open_fhe_binding::openfhe_conv2d(
             context.as_ptr(),
+            keypair.as_ptr(),
             self.ptr.as_ptr(),
             kernel.as_ptr(),
             input_height,
@@ -412,6 +414,7 @@ pub fn poly_relu(&self, context: &OpenFHEContext, degree: i32) -> Result<OpenFHE
 pub fn avgpool(
     &self,
     context: &OpenFHEContext,
+    keypair: &OpenFHEKeyPair,
     input_height: usize,
     input_width: usize,
     pool_size: usize,
@@ -420,6 +423,7 @@ pub fn avgpool(
     let ptr = unsafe {
         open_fhe_binding::openfhe_avgpool(
             context.as_ptr(),
+            keypair.as_ptr(),
             self.ptr.as_ptr(),
             input_height,
             input_width,
