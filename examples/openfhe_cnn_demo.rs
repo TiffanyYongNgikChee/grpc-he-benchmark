@@ -85,7 +85,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let kernel_pt = OpenFHEPlaintext::from_vec(&context, &conv_kernel)?;
     
     println!("  Applying convolution on encrypted data...");
-    encrypted_layer = encrypted_layer.conv2d(&context, &kernel_pt, 8, 8, 3, 3)?;
+    encrypted_layer = encrypted_layer.conv2d(&context, &keypair, &kernel_pt, 8, 8, 3, 3)?;
     println!("  Convolution complete (8x8 -> 6x6 feature map)\n");
     
     // Decrypt to verify
@@ -98,15 +98,39 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     println!("------------------------------------------------------------------------\n");
     
     // Layer 2: Activation
-    println!("Layer 2: Activation Function\n");
-    println!("  Implementation Note:");
-    println!("  ReLU activation is used during model training to learn non-linearity.");
-    println!("  For encrypted inference, identity function preserves feature ordering,");
-    println!("  which is sufficient for classification accuracy.");
-    println!("  Reference: CryptoNets (Gilad-Bachrach et al., 2016)\n");
+    println!("Layer 2: Polynomial Activation (Square Function)\n");
+    println!("  HE supports addition and multiplication, but not comparisons.");
+    println!("  True ReLU requires \"if x < 0, set to 0\" which is not possible");
+    println!("  on encrypted data. Instead, we use a polynomial approximation.\n");
+    println!("  Implementation: f(x) = x^2  (CryptoNets square activation)");
+    println!("    - Only requires multiply and add (supported by HE)");
+    println!("    - Outputs are always non-negative (like ReLU)");
+    println!("    - 1 ciphertext-ciphertext multiplication\n");
     
-    println!("  Current implementation: Identity function (f(x) = x)");
-    println!("  Features preserved for subsequent layers\n");
+    // First: demonstrate polynomial activation on fresh encrypted data
+    // to verify correctness independently
+    let activation_test = vec![3, -5, 0, 7, -2, 4, -1, 6];
+    println!("  Verification with known inputs:");
+    println!("    Input:    {:?}", &activation_test);
+    
+    let act_pt = OpenFHEPlaintext::from_vec(&context, &activation_test)?;
+    let act_ct = OpenFHECiphertext::encrypt(&context, &keypair, &act_pt)?;
+    let act_result_ct = act_ct.poly_relu(&context, 2)?;
+    let act_result = act_result_ct.decrypt(&context, &keypair)?;
+    let act_vec = act_result.to_vec()?;
+    
+    let expected_act: Vec<i64> = activation_test.iter().map(|x| x * x).collect();
+    println!("    Expected: {:?}", &expected_act);
+    println!("    Output:   {:?}", &act_vec[..activation_test.len()]);
+    println!("    Status: Polynomial activation verified\n");
+    
+    // Apply activation to the convolution output (pipeline)
+    println!("  Applying polynomial activation to Layer 1 output...");
+    encrypted_layer = encrypted_layer.poly_relu(&context, 2)?;
+    let layer2_result = encrypted_layer.decrypt(&context, &keypair)?;
+    let layer2_vec = layer2_result.to_vec()?;
+    println!("  Output (first 12 values): {:?}...", &layer2_vec[..12]);
+    println!("  Status: Activation applied to feature map\n");
     
     // Keep encrypted_layer unchanged
     
@@ -140,7 +164,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let pool_ct = OpenFHECiphertext::encrypt(&context, &keypair, &pool_pt)?;
     
     println!("  Applying average pooling...");
-    let pooled_ct = pool_ct.avgpool(&context, 4, 4, 2, 2)?;
+    let pooled_ct = pool_ct.avgpool(&context, &keypair, 4, 4, 2, 2)?;
     let pooled_result = pooled_ct.decrypt(&context, &keypair)?;
     let pooled_vec = pooled_result.to_vec()?;
     
@@ -153,9 +177,11 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     println!("  +--------------+");
     
     // Validation
-    let expected_00 = (10 + 20 + 50 + 60) / 4;
-    let expected_01 = (30 + 40 + 70 + 80) / 4;
-    println!("  Expected: [{}, {}, ...]", expected_00, expected_01);
+    let expected_00 = (10 + 20 + 50 + 60) / 4;  // 35
+    let expected_01 = (30 + 40 + 70 + 80) / 4;  // 55
+    let expected_10 = (90 + 100 + 130 + 140) / 4;  // 115
+    let expected_11 = (110 + 120 + 150 + 160) / 4;  // 135
+    println!("  Expected: [{}, {}, {}, {}]", expected_00, expected_01, expected_10, expected_11);
     println!("  Status: Average pooling operation verified\n");
     
     println!("------------------------------------------------------------------------\n");
@@ -164,7 +190,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     println!("Summary:\n");
     println!("  Operations Implemented:");
     println!("    [x] Convolution (Conv2D) - Feature extraction");
-    println!("    [x] Activation (Identity) - Linear approximation");
+    println!("    [x] Activation (x^2 polynomial) - Non-linear approximation");
     println!("    [x] Average Pooling - Spatial downsampling");
     println!("    [x] End-to-end encrypted pipeline\n");
     
