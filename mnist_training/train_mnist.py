@@ -160,6 +160,62 @@ def verify_dataset(train_loader, test_loader):
 
 
 # ============================================================================
+# Step 2a: Custom x² Activation Function
+# ============================================================================
+
+class SquareActivation(nn.Module):
+    """
+    Square activation function: f(x) = x²
+    
+    Why x² instead of ReLU?
+      HE (homomorphic encryption) only supports addition and multiplication
+      on encrypted data. ReLU requires a comparison (if x < 0, set to 0),
+      which is impossible on encrypted values.
+      
+      x² is a valid alternative because:
+        - It only requires one multiplication (HE-friendly)
+        - Outputs are always non-negative (like ReLU)
+        - It's used in CryptoNets (Gilad-Bachrach et al., ICML 2016)
+      
+      The model must be TRAINED with x² so the weights learn to work
+      with this activation. You can't train with ReLU and swap to x²
+      at inference — the accuracy would collapse.
+    
+    Maps to: openfhe_poly_relu() in openfhe_cnn_ops.cpp
+    """
+    
+    def forward(self, x):
+        return x * x
+
+
+def verify_activation():
+    """Test the square activation on known values."""
+    act = SquareActivation()
+    
+    test_input = torch.tensor([-3.0, -1.0, 0.0, 1.0, 2.0, 5.0])
+    expected   = torch.tensor([ 9.0,  1.0, 0.0, 1.0, 4.0, 25.0])
+    output = act(test_input)
+    
+    match = torch.allclose(output, expected)
+    print(f"  SquareActivation test:")
+    print(f"    Input:    {test_input.tolist()}")
+    print(f"    Output:   {output.tolist()}")
+    print(f"    Expected: {expected.tolist()}")
+    print(f"    Match:    {'✓' if match else '✗'}")
+    
+    # Verify gradient flows (needed for backprop during training)
+    x = torch.tensor([2.0, -3.0], requires_grad=True)
+    y = act(x)
+    y.sum().backward()
+    # d/dx(x²) = 2x, so gradients should be [4.0, -6.0]
+    expected_grad = torch.tensor([4.0, -6.0])
+    grad_match = torch.allclose(x.grad, expected_grad)
+    print(f"    Gradient: {x.grad.tolist()} (expected {expected_grad.tolist()}) {'✓' if grad_match else '✗'}")
+    
+    return match and grad_match
+
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -178,7 +234,17 @@ if __name__ == "__main__":
     print("Step 1 Complete: Dataset ready for training")
     print("=" * 70)
     
-    # Step 2: Build model      (TODO)
+    # Step 2a: Custom activation
+    print("\nStep 2a: Square Activation Function (x²)")
+    print("-" * 40)
+    activation_ok = verify_activation()
+    if not activation_ok:
+        print("  ERROR: Activation function test failed!")
+        exit(1)
+    print("  Step 2a Complete: x² activation verified ✓")
+    
+    # Step 2b: Build model      (TODO)
+    # Step 2c: Verify forward pass (TODO)
     # Step 3: Train model       (TODO)
     # Step 4: Evaluate accuracy  (TODO)
     # Step 5: Export weights     (TODO)
