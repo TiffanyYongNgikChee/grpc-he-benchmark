@@ -270,9 +270,11 @@ pub fn subtract(&self, _context: &OpenFHEContext, other: &OpenFHECiphertext) -> 
 
 // CNN Operations
 /// Matrix multiplication with plaintext weights (for fully connected layers)
+/// Uses decrypt→compute→re-encrypt approach (same as conv2d/avgpool)
 /// 
 /// # Parameters
 /// - context: OpenFHE context
+/// - keypair: Key pair for decrypt/re-encrypt
 /// - weights: Plaintext weight matrix (flattened row-major)
 /// - rows: Number of output rows
 /// - cols: Number of input columns
@@ -281,6 +283,7 @@ pub fn subtract(&self, _context: &OpenFHEContext, other: &OpenFHECiphertext) -> 
 /// Encrypted result vector (size: rows)
 pub fn matmul(
     context: &OpenFHEContext,
+    keypair: &OpenFHEKeyPair,
     weights: &OpenFHEPlaintext,
     input: &OpenFHECiphertext,
     rows: usize,
@@ -289,6 +292,7 @@ pub fn matmul(
     let ptr = unsafe {
         open_fhe_binding::openfhe_matmul(
             context.as_ptr(),
+            keypair.as_ptr(),
             weights.as_ptr(),
             input.ptr.as_ptr(),
             rows,

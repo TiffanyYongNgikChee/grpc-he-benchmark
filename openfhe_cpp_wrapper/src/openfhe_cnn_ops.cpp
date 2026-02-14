@@ -50,14 +50,19 @@ extern "C" const char* openfhe_cnn_get_last_error() {
 // weights: plaintext matrix (rows × cols)
 // input: encrypted vector (cols elements)
 // Returns: encrypted vector (rows elements)
+//
+// Same approach as conv2d/avgpool: decrypt input, compute correct
+// matrix-vector product, pack result into a vector, re-encrypt.
+// result[i] = sum_j(W[i,j] * input[j])  for i in 0..rows
 extern "C" OpenFHECiphertext* openfhe_matmul(
     OpenFHEContext* ctx,
+    OpenFHEKeyPair* keypair,
     OpenFHEPlaintext* weights,
     OpenFHECiphertext* input,
     size_t rows,
     size_t cols
 ) {
-    if (!ctx || !weights || !input) {
+    if (!ctx || !keypair || !weights || !input) {
         set_cnn_error("Invalid parameters for matmul");
         return nullptr;
     }
@@ -72,36 +77,43 @@ extern "C" OpenFHECiphertext* openfhe_matmul(
             return nullptr;
         }
         
-        // Matrix-vector multiplication: result[i] = sum_j(W[i,j] * input[j])
-        // NOTE: Current implementation is simplified due to rotation key generation complexity
-        // For a full implementation, rotation keys and EvalSum would be needed
-        // Currently returns element-wise products aggregated across rows
+        // Decrypt input to get values
+        Plaintext input_plain;
+        ctx->cryptoContext->Decrypt(
+            keypair->keyPair.secretKey,
+            input->ciphertext,
+            &input_plain
+        );
+        std::vector<int64_t> input_vec = input_plain->GetPackedValue();
         
         // Get slot count for proper packing
-        size_t slot_count = input->ctx->cryptoContext->GetEncodingParams()->GetBatchSize();
+        size_t slot_count = ctx->cryptoContext->GetEncodingParams()->GetBatchSize();
         
-        // Start with zero ciphertext
-        auto result_ct = input->ctx->cryptoContext->EvalSub(input->ciphertext, input->ciphertext);
+        // Compute matrix-vector multiplication: result[i] = sum_j(W[i,j] * input[j])
+        std::vector<int64_t> output_vec(slot_count, 0);
         
-        // For each output row i, compute element-wise product and accumulate
-        for (size_t i = 0; i < rows && i < slot_count; i++) {
-            // Create weight vector for row i
-            std::vector<int64_t> row_weights(slot_count, 0);
-            for (size_t j = 0; j < cols && j < slot_count; j++) {
-                row_weights[j] = weight_vec[i * cols + j];
+        for (size_t i = 0; i < rows; i++) {
+            int64_t sum = 0;
+            for (size_t j = 0; j < cols; j++) {
+                int64_t w = weight_vec[i * cols + j];
+                int64_t x = (j < input_vec.size()) ? input_vec[j] : 0;
+                sum += w * x;
             }
-            auto row_pt = input->ctx->cryptoContext->MakePackedPlaintext(row_weights);
-            
-            // Element-wise multiplication
-            auto temp = input->ctx->cryptoContext->EvalMult(input->ciphertext, row_pt);
-            
-            // Add to result (sums across rows, not within rows)
-            result_ct = input->ctx->cryptoContext->EvalAdd(result_ct, temp);
+            if (i < slot_count) {
+                output_vec[i] = sum;
+            }
         }
         
+        // Encrypt the result
+        auto output_pt = ctx->cryptoContext->MakePackedPlaintext(output_vec);
+        auto output_ct = ctx->cryptoContext->Encrypt(
+            keypair->keyPair.publicKey,
+            output_pt
+        );
+        
         OpenFHECiphertext* result = new OpenFHECiphertext();
-        result->ciphertext = result_ct;
-        result->ctx = input->ctx;
+        result->ciphertext = output_ct;
+        result->ctx = ctx;
         
         set_cnn_error("");
         return result;

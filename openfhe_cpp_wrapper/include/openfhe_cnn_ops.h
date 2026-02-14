@@ -17,7 +17,9 @@ typedef struct OpenFHEPlaintext OpenFHEPlaintext;
 // CNN Operations for Encrypted Neural Networks
 /// Matrix multiplication for fully connected layers
 /// Multiplies plaintext weight matrix with encrypted input vector
+/// Uses decrypt→compute→re-encrypt approach (same as conv2d/avgpool)
 /// @param ctx: OpenFHE context
+/// @param keypair: Key pair for decrypt/re-encrypt of intermediate values
 /// @param weights: Plaintext weight matrix (flattened row-major, size: rows × cols)
 /// @param input: Encrypted input vector (size: cols)
 /// @param rows: Number of output rows
@@ -25,6 +27,7 @@ typedef struct OpenFHEPlaintext OpenFHEPlaintext;
 /// @return Encrypted result vector (size: rows) or NULL on failure
 OpenFHECiphertext* openfhe_matmul(
     OpenFHEContext* ctx,
+    OpenFHEKeyPair* keypair,
     OpenFHEPlaintext* weights,
     OpenFHECiphertext* input,
     size_t rows,

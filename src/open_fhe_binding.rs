@@ -99,6 +99,7 @@ unsafe extern "C" {
     /// returns: encrypted vector (rows elements)
     pub fn openfhe_matmul(
         ctx: *mut OpenFHEContext,
+        keypair: *mut OpenFHEKeyPair,
         weights: *mut OpenFHEPlaintext,
         input: *mut OpenFHECiphertext,
         rows: usize,
