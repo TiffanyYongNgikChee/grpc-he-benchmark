@@ -216,6 +216,171 @@ def verify_activation():
 
 
 # ============================================================================
+# Step 2b: Define the CNN Model
+# ============================================================================
+
+class HE_CNN(nn.Module):
+    """
+    Simple CNN designed for homomorphic encryption inference.
+    
+    Architecture:
+      Conv1 (5×5, 1→1) → x² → AvgPool(2×2)
+      Conv2 (5×5, 1→1) → x² → AvgPool(2×2)
+      Flatten → FC (16→10)
+    
+    Dimension flow:
+      Input:  [batch, 1, 28, 28]
+      Conv1:  [batch, 1, 24, 24]  (28-5+1=24)
+      Act1:   [batch, 1, 24, 24]
+      Pool1:  [batch, 1, 12, 12]  (24/2=12)
+      Conv2:  [batch, 1,  8,  8]  (12-5+1=8)
+      Act2:   [batch, 1,  8,  8]
+      Pool2:  [batch, 1,  4,  4]  (8/2=4)
+      Flat:   [batch, 16]         (1×4×4=16)
+      FC:     [batch, 10]
+    
+    Constraints for HE compatibility:
+      - Single channel only (current conv2d op doesn't support multi-channel)
+      - x² activation (no ReLU — HE can't do comparisons)
+      - Average pooling (no max pool — HE can't do comparisons)
+      - No batch normalization (not supported in HE)
+      - No dropout (not needed for HE inference)
+    
+    HE operation mapping:
+      Conv1/Conv2 → openfhe_conv2d()     (5×5 kernel, valid padding)
+      Act1/Act2   → openfhe_poly_relu()  (x² square activation)
+      Pool1/Pool2 → openfhe_avgpool()    (2×2, stride 2)
+      FC          → openfhe_matmul()     (16→10 matrix-vector multiply)
+    
+    Total parameters: Conv1(25+1) + Conv2(25+1) + FC(160+10) = 222
+    """
+    
+    def __init__(self):
+        super(HE_CNN, self).__init__()
+        
+        # Conv1: 1 input channel, 1 output channel, 5×5 kernel
+        # No padding (valid convolution) — matches openfhe_conv2d behavior
+        self.conv1 = nn.Conv2d(
+            in_channels=1,
+            out_channels=1,
+            kernel_size=5,
+            padding=0,
+            bias=True
+        )
+        
+        # Square activation (replaces ReLU)
+        self.act1 = SquareActivation()
+        
+        # Average pooling 2×2, stride 2
+        self.pool1 = nn.AvgPool2d(kernel_size=2, stride=2)
+        
+        # Conv2: 1 input channel, 1 output channel, 5×5 kernel
+        self.conv2 = nn.Conv2d(
+            in_channels=1,
+            out_channels=1,
+            kernel_size=5,
+            padding=0,
+            bias=True
+        )
+        
+        # Square activation
+        self.act2 = SquareActivation()
+        
+        # Average pooling 2×2, stride 2
+        self.pool2 = nn.AvgPool2d(kernel_size=2, stride=2)
+        
+        # Fully connected: 1×4×4 = 16 inputs → 10 outputs (digits 0-9)
+        self.fc = nn.Linear(16, 10, bias=True)
+    
+    def forward(self, x):
+        """
+        Forward pass with shape tracking.
+        
+        Args:
+            x: Input tensor [batch, 1, 28, 28]
+        Returns:
+            Output logits [batch, 10]
+        """
+        # Conv1 block
+        x = self.conv1(x)    # [batch, 1, 28, 28] → [batch, 1, 24, 24]
+        x = self.act1(x)     # [batch, 1, 24, 24] → [batch, 1, 24, 24]
+        x = self.pool1(x)    # [batch, 1, 24, 24] → [batch, 1, 12, 12]
+        
+        # Conv2 block
+        x = self.conv2(x)    # [batch, 1, 12, 12] → [batch, 1, 8, 8]
+        x = self.act2(x)     # [batch, 1, 8, 8]   → [batch, 1, 8, 8]
+        x = self.pool2(x)    # [batch, 1, 8, 8]   → [batch, 1, 4, 4]
+        
+        # Flatten and classify
+        x = x.view(x.size(0), -1)  # [batch, 1, 4, 4] → [batch, 16]
+        x = self.fc(x)             # [batch, 16]       → [batch, 10]
+        
+        return x
+
+
+# ============================================================================
+# Step 2c: Verify Forward Pass
+# ============================================================================
+
+def verify_model(model):
+    """
+    Verify the model dimensions with a dummy forward pass.
+    
+    Feeds a random 28×28 image through every layer and prints
+    the shape at each stage. Catches dimension mismatches before training.
+    """
+    
+    # Print model architecture
+    print(f"  Model Architecture:")
+    print(f"  {model}\n")
+    
+    # Count parameters
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"  Parameters:")
+    for name, param in model.named_parameters():
+        print(f"    {name:20s} shape={str(list(param.shape)):15s} count={param.numel()}")
+    print(f"    {'TOTAL':20s} {'':15s} count={total_params}")
+    print(f"    Trainable: {trainable_params}")
+    
+    # Dummy forward pass with shape tracking
+    print(f"\n  Forward Pass (dummy 28×28 input):")
+    x = torch.randn(1, 1, 28, 28)
+    print(f"    Input:       {list(x.shape)}")
+    
+    x = model.conv1(x)
+    print(f"    After Conv1: {list(x.shape)}")
+    
+    x = model.act1(x)
+    print(f"    After Act1:  {list(x.shape)}")
+    
+    x = model.pool1(x)
+    print(f"    After Pool1: {list(x.shape)}")
+    
+    x = model.conv2(x)
+    print(f"    After Conv2: {list(x.shape)}")
+    
+    x = model.act2(x)
+    print(f"    After Act2:  {list(x.shape)}")
+    
+    x = model.pool2(x)
+    print(f"    After Pool2: {list(x.shape)}")
+    
+    x = x.view(x.size(0), -1)
+    print(f"    After Flat:  {list(x.shape)}")
+    
+    x = model.fc(x)
+    print(f"    After FC:    {list(x.shape)}")
+    
+    # Verify output shape
+    expected_shape = [1, 10]
+    shape_ok = list(x.shape) == expected_shape
+    print(f"\n  Output shape: {list(x.shape)} (expected {expected_shape}) {'✓' if shape_ok else '✗'}")
+    
+    return shape_ok
+
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -243,8 +408,19 @@ if __name__ == "__main__":
         exit(1)
     print("  Step 2a Complete: x² activation verified ✓")
     
-    # Step 2b: Build model      (TODO)
-    # Step 2c: Verify forward pass (TODO)
+    # Step 2b + 2c: Build model and verify forward pass
+    print("\nStep 2b: Building CNN Model")
+    print("-" * 40)
+    model = HE_CNN()
+    
+    print("\nStep 2c: Verifying Forward Pass")
+    print("-" * 40)
+    model_ok = verify_model(model)
+    if not model_ok:
+        print("  ERROR: Model shape verification failed!")
+        exit(1)
+    print("  Step 2 Complete: Model built and verified ✓")
+    
     # Step 3: Train model       (TODO)
     # Step 4: Evaluate accuracy  (TODO)
     # Step 5: Export weights     (TODO)
