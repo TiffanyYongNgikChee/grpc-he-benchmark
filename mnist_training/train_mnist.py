@@ -425,6 +425,57 @@ def train_one_epoch(model, train_loader, optimizer, criterion, epoch):
 
 
 # ============================================================================
+# Step 3b: Evaluation Function
+# ============================================================================
+
+def evaluate(model, test_loader):
+    """
+    Evaluate model accuracy on the test set.
+    
+    Runs inference on all test images with no gradient computation
+    (faster, less memory). Returns overall accuracy and per-digit accuracy.
+    
+    Args:
+        model: HE_CNN model
+        test_loader: DataLoader for test data (10,000 images)
+    
+    Returns:
+        accuracy: Overall accuracy as a percentage (0-100)
+        per_digit: Dict mapping digit → accuracy percentage
+    """
+    model.eval()  # Set model to evaluation mode (disables dropout, etc.)
+    
+    correct = 0
+    total = 0
+    per_digit_correct = [0] * 10
+    per_digit_total = [0] * 10
+    
+    with torch.no_grad():  # No gradients needed — saves memory and time
+        for images, labels in test_loader:
+            outputs = model(images)
+            _, predicted = torch.max(outputs, dim=1)  # Get digit with highest score
+            
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+            
+            # Per-digit tracking
+            for digit in range(10):
+                mask = (labels == digit)
+                per_digit_total[digit] += mask.sum().item()
+                per_digit_correct[digit] += (predicted[mask] == digit).sum().item()
+    
+    accuracy = 100.0 * correct / total
+    per_digit = {}
+    for digit in range(10):
+        if per_digit_total[digit] > 0:
+            per_digit[digit] = 100.0 * per_digit_correct[digit] / per_digit_total[digit]
+        else:
+            per_digit[digit] = 0.0
+    
+    return accuracy, per_digit
+
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -477,7 +528,17 @@ if __name__ == "__main__":
     print(f"\n  Epoch 1 average loss: {epoch_loss:.4f}")
     print(f"  Step 3a Complete: Training function verified ✓")
     
-    # Step 3b: Evaluate function  (TODO)
+    # Step 3b: Evaluation function test
+    print("\nStep 3b: Evaluation Function")
+    print("-" * 40)
+    accuracy, per_digit = evaluate(model, test_loader)
+    print(f"  Test accuracy after 1 epoch: {accuracy:.2f}%")
+    print(f"  Per-digit accuracy:")
+    for digit in range(10):
+        bar = "█" * int(per_digit[digit] / 5)  # Simple bar chart
+        print(f"    Digit {digit}: {per_digit[digit]:5.1f}%  {bar}")
+    print(f"  Step 3b Complete: Evaluation function verified ✓")
+    
     # Step 3c: Full training loop (TODO)
     # Step 4: Evaluate accuracy   (TODO)
     # Step 5: Export weights      (TODO)
