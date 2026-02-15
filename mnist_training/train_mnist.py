@@ -476,6 +476,102 @@ def evaluate(model, test_loader):
 
 
 # ============================================================================
+# Step 3c: Full Training Loop
+# ============================================================================
+
+def train_full(model, train_loader, test_loader, num_epochs=10, lr=0.001):
+    """
+    Train the model for multiple epochs, tracking loss and accuracy.
+    
+    Saves the best model (highest test accuracy) and generates a
+    training curve plot showing loss and accuracy over epochs.
+    
+    Args:
+        model: HE_CNN model
+        train_loader: Training data
+        test_loader: Test data
+        num_epochs: Number of training epochs (default: 10)
+        lr: Learning rate for Adam optimizer (default: 0.001)
+    
+    Returns:
+        model: Trained model (with best weights loaded)
+        history: Dict with 'loss', 'accuracy' lists per epoch
+    """
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+    criterion = nn.CrossEntropyLoss()
+    
+    history = {"loss": [], "accuracy": []}
+    best_accuracy = 0.0
+    best_state = None
+    output_dir = os.path.dirname(__file__)
+    
+    print(f"  Config:")
+    print(f"    Optimizer:  Adam (lr={lr})")
+    print(f"    Loss:       CrossEntropyLoss")
+    print(f"    Epochs:     {num_epochs}")
+    print(f"    Batch size: {train_loader.batch_size}")
+    print()
+    
+    for epoch in range(num_epochs):
+        # Train one epoch
+        avg_loss = train_one_epoch(model, train_loader, optimizer, criterion, epoch)
+        
+        # Evaluate on test set
+        accuracy, per_digit = evaluate(model, test_loader)
+        
+        # Record history
+        history["loss"].append(avg_loss)
+        history["accuracy"].append(accuracy)
+        
+        # Track best model
+        if accuracy > best_accuracy:
+            best_accuracy = accuracy
+            best_state = {k: v.clone() for k, v in model.state_dict().items()}
+            marker = " ★ best"
+        else:
+            marker = ""
+        
+        print(f"  Epoch {epoch+1:2d}/{num_epochs}  "
+              f"loss: {avg_loss:.4f}  "
+              f"accuracy: {accuracy:.2f}%{marker}")
+    
+    # Load best model weights
+    if best_state is not None:
+        model.load_state_dict(best_state)
+    
+    # Save model checkpoint
+    model_path = os.path.join(output_dir, "he_cnn_model.pth")
+    torch.save(model.state_dict(), model_path)
+    print(f"\n  Best accuracy: {best_accuracy:.2f}%")
+    print(f"  Model saved to: {model_path}")
+    
+    # Plot training curve
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
+    
+    epochs_range = range(1, num_epochs + 1)
+    
+    ax1.plot(epochs_range, history["loss"], "b-o", markersize=4)
+    ax1.set_xlabel("Epoch")
+    ax1.set_ylabel("Loss")
+    ax1.set_title("Training Loss")
+    ax1.grid(True, alpha=0.3)
+    
+    ax2.plot(epochs_range, history["accuracy"], "r-o", markersize=4)
+    ax2.set_xlabel("Epoch")
+    ax2.set_ylabel("Accuracy (%)")
+    ax2.set_title("Test Accuracy")
+    ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    curve_path = os.path.join(output_dir, "training_curve.png")
+    plt.savefig(curve_path, dpi=100)
+    plt.close()
+    print(f"  Training curve saved to: {curve_path}")
+    
+    return model, history
+
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -516,29 +612,11 @@ if __name__ == "__main__":
         exit(1)
     print("  Step 2 Complete: Model built and verified ✓")
     
-    # Step 3a: Training function smoke test (1 epoch)
-    print("\nStep 3a: Training Function (1-epoch smoke test)")
+    # Step 3: Train the model (10 epochs)
+    print("\nStep 3: Training Model (10 epochs)")
     print("-" * 40)
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-    criterion = nn.CrossEntropyLoss()
-    print(f"  Optimizer:  Adam (lr=0.001)")
-    print(f"  Loss:       CrossEntropyLoss")
-    print(f"  Running 1 epoch to verify training works...\n")
-    epoch_loss = train_one_epoch(model, train_loader, optimizer, criterion, epoch=0)
-    print(f"\n  Epoch 1 average loss: {epoch_loss:.4f}")
-    print(f"  Step 3a Complete: Training function verified ✓")
+    model, history = train_full(model, train_loader, test_loader, num_epochs=10, lr=0.001)
+    print(f"  Step 3 Complete: Training finished ✓")
     
-    # Step 3b: Evaluation function test
-    print("\nStep 3b: Evaluation Function")
-    print("-" * 40)
-    accuracy, per_digit = evaluate(model, test_loader)
-    print(f"  Test accuracy after 1 epoch: {accuracy:.2f}%")
-    print(f"  Per-digit accuracy:")
-    for digit in range(10):
-        bar = "█" * int(per_digit[digit] / 5)  # Simple bar chart
-        print(f"    Digit {digit}: {per_digit[digit]:5.1f}%  {bar}")
-    print(f"  Step 3b Complete: Evaluation function verified ✓")
-    
-    # Step 3c: Full training loop (TODO)
     # Step 4: Evaluate accuracy   (TODO)
     # Step 5: Export weights      (TODO)
