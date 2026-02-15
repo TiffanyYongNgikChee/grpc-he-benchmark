@@ -381,6 +381,50 @@ def verify_model(model):
 
 
 # ============================================================================
+# Step 3a: Training Function
+# ============================================================================
+
+def train_one_epoch(model, train_loader, optimizer, criterion, epoch):
+    """
+    Train the model for one epoch.
+    
+    Args:
+        model: HE_CNN model
+        train_loader: DataLoader for training data
+        optimizer: Adam optimizer
+        criterion: CrossEntropyLoss
+        epoch: Current epoch number (for display)
+    
+    Returns:
+        avg_loss: Average loss over all batches in this epoch
+    """
+    model.train()  # Set model to training mode
+    running_loss = 0.0
+    total_batches = len(train_loader)
+    
+    for batch_idx, (images, labels) in enumerate(train_loader):
+        # Forward pass
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+        
+        # Backward pass
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        
+        # Track loss
+        running_loss += loss.item()
+        
+        # Print progress every 200 batches
+        if (batch_idx + 1) % 200 == 0:
+            avg_so_far = running_loss / (batch_idx + 1)
+            print(f"    Epoch {epoch+1} [{batch_idx+1:4d}/{total_batches}]  loss: {avg_so_far:.4f}")
+    
+    avg_loss = running_loss / total_batches
+    return avg_loss
+
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -421,6 +465,19 @@ if __name__ == "__main__":
         exit(1)
     print("  Step 2 Complete: Model built and verified ✓")
     
-    # Step 3: Train model       (TODO)
-    # Step 4: Evaluate accuracy  (TODO)
-    # Step 5: Export weights     (TODO)
+    # Step 3a: Training function smoke test (1 epoch)
+    print("\nStep 3a: Training Function (1-epoch smoke test)")
+    print("-" * 40)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    criterion = nn.CrossEntropyLoss()
+    print(f"  Optimizer:  Adam (lr=0.001)")
+    print(f"  Loss:       CrossEntropyLoss")
+    print(f"  Running 1 epoch to verify training works...\n")
+    epoch_loss = train_one_epoch(model, train_loader, optimizer, criterion, epoch=0)
+    print(f"\n  Epoch 1 average loss: {epoch_loss:.4f}")
+    print(f"  Step 3a Complete: Training function verified ✓")
+    
+    # Step 3b: Evaluate function  (TODO)
+    # Step 3c: Full training loop (TODO)
+    # Step 4: Evaluate accuracy   (TODO)
+    # Step 5: Export weights      (TODO)
