@@ -652,6 +652,123 @@ def evaluate_final(model, test_loader):
 
 
 # ============================================================================
+# Step 4b: Confusion Matrix
+# ============================================================================
+
+def confusion_matrix_report(model, test_loader):
+    """
+    Build and visualize a 10×10 confusion matrix.
+    
+    The confusion matrix shows how predictions map to true labels:
+      - Rows    = true digit (what the image actually is)
+      - Columns = predicted digit (what the model guessed)
+      - Diagonal = correct predictions
+      - Off-diagonal = misclassifications
+    
+    This helps identify which digit pairs the model confuses most,
+    which is useful for understanding HE inference errors later.
+    
+    Args:
+        model: Trained HE_CNN model
+        test_loader: DataLoader for test data (10,000 images)
+    """
+    output_dir = os.path.dirname(__file__)
+    
+    # Build confusion matrix
+    cm = np.zeros((10, 10), dtype=int)
+    model.eval()
+    
+    with torch.no_grad():
+        for images, labels in test_loader:
+            outputs = model(images)
+            _, predicted = torch.max(outputs, dim=1)
+            
+            for true_label, pred_label in zip(labels, predicted):
+                cm[true_label.item()][pred_label.item()] += 1
+    
+    # Print text confusion matrix
+    print(f"\n  Confusion Matrix (rows=true, cols=predicted):\n")
+    
+    # Header
+    header = "       " + "".join(f"{d:>6d}" for d in range(10))
+    print(f"  {header}")
+    print(f"  {'─' * 67}")
+    
+    for true_digit in range(10):
+        row = f"  {true_digit:>4d} │"
+        for pred_digit in range(10):
+            count = cm[true_digit][pred_digit]
+            if true_digit == pred_digit:
+                row += f"{count:>6d}"  # Diagonal (correct)
+            elif count > 0:
+                row += f"{count:>6d}"  # Misclassification
+            else:
+                row += f"{'·':>6s}"   # Zero
+        
+        # Row accuracy
+        row_total = cm[true_digit].sum()
+        row_correct = cm[true_digit][true_digit]
+        row_acc = 100.0 * row_correct / row_total if row_total > 0 else 0
+        row += f"  │ {row_acc:5.1f}%"
+        print(row)
+    
+    print(f"  {'─' * 67}")
+    
+    # Find top misclassification pairs
+    print(f"\n  Top Misclassifications:")
+    
+    # Get off-diagonal entries sorted by count
+    misclass = []
+    for true_d in range(10):
+        for pred_d in range(10):
+            if true_d != pred_d and cm[true_d][pred_d] > 0:
+                misclass.append((cm[true_d][pred_d], true_d, pred_d))
+    
+    misclass.sort(reverse=True)
+    
+    for count, true_d, pred_d in misclass[:10]:
+        pct = 100.0 * count / cm[true_d].sum()
+        print(f"    {true_d} → {pred_d}: {count:4d} times ({pct:.1f}% of digit {true_d})")
+    
+    # Plot confusion matrix heatmap
+    fig, ax = plt.subplots(figsize=(9, 8))
+    
+    # Normalize for color (percentage per row)
+    cm_pct = cm.astype(float)
+    row_sums = cm_pct.sum(axis=1, keepdims=True)
+    cm_pct = np.zeros_like(cm_pct)
+    np.divide(cm.astype(float), row_sums, out=cm_pct, where=row_sums != 0)
+    cm_pct *= 100
+    
+    im = ax.imshow(cm_pct, interpolation="nearest", cmap="Blues", vmin=0, vmax=100)
+    
+    # Add text annotations
+    for i in range(10):
+        for j in range(10):
+            count = cm[i][j]
+            pct = cm_pct[i][j]
+            if count > 0:
+                color = "white" if pct > 50 else "black"
+                ax.text(j, i, f"{count}\n({pct:.0f}%)",
+                        ha="center", va="center", fontsize=7, color=color)
+    
+    ax.set_xlabel("Predicted Digit", fontsize=12)
+    ax.set_ylabel("True Digit", fontsize=12)
+    ax.set_title("Confusion Matrix (HE-Compatible CNN)", fontsize=14)
+    ax.set_xticks(range(10))
+    ax.set_yticks(range(10))
+    
+    cbar = plt.colorbar(im, ax=ax, shrink=0.8)
+    cbar.set_label("Percentage (%)", fontsize=10)
+    
+    plt.tight_layout()
+    cm_path = os.path.join(output_dir, "confusion_matrix.png")
+    plt.savefig(cm_path, dpi=150)
+    plt.close()
+    print(f"\n  Confusion matrix saved to: {cm_path}")
+
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -698,12 +815,17 @@ if __name__ == "__main__":
     model, history = train_full(model, train_loader, test_loader, num_epochs=10, lr=0.001)
     print(f"  Step 3 Complete: Training finished ✓")
     
-    # Step 4a: Final accuracy report
-    print("\nStep 4a: Final Accuracy Report")
+    # Final accuracy report
+    print("\nFinal Accuracy Report")
     print("-" * 40)
     evaluate_final(model, test_loader)
-    print("  Step 4a Complete: Accuracy report generated ✓")
+    print("  Accuracy report generated ✓")
 
-    # Step 4b: Confusion matrix   (TODO)
+    # Confusion matrix
+    print("\nConfusion Matrix")
+    print("-" * 40)
+    confusion_matrix_report(model, test_loader)
+    print("  Confusion matrix generated ✓")
+
     # Step 4c: Sample predictions (TODO)
     # Step 5: Export weights      (TODO)
