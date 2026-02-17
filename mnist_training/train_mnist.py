@@ -572,6 +572,86 @@ def train_full(model, train_loader, test_loader, num_epochs=10, lr=0.001):
 
 
 # ============================================================================
+# Step 4a: Final Accuracy Report
+# ============================================================================
+
+def evaluate_final(model, test_loader):
+    """
+    Generate a final accuracy report with per-digit breakdown and bar chart.
+    
+    Loads the best model weights (already loaded after train_full) and runs
+    evaluate() to get overall + per-digit accuracy. Prints a formatted
+    report and saves a per-digit accuracy bar chart.
+    
+    Args:
+        model: Trained HE_CNN model (best weights already loaded)
+        test_loader: DataLoader for test data (10,000 images)
+    """
+    output_dir = os.path.dirname(__file__)
+    
+    # Run evaluation
+    accuracy, per_digit = evaluate(model, test_loader)
+    
+    # Print overall accuracy
+    print(f"\n  ┌─────────────────────────────────────┐")
+    print(f"  │  Overall Test Accuracy: {accuracy:6.2f}%      │")
+    print(f"  └─────────────────────────────────────┘\n")
+    
+    # Print per-digit breakdown
+    print(f"  Per-Digit Accuracy:")
+    print(f"  {'Digit':>5s}  {'Accuracy':>8s}  {'Bar'}")
+    print(f"  {'─'*5}  {'─'*8}  {'─'*30}")
+    
+    for digit in range(10):
+        acc = per_digit[digit]
+        bar_len = int(acc / 100.0 * 30)
+        bar = "█" * bar_len + "░" * (30 - bar_len)
+        print(f"  {digit:5d}  {acc:7.2f}%  {bar}")
+    
+    # Summary statistics
+    accs = list(per_digit.values())
+    best_digit = max(per_digit, key=per_digit.get)
+    worst_digit = min(per_digit, key=per_digit.get)
+    spread = max(accs) - min(accs)
+    
+    print(f"\n  Best digit:   {best_digit} ({per_digit[best_digit]:.2f}%)")
+    print(f"  Worst digit:  {worst_digit} ({per_digit[worst_digit]:.2f}%)")
+    print(f"  Spread:       {spread:.2f}% (best − worst)")
+    print(f"  Mean per-digit: {np.mean(accs):.2f}%")
+    
+    # Save per-digit accuracy bar chart
+    fig, ax = plt.subplots(figsize=(10, 5))
+    
+    digits = list(range(10))
+    accuracies = [per_digit[d] for d in digits]
+    colors = ["#2ecc71" if a >= 90 else "#f39c12" if a >= 80 else "#e74c3c" for a in accuracies]
+    
+    bars = ax.bar(digits, accuracies, color=colors, edgecolor="white", linewidth=0.5)
+    
+    # Add value labels on bars
+    for bar, acc in zip(bars, accuracies):
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.5,
+                f"{acc:.1f}%", ha="center", va="bottom", fontsize=10, fontweight="bold")
+    
+    # Add overall accuracy line
+    ax.axhline(y=accuracy, color="#3498db", linestyle="--", linewidth=1.5, label=f"Overall: {accuracy:.2f}%")
+    ax.legend(fontsize=11, loc="lower right")
+    
+    ax.set_xlabel("Digit", fontsize=12)
+    ax.set_ylabel("Accuracy (%)", fontsize=12)
+    ax.set_title("Per-Digit Test Accuracy (HE-Compatible CNN)", fontsize=14)
+    ax.set_xticks(digits)
+    ax.set_ylim(0, 105)
+    ax.grid(axis="y", alpha=0.3)
+    
+    plt.tight_layout()
+    chart_path = os.path.join(output_dir, "per_digit_accuracy.png")
+    plt.savefig(chart_path, dpi=150)
+    plt.close()
+    print(f"\n  Per-digit chart saved to: {chart_path}")
+
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -618,5 +698,12 @@ if __name__ == "__main__":
     model, history = train_full(model, train_loader, test_loader, num_epochs=10, lr=0.001)
     print(f"  Step 3 Complete: Training finished ✓")
     
-    # Step 4: Evaluate accuracy   (TODO)
+    # Step 4a: Final accuracy report
+    print("\nStep 4a: Final Accuracy Report")
+    print("-" * 40)
+    evaluate_final(model, test_loader)
+    print("  Step 4a Complete: Accuracy report generated ✓")
+
+    # Step 4b: Confusion matrix   (TODO)
+    # Step 4c: Sample predictions (TODO)
     # Step 5: Export weights      (TODO)
