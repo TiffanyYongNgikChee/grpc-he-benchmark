@@ -769,6 +769,110 @@ def confusion_matrix_report(model, test_loader):
 
 
 # ============================================================================
+# Step 4c: Sample Predictions
+# ============================================================================
+
+def sample_predictions(model, test_loader):
+    """
+    Visualize sample correct and incorrect predictions for each digit.
+    
+    Creates a 10×2 grid:
+      - Left column:  one correctly classified example per digit
+      - Right column: one incorrectly classified example per digit (if any)
+    
+    Each cell shows the image, true label, predicted label, and confidence.
+    This gives a quick visual sanity check of what the model gets right
+    and wrong, and is useful for comparing with HE inference results later.
+    
+    Args:
+        model: Trained HE_CNN model
+        test_loader: DataLoader for test data (10,000 images)
+    """
+    output_dir = os.path.dirname(__file__)
+    model.eval()
+    
+    # Collect one correct and one incorrect example per digit
+    correct_samples = {}   # digit → (image, predicted, confidence)
+    incorrect_samples = {} # digit → (image, predicted, confidence)
+    
+    with torch.no_grad():
+        for images, labels in test_loader:
+            outputs = model(images)
+            probs = torch.softmax(outputs, dim=1)
+            confidences, predicted = torch.max(probs, dim=1)
+            
+            for i in range(images.size(0)):
+                true_label = labels[i].item()
+                pred_label = predicted[i].item()
+                conf = confidences[i].item() * 100
+                img = images[i]
+                
+                if true_label == pred_label and true_label not in correct_samples:
+                    correct_samples[true_label] = (img, pred_label, conf)
+                
+                if true_label != pred_label and true_label not in incorrect_samples:
+                    incorrect_samples[true_label] = (img, pred_label, conf)
+            
+            # Stop early if we have all samples
+            if len(correct_samples) == 10 and len(incorrect_samples) >= 8:
+                break
+    
+    # Print summary
+    print(f"\n  Correct examples found:   {len(correct_samples)}/10 digits")
+    print(f"  Incorrect examples found: {len(incorrect_samples)}/10 digits")
+    
+    # Print text summary of incorrect predictions
+    if incorrect_samples:
+        print(f"\n  Misclassified Examples:")
+        for digit in range(10):
+            if digit in incorrect_samples:
+                _, pred, conf = incorrect_samples[digit]
+                print(f"    Digit {digit} → predicted {pred} (confidence: {conf:.1f}%)")
+            else:
+                print(f"    Digit {digit} → (all correct in sample)")
+    
+    # Create visualization: 10 rows × 2 columns (correct | incorrect)
+    fig, axes = plt.subplots(10, 2, figsize=(6, 24))
+    fig.suptitle("Sample Predictions: Correct vs Incorrect", fontsize=14, y=0.995)
+    
+    # Column headers
+    axes[0, 0].set_title("✓ Correct", fontsize=12, fontweight="bold", color="#2ecc71")
+    axes[0, 1].set_title("✗ Incorrect", fontsize=12, fontweight="bold", color="#e74c3c")
+    
+    for digit in range(10):
+        # Left column: correct prediction
+        ax_correct = axes[digit, 0]
+        if digit in correct_samples:
+            img, pred, conf = correct_samples[digit]
+            ax_correct.imshow(img.squeeze(), cmap="gray")
+            ax_correct.set_ylabel(f"Digit {digit}", fontsize=10, fontweight="bold")
+            ax_correct.set_xlabel(f"pred={pred} ({conf:.0f}%)", fontsize=8, color="#2ecc71")
+        else:
+            ax_correct.text(0.5, 0.5, "N/A", ha="center", va="center", fontsize=12)
+            ax_correct.set_ylabel(f"Digit {digit}", fontsize=10, fontweight="bold")
+        ax_correct.set_xticks([])
+        ax_correct.set_yticks([])
+        
+        # Right column: incorrect prediction
+        ax_incorrect = axes[digit, 1]
+        if digit in incorrect_samples:
+            img, pred, conf = incorrect_samples[digit]
+            ax_incorrect.imshow(img.squeeze(), cmap="gray")
+            ax_incorrect.set_xlabel(f"pred={pred} ({conf:.0f}%)", fontsize=8, color="#e74c3c")
+        else:
+            ax_incorrect.text(0.5, 0.5, "All correct!", ha="center", va="center",
+                            fontsize=9, color="#2ecc71", fontweight="bold")
+        ax_incorrect.set_xticks([])
+        ax_incorrect.set_yticks([])
+    
+    plt.tight_layout()
+    pred_path = os.path.join(output_dir, "sample_predictions.png")
+    plt.savefig(pred_path, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"\n  Sample predictions saved to: {pred_path}")
+
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -827,5 +931,10 @@ if __name__ == "__main__":
     confusion_matrix_report(model, test_loader)
     print("  Confusion matrix generated ✓")
 
-    # Step 4c: Sample predictions (TODO)
+    # Sample predictions
+    print("\nSample Predictions")
+    print("-" * 40)
+    sample_predictions(model, test_loader)
+    print("  Sample predictions generated ✓")
+
     # Step 5: Export weights      (TODO)
