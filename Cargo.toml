@@ -25,3 +25,7 @@ path = "examples/openfhe_cnn_demo.rs"
 name = "test_weight_loader"
 path = "examples/test_weight_loader.rs"
 
+[[example]]
+name = "mnist_inference"
+path = "examples/mnist_inference.rs"
+
