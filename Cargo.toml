@@ -17,3 +17,11 @@ path = "src/lib.rs"
 name = "benchmark"
 path = "examples/benchmark.rs"
 
+[[example]]
+name = "openfhe_cnn_demo"
+path = "examples/openfhe_cnn_demo.rs"
+
+[[example]]
+name = "test_weight_loader"
+path = "examples/test_weight_loader.rs"
+

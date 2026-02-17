@@ -7,6 +7,7 @@ mod helib_bindings;     // HElib FFI bindings
 pub mod helib;          // HElib safe wrapper 
 mod open_fhe_binding;
 pub mod open_fhe_lib;
+pub mod weight_loader;  // MNIST weight loader (CSV parser for exported weights)
 
 use std::ffi::{CStr, CString}; // CStr and CString convert between Rust strings and C strings.
 use std::ptr::NonNull; // NonNull safely wraps raw pointers that should never be null.
