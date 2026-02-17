@@ -873,6 +873,123 @@ def sample_predictions(model, test_loader):
 
 
 # ============================================================================
+# Step 5a: Quantize Weights to Integers
+# ============================================================================
+
+def quantize_weights(model, scale_factor=1000):
+    """
+    Quantize float32 model weights to integers for BFV encryption.
+    
+    BFV (Brakerski-Fan-Vercauteren) operates on integers modulo a plaintext
+    modulus. Our OpenFHE setup uses plaintext_modulus = 7340033, so integer
+    weights must fit within that range.
+    
+    Quantization process:
+      1. Take float weight w (e.g., 0.0342)
+      2. Multiply by scale_factor (e.g., 1000 → 34.2)
+      3. Round to nearest integer (→ 34)
+    
+    The same scale_factor must be applied to input pixels at inference time.
+    After each layer, intermediate values grow by scale_factor, so we need
+    to track the cumulative scale through the network.
+    
+    Scale tracking through layers:
+      Input pixels:  scaled by S (scale_factor)
+      After Conv1:   S × S = S² (input × kernel, both scaled)
+      After x²:     S² × S² = S⁴
+      After Pool:   S⁴ (averaging doesn't change scale)
+      After Conv2:  S⁴ × S = S⁵
+      After x²:    S⁵ × S⁵ = S¹⁰
+      After Pool:  S¹⁰
+      After FC:    S¹⁰ × S = S¹¹
+    
+    Note: The scale grows exponentially! With scale=1000, S¹¹ overflows.
+    In practice, the HE pipeline applies rescaling after each operation.
+    For weight export, we just need each layer's weights × scale_factor.
+    
+    Args:
+        model: Trained HE_CNN model with float32 weights
+        scale_factor: Integer multiplier (default: 1000)
+    
+    Returns:
+        quantized: Dict with quantized weights for each layer
+                   Keys: 'conv1_weight', 'conv1_bias', 'conv2_weight',
+                         'conv2_bias', 'fc_weight', 'fc_bias',
+                         'scale_factor'
+    """
+    print(f"\n  Scale factor: {scale_factor}")
+    print(f"  Plaintext modulus: 7340033 (max integer in BFV)")
+    print(f"  Max representable value: ±{7340033 // 2}\n")
+    
+    quantized = {"scale_factor": scale_factor}
+    
+    # Layer mapping: param_name → (display_name, key)
+    layers = [
+        ("conv1.weight", "Conv1 kernel", "conv1_weight"),
+        ("conv1.bias",   "Conv1 bias",   "conv1_bias"),
+        ("conv2.weight", "Conv2 kernel", "conv2_weight"),
+        ("conv2.bias",   "Conv2 bias",   "conv2_bias"),
+        ("fc.weight",    "FC weights",   "fc_weight"),
+        ("fc.bias",      "FC bias",      "fc_bias"),
+    ]
+    
+    state_dict = model.state_dict()
+    
+    print(f"  {'Layer':<15s} {'Shape':>15s} {'Float range':>25s} {'Int range':>20s} {'Max |int|':>10s}")
+    print(f"  {'─'*15}  {'─'*15} {'─'*25} {'─'*20} {'─'*10}")
+    
+    for param_name, display_name, key in layers:
+        float_weights = state_dict[param_name].numpy()
+        
+        # Quantize: multiply by scale factor and round
+        int_weights = np.round(float_weights * scale_factor).astype(np.int64)
+        
+        quantized[key] = int_weights
+        
+        # Statistics
+        f_min, f_max = float_weights.min(), float_weights.max()
+        i_min, i_max = int_weights.min(), int_weights.max()
+        max_abs = max(abs(i_min), abs(i_max))
+        
+        shape_str = str(list(float_weights.shape))
+        float_range = f"[{f_min:+.6f}, {f_max:+.6f}]"
+        int_range = f"[{i_min:+d}, {i_max:+d}]"
+        
+        print(f"  {display_name:<15s} {shape_str:>15s} {float_range:>25s} {int_range:>20s} {max_abs:>10d}")
+    
+    # Check if any values exceed plaintext modulus
+    max_half = 7340033 // 2
+    overflow = False
+    for param_name, display_name, key in layers:
+        max_val = max(abs(quantized[key].min()), abs(quantized[key].max()))
+        if max_val > max_half:
+            print(f"\n  ⚠ WARNING: {display_name} max |value| = {max_val} exceeds ±{max_half}")
+            overflow = True
+    
+    if not overflow:
+        print(f"\n  ✓ All quantized values fit within plaintext modulus (±{max_half})")
+    
+    # Show quantization error
+    print(f"\n  Quantization Error (per layer):")
+    for param_name, display_name, key in layers:
+        float_weights = state_dict[param_name].numpy()
+        # Reconstruct: int / scale → approximate float
+        reconstructed = quantized[key].astype(np.float64) / scale_factor
+        error = np.abs(float_weights - reconstructed)
+        
+        print(f"    {display_name:<15s}  "
+              f"mean_err={error.mean():.6f}  "
+              f"max_err={error.max():.6f}  "
+              f"(max is {error.max() / (abs(float_weights).max() + 1e-10) * 100:.2f}% of max weight)")
+    
+    # Total parameter count
+    total_ints = sum(quantized[key].size for _, _, key in layers)
+    print(f"\n  Total quantized parameters: {total_ints}")
+    
+    return quantized
+
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -937,4 +1054,11 @@ if __name__ == "__main__":
     sample_predictions(model, test_loader)
     print("  Sample predictions generated ✓")
 
-    # Step 5: Export weights      (TODO)
+    # Export weights
+    print("\nStep 5a: Quantize Weights")
+    print("-" * 40)
+    quantized = quantize_weights(model)
+    print("  Step 5a Complete: Weights quantized ✓")
+
+    # Step 5b: Save weights to CSV  (TODO)
+    # Step 5c: Verify quantized accuracy (TODO)
