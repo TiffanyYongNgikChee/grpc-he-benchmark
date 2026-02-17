@@ -37,6 +37,11 @@ use std::fs;
 use std::io::{self, BufRead};
 use std::path::Path;
 
+use crate::open_fhe_lib::{
+    OpenFHEContext, OpenFHEKeyPair, OpenFHEPlaintext, OpenFHECiphertext,
+    OpenFHEError,
+};
+
 // ============================================================================
 // Error type
 // ============================================================================
@@ -418,6 +423,137 @@ impl MnistWeights {
         + self.conv2_weights.len() + self.conv2_bias.len()
         + self.fc_weights.len() + self.fc_bias.len()
     }
+
+    // ========================================================================
+    // Step 6b: Encode weights into OpenFHE plaintexts
+    // ========================================================================
+    //
+    // These methods convert loaded integer weights into OpenFHE types
+    // ready for the encrypted CNN pipeline. The encoding matches
+    // what each HE operation expects:
+    //
+    //   conv2d:  plaintext kernel (flat 5×5 = 25 values)
+    //   matmul:  plaintext weight matrix (flat 10×16 = 160 values)
+    //   bias:    encrypted bias vector (add to ciphertext output)
+    //
+    // Bias must be ENCRYPTED (not plaintext) because the existing
+    // `ciphertext.add()` only supports ciphertext + ciphertext.
+    // We encrypt a vector where the bias is placed in the correct
+    // slot positions to align with the layer output.
+
+    /// Encode all model weights as OpenFHE plaintexts/ciphertexts.
+    ///
+    /// Returns an `EncodedWeights` struct with everything ready for
+    /// the encrypted inference pipeline.
+    ///
+    /// # Arguments
+    /// * `context` - OpenFHE BFV context (must match training config:
+    ///               plaintext_modulus=7340033, mult_depth=3)
+    /// * `keypair` - Key pair (needed to encrypt bias vectors)
+    pub fn encode(&self, context: &OpenFHEContext, keypair: &OpenFHEKeyPair)
+        -> Result<EncodedWeights, OpenFHEError>
+    {
+        println!("  Encoding weights as OpenFHE plaintexts...");
+
+        // ---- Conv1 kernel: 5×5 = 25 values → plaintext ----
+        let conv1_kernel_pt = OpenFHEPlaintext::from_vec(context, &self.conv1_weights)?;
+
+        // ---- Conv1 bias: 1 value → encrypted ----
+        // After conv2d on 28×28 with 5×5 kernel → 24×24 = 576 output values.
+        // The bias needs to be added to EVERY output pixel.
+        // Create a vector with the bias repeated in every slot.
+        let conv1_out_size = 24 * 24; // 576
+        let conv1_bias_vec: Vec<i64> = vec![self.conv1_bias[0]; conv1_out_size];
+        let conv1_bias_pt = OpenFHEPlaintext::from_vec(context, &conv1_bias_vec)?;
+        let conv1_bias_ct = OpenFHECiphertext::encrypt(context, keypair, &conv1_bias_pt)?;
+
+        // ---- Conv2 kernel: 5×5 = 25 values → plaintext ----
+        let conv2_kernel_pt = OpenFHEPlaintext::from_vec(context, &self.conv2_weights)?;
+
+        // ---- Conv2 bias: 1 value → encrypted ----
+        // After conv2d on 12×12 with 5×5 kernel → 8×8 = 64 output values.
+        let conv2_out_size = 8 * 8; // 64
+        let conv2_bias_vec: Vec<i64> = vec![self.conv2_bias[0]; conv2_out_size];
+        let conv2_bias_pt = OpenFHEPlaintext::from_vec(context, &conv2_bias_vec)?;
+        let conv2_bias_ct = OpenFHECiphertext::encrypt(context, keypair, &conv2_bias_pt)?;
+
+        // ---- FC weights: 10×16 = 160 values → plaintext ----
+        // matmul() expects the full matrix as a single plaintext (flattened row-major)
+        let fc_weights_pt = OpenFHEPlaintext::from_vec(context, &self.fc_weights)?;
+
+        // ---- FC bias: 10 values → encrypted ----
+        // matmul output is a 10-element vector (one per class).
+        // Bias has one value per class, already aligned correctly.
+        let fc_bias_pt = OpenFHEPlaintext::from_vec(context, &self.fc_bias)?;
+        let fc_bias_ct = OpenFHECiphertext::encrypt(context, keypair, &fc_bias_pt)?;
+
+        println!("  ✓ All weights encoded ({} parameters)", self.total_params());
+        println!("    Conv1 kernel: plaintext (25 values)");
+        println!("    Conv1 bias:   ciphertext ({} slots, bias={})", conv1_out_size, self.conv1_bias[0]);
+        println!("    Conv2 kernel: plaintext (25 values)");
+        println!("    Conv2 bias:   ciphertext ({} slots, bias={})", conv2_out_size, self.conv2_bias[0]);
+        println!("    FC weights:   plaintext (160 values, 10×16)");
+        println!("    FC bias:      ciphertext (10 values)");
+
+        Ok(EncodedWeights {
+            conv1_kernel: conv1_kernel_pt,
+            conv1_bias: conv1_bias_ct,
+            conv2_kernel: conv2_kernel_pt,
+            conv2_bias: conv2_bias_ct,
+            fc_weights: fc_weights_pt,
+            fc_bias: fc_bias_ct,
+            scale_factor: self.config.scale_factor,
+        })
+    }
+}
+
+// ============================================================================
+// Encoded weights (ready for OpenFHE inference pipeline)
+// ============================================================================
+
+/// All model weights encoded as OpenFHE types, ready for encrypted inference.
+///
+/// Usage in the CNN pipeline:
+/// ```text
+/// // Conv1 block
+/// let x = encrypted_input
+///     .conv2d(&ctx, &kp, &w.conv1_kernel, 28, 28, 5, 5)?  // [24×24]
+///     ;
+/// let x = x.add(&ctx, &w.conv1_bias)?;                     // + bias
+/// let x = x.poly_relu(&ctx, 2)?;                           // x²
+/// let x = x.avgpool(&ctx, &kp, 24, 24, 2, 2)?;            // [12×12]
+///
+/// // Conv2 block
+/// let x = x.conv2d(&ctx, &kp, &w.conv2_kernel, 12, 12, 5, 5)?;
+/// let x = x.add(&ctx, &w.conv2_bias)?;
+/// let x = x.poly_relu(&ctx, 2)?;
+/// let x = x.avgpool(&ctx, &kp, 8, 8, 2, 2)?;              // [4×4=16]
+///
+/// // FC layer
+/// let x = OpenFHECiphertext::matmul(&ctx, &kp, &w.fc_weights, &x, 10, 16)?;
+/// let x = x.add(&ctx, &w.fc_bias)?;                        // [10] logits
+/// ```
+pub struct EncodedWeights {
+    /// Conv1 kernel as plaintext (flat 5×5, for `conv2d()`)
+    pub conv1_kernel: OpenFHEPlaintext,
+
+    /// Conv1 bias as encrypted ciphertext (broadcast to 24×24 slots, for `.add()`)
+    pub conv1_bias: OpenFHECiphertext,
+
+    /// Conv2 kernel as plaintext (flat 5×5, for `conv2d()`)
+    pub conv2_kernel: OpenFHEPlaintext,
+
+    /// Conv2 bias as encrypted ciphertext (broadcast to 8×8 slots, for `.add()`)
+    pub conv2_bias: OpenFHECiphertext,
+
+    /// FC weight matrix as plaintext (flat 10×16 row-major, for `matmul()`)
+    pub fc_weights: OpenFHEPlaintext,
+
+    /// FC bias as encrypted ciphertext (10 values, for `.add()`)
+    pub fc_bias: OpenFHECiphertext,
+
+    /// Scale factor from quantization (e.g., 1000)
+    pub scale_factor: i64,
 }
 
 // ============================================================================
