@@ -3,15 +3,36 @@ target/
 Cargo.lock
 **/*.rs.bk
 
-# C++
+# C++ build artifacts
 cpp_wrapper/build/
 helib_wrapper/build/
+openfhe_cpp_wrapper/build/
 **/CMakeCache.txt
 **/CMakeFiles/
 *.dylib
 *.so
+*.so.*
 *.o
 *.a
+
+# Java / Spring Boot
+spring-boot-api/target/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# MNIST dataset (large, re-downloadable)
+mnist_training/data/
+
+# Model checkpoints & generated images (re-trainable)
+mnist_training/*.pth
+mnist_training/*.png
+
+# Logs
+*.log
 
 # macOS
 .DS_Store
