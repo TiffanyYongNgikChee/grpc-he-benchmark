@@ -31,6 +31,9 @@ mnist_training/data/
 mnist_training/*.pth
 mnist_training/*.png
 
+# Exported weights (re-exportable from .pth)
+mnist_training/weights/
+
 # Logs
 *.log
 

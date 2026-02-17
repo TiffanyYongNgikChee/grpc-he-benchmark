@@ -23,6 +23,7 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 import numpy as np
+import json
 import os
 import matplotlib.pyplot as plt
 
@@ -990,6 +991,150 @@ def quantize_weights(model, scale_factor=1000):
 
 
 # ============================================================================
+# Step 5b: Export Weights to CSV
+# ============================================================================
+
+def export_weights_csv(quantized, model, test_loader):
+    """
+    Save quantized integer weights to CSV files for the Rust/OpenFHE pipeline.
+    
+    Creates a 'weights/' directory with one CSV file per layer parameter,
+    plus a model_config.json with metadata needed by the Rust weight loader.
+    
+    File layout:
+      weights/
+        conv1_weights.csv   — 5×5 kernel, 25 integers (row-major)
+        conv1_bias.csv      — 1 integer
+        conv2_weights.csv   — 5×5 kernel, 25 integers (row-major)
+        conv2_bias.csv      — 1 integer
+        fc_weights.csv      — 10×16 matrix, 160 integers (row-major)
+        fc_bias.csv         — 10 integers
+        model_config.json   — scale factor, architecture, accuracy
+    
+    CSV format:
+      - Conv kernels: 2D grid (rows × cols), comma-separated
+      - FC weights: 2D grid (out_features × in_features), comma-separated
+      - Biases: single row, comma-separated
+    
+    This format is easy to parse in Rust with simple CSV reading.
+    
+    Args:
+        quantized: Dict from quantize_weights() with integer arrays
+        model: Trained model (for accuracy reference)
+        test_loader: Test loader (for recording accuracy in config)
+    """
+    output_dir = os.path.join(os.path.dirname(__file__), "weights")
+    os.makedirs(output_dir, exist_ok=True)
+    
+    scale_factor = quantized["scale_factor"]
+    files_written = []
+    
+    # --- Conv1 kernel: shape [1, 1, 5, 5] → flatten to [5, 5] ---
+    conv1_w = quantized["conv1_weight"].reshape(5, 5)
+    conv1_path = os.path.join(output_dir, "conv1_weights.csv")
+    np.savetxt(conv1_path, conv1_w, fmt="%d", delimiter=",")
+    files_written.append(("conv1_weights.csv", conv1_w.shape, conv1_w.size))
+    
+    # --- Conv1 bias: shape [1] ---
+    conv1_b = quantized["conv1_bias"].flatten()
+    conv1_b_path = os.path.join(output_dir, "conv1_bias.csv")
+    np.savetxt(conv1_b_path, conv1_b.reshape(1, -1), fmt="%d", delimiter=",")
+    files_written.append(("conv1_bias.csv", conv1_b.shape, conv1_b.size))
+    
+    # --- Conv2 kernel: shape [1, 1, 5, 5] → flatten to [5, 5] ---
+    conv2_w = quantized["conv2_weight"].reshape(5, 5)
+    conv2_path = os.path.join(output_dir, "conv2_weights.csv")
+    np.savetxt(conv2_path, conv2_w, fmt="%d", delimiter=",")
+    files_written.append(("conv2_weights.csv", conv2_w.shape, conv2_w.size))
+    
+    # --- Conv2 bias: shape [1] ---
+    conv2_b = quantized["conv2_bias"].flatten()
+    conv2_b_path = os.path.join(output_dir, "conv2_bias.csv")
+    np.savetxt(conv2_b_path, conv2_b.reshape(1, -1), fmt="%d", delimiter=",")
+    files_written.append(("conv2_bias.csv", conv2_b.shape, conv2_b.size))
+    
+    # --- FC weights: shape [10, 16] ---
+    fc_w = quantized["fc_weight"]  # Already [10, 16]
+    fc_path = os.path.join(output_dir, "fc_weights.csv")
+    np.savetxt(fc_path, fc_w, fmt="%d", delimiter=",")
+    files_written.append(("fc_weights.csv", fc_w.shape, fc_w.size))
+    
+    # --- FC bias: shape [10] ---
+    fc_b = quantized["fc_bias"].flatten()
+    fc_b_path = os.path.join(output_dir, "fc_bias.csv")
+    np.savetxt(fc_b_path, fc_b.reshape(1, -1), fmt="%d", delimiter=",")
+    files_written.append(("fc_bias.csv", fc_b.shape, fc_b.size))
+    
+    # Print summary
+    print(f"\n  Output directory: {output_dir}\n")
+    print(f"  {'File':<25s} {'Shape':>12s} {'Values':>8s}")
+    print(f"  {'─'*25} {'─'*12} {'─'*8}")
+    for filename, shape, count in files_written:
+        print(f"  {filename:<25s} {str(list(shape)):>12s} {count:>8d}")
+    
+    total_values = sum(c for _, _, c in files_written)
+    print(f"  {'TOTAL':<25s} {'':>12s} {total_values:>8d}")
+    
+    # --- model_config.json ---
+    # Get current accuracy for reference
+    accuracy, per_digit = evaluate(model, test_loader)
+    
+    config = {
+        "model_name": "HE_CNN",
+        "framework": "PyTorch",
+        "architecture": {
+            "layers": [
+                {"name": "conv1", "type": "Conv2d", "kernel_size": 5, "in_channels": 1, "out_channels": 1, "padding": 0},
+                {"name": "act1", "type": "SquareActivation", "formula": "x^2"},
+                {"name": "pool1", "type": "AvgPool2d", "kernel_size": 2, "stride": 2},
+                {"name": "conv2", "type": "Conv2d", "kernel_size": 5, "in_channels": 1, "out_channels": 1, "padding": 0},
+                {"name": "act2", "type": "SquareActivation", "formula": "x^2"},
+                {"name": "pool2", "type": "AvgPool2d", "kernel_size": 2, "stride": 2},
+                {"name": "fc", "type": "Linear", "in_features": 16, "out_features": 10}
+            ],
+            "input_shape": [1, 1, 28, 28],
+            "output_shape": [1, 10],
+            "total_parameters": 222
+        },
+        "quantization": {
+            "scale_factor": scale_factor,
+            "method": "round(weight * scale_factor)",
+            "plaintext_modulus": 7340033,
+            "scheme": "BFV"
+        },
+        "accuracy": {
+            "float_model": round(accuracy, 2),
+            "per_digit": {str(d): round(a, 2) for d, a in per_digit.items()}
+        },
+        "files": {
+            "conv1_weights": "conv1_weights.csv",
+            "conv1_bias": "conv1_bias.csv",
+            "conv2_weights": "conv2_weights.csv",
+            "conv2_bias": "conv2_bias.csv",
+            "fc_weights": "fc_weights.csv",
+            "fc_bias": "fc_bias.csv"
+        }
+    }
+    
+    config_path = os.path.join(output_dir, "model_config.json")
+    with open(config_path, "w") as f:
+        json.dump(config, f, indent=2)
+    
+    print(f"\n  Config saved to: {config_path}")
+    
+    # Verify files are readable
+    print(f"\n  Verification (re-read and check):")
+    for filename, expected_shape, expected_count in files_written:
+        filepath = os.path.join(output_dir, filename)
+        data = np.loadtxt(filepath, delimiter=",", dtype=np.int64)
+        if data.ndim == 0:
+            data = data.reshape(1)
+        actual_count = data.size
+        match = actual_count == expected_count
+        print(f"    {filename:<25s} read {actual_count} values {'✓' if match else '✗'}")
+
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -1060,5 +1205,10 @@ if __name__ == "__main__":
     quantized = quantize_weights(model)
     print("  Step 5a Complete: Weights quantized ✓")
 
-    # Step 5b: Save weights to CSV  (TODO)
+    # Save weights to CSV
+    print("\nStep 5b: Export Weights to CSV")
+    print("-" * 40)
+    export_weights_csv(quantized, model, test_loader)
+    print("  Step 5b Complete: Weights exported ✓")
+
     # Step 5c: Verify quantized accuracy (TODO)
