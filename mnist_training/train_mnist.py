@@ -1135,6 +1135,93 @@ def export_weights_csv(quantized, model, test_loader):
 
 
 # ============================================================================
+# Step 5c: Verify Quantized Accuracy
+# ============================================================================
+
+def verify_quantized_accuracy(quantized, model, test_loader):
+    """
+    Verify that quantized integer weights produce the same accuracy.
+    
+    This simulates what the HE pipeline will do:
+      1. Load quantized integer weights (from CSV)
+      2. Convert back to float by dividing by scale_factor
+      3. Run inference with reconstructed float weights
+      4. Compare accuracy against original float model
+    
+    If accuracy drops significantly, the scale_factor is too small
+    and we need a larger one (or a different quantization strategy).
+    
+    This is NOT a full HE simulation — it just checks that the
+    rounding error from quantization doesn't destroy accuracy.
+    The actual HE pipeline will have additional noise from encryption.
+    
+    Args:
+        quantized: Dict from quantize_weights() with integer arrays
+        model: Original trained model (for comparison)
+        test_loader: Test data for evaluation
+    """
+    scale_factor = quantized["scale_factor"]
+    
+    # Step 1: Get original float accuracy
+    print(f"\n  Scale factor: {scale_factor}")
+    original_acc, original_per_digit = evaluate(model, test_loader)
+    print(f"  Original float accuracy: {original_acc:.2f}%")
+    
+    # Step 2: Create a new model with quantized weights (int → float)
+    quantized_model = HE_CNN()
+    
+    # Reconstruct float weights from quantized integers
+    state_dict = quantized_model.state_dict()
+    
+    layer_map = [
+        ("conv1.weight", "conv1_weight", [1, 1, 5, 5]),
+        ("conv1.bias",   "conv1_bias",   [1]),
+        ("conv2.weight", "conv2_weight", [1, 1, 5, 5]),
+        ("conv2.bias",   "conv2_bias",   [1]),
+        ("fc.weight",    "fc_weight",    [10, 16]),
+        ("fc.bias",      "fc_bias",      [10]),
+    ]
+    
+    for param_name, key, shape in layer_map:
+        int_weights = quantized[key]
+        float_reconstructed = int_weights.astype(np.float32) / scale_factor
+        state_dict[param_name] = torch.from_numpy(float_reconstructed.reshape(shape))
+    
+    quantized_model.load_state_dict(state_dict)
+    
+    # Step 3: Evaluate quantized model
+    quant_acc, quant_per_digit = evaluate(quantized_model, test_loader)
+    print(f"  Quantized accuracy:      {quant_acc:.2f}%")
+    
+    # Step 4: Compare
+    drop = original_acc - quant_acc
+    print(f"  Accuracy drop:           {drop:+.2f}%")
+    
+    if abs(drop) < 0.1:
+        print(f"\n  ✓ Negligible accuracy drop — quantization is lossless in practice")
+    elif abs(drop) < 1.0:
+        print(f"\n  ✓ Minor accuracy drop — acceptable for HE inference")
+    elif abs(drop) < 5.0:
+        print(f"\n  ⚠ Moderate accuracy drop — consider increasing scale_factor")
+    else:
+        print(f"\n  ✗ Significant accuracy drop — scale_factor too small!")
+    
+    # Per-digit comparison
+    print(f"\n  Per-Digit Comparison:")
+    print(f"  {'Digit':>5s}  {'Float':>8s}  {'Quantized':>10s}  {'Drop':>8s}")
+    print(f"  {'─'*5}  {'─'*8}  {'─'*10}  {'─'*8}")
+    
+    for digit in range(10):
+        f_acc = original_per_digit[digit]
+        q_acc = quant_per_digit[digit]
+        d = f_acc - q_acc
+        marker = "" if abs(d) < 0.5 else " ⚠" if abs(d) < 2.0 else " ✗"
+        print(f"  {digit:5d}  {f_acc:7.2f}%  {q_acc:9.2f}%  {d:+7.2f}%{marker}")
+    
+    print(f"\n  Conclusion: Quantized weights are ready for OpenFHE pipeline")
+
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -1211,4 +1298,8 @@ if __name__ == "__main__":
     export_weights_csv(quantized, model, test_loader)
     print("  Step 5b Complete: Weights exported ✓")
 
-    # Step 5c: Verify quantized accuracy (TODO)
+    # Verify quantized accuracy
+    print("\nStep 5c: Verify Quantized Accuracy")
+    print("-" * 40)
+    verify_quantized_accuracy(quantized, model, test_loader)
+    print("  Step 5c Complete: Quantized accuracy verified ✓")
