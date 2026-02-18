@@ -11,6 +11,7 @@
 #include <vector>
 #include <cstdint>
 #include <cmath>
+#include <cstdio>
 #include <string>
 
 using namespace lbcrypto;
@@ -60,9 +61,10 @@ extern "C" OpenFHECiphertext* openfhe_matmul(
     OpenFHEPlaintext* weights,
     OpenFHECiphertext* input,
     size_t rows,
-    size_t cols
+    size_t cols,
+    int64_t divisor
 ) {
-    if (!ctx || !keypair || !weights || !input) {
+    if (!ctx || !keypair || !weights || !input || divisor == 0) {
         set_cnn_error("Invalid parameters for matmul");
         return nullptr;
     }
@@ -86,10 +88,16 @@ extern "C" OpenFHECiphertext* openfhe_matmul(
         );
         std::vector<int64_t> input_vec = input_plain->GetPackedValue();
         
-        // Get slot count for proper packing
+        // Get slot count and handle signed representation
         size_t slot_count = ctx->cryptoContext->GetEncodingParams()->GetBatchSize();
+        int64_t p = ctx->cryptoContext->GetCryptoParameters()->GetPlaintextModulus();
+        int64_t half_p = p / 2;
         
-        // Compute matrix-vector multiplication: result[i] = sum_j(W[i,j] * input[j])
+        // Convert weight and input values to signed representation
+        for (auto& v : weight_vec) { if (v > half_p) v -= p; }
+        for (auto& v : input_vec) { if (v > half_p) v -= p; }
+        
+        // Compute matrix-vector multiplication: result[i] = sum_j(W[i,j] * input[j]) / divisor
         std::vector<int64_t> output_vec(slot_count, 0);
         
         for (size_t i = 0; i < rows; i++) {
@@ -100,7 +108,7 @@ extern "C" OpenFHECiphertext* openfhe_matmul(
                 sum += w * x;
             }
             if (i < slot_count) {
-                output_vec[i] = sum;
+                output_vec[i] = sum / divisor;
             }
         }
         
@@ -144,9 +152,10 @@ extern "C" OpenFHECiphertext* openfhe_conv2d(
     size_t input_height,
     size_t input_width,
     size_t kernel_height,
-    size_t kernel_width
+    size_t kernel_width,
+    int64_t divisor
 ) {
-    if (!ctx || !keypair || !input || !kernel) {
+    if (!ctx || !keypair || !input || !kernel || divisor == 0) {
         set_cnn_error("Invalid parameters for conv2d");
         return nullptr;
     }
@@ -171,6 +180,12 @@ extern "C" OpenFHECiphertext* openfhe_conv2d(
         );
         std::vector<int64_t> input_vec = input_plain->GetPackedValue();
         
+        // Convert to signed representation
+        int64_t p = ctx->cryptoContext->GetCryptoParameters()->GetPlaintextModulus();
+        int64_t half_p = p / 2;
+        for (auto& v : kernel_vec) { if (v > half_p) v -= p; }
+        for (auto& v : input_vec) { if (v > half_p) v -= p; }
+        
         // Compute convolution output
         size_t slot_count = ctx->cryptoContext->GetEncodingParams()->GetBatchSize();
         std::vector<int64_t> output_vec(slot_count, 0);
@@ -191,7 +206,7 @@ extern "C" OpenFHECiphertext* openfhe_conv2d(
                 }
                 size_t output_idx = oh * out_width + ow;
                 if (output_idx < slot_count) {
-                    output_vec[output_idx] = sum;
+                    output_vec[output_idx] = sum / divisor;
                 }
             }
         }
@@ -216,9 +231,70 @@ extern "C" OpenFHECiphertext* openfhe_conv2d(
     }
 }
 
-// Polynomial ReLU Approximation
-// Approximates ReLU using polynomial: a*x^3 + b*x + c
-// degree: polynomial degree (3, 5, or 7)
+// Square Activation with Rescale — decrypt→compute→re-encrypt
+// Computes f(x) = x² / divisor for each value in the encrypted vector.
+// Combines squaring and rescaling in a single step to prevent overflow.
+// The divisor should typically be the scale_factor to manage scale growth.
+//
+// The x² activation is from the CryptoNets paper (Gilad-Bachrach et al., ICML 2016).
+extern "C" OpenFHECiphertext* openfhe_square_activate(
+    OpenFHEContext* ctx,
+    OpenFHEKeyPair* keypair,
+    OpenFHECiphertext* input,
+    int64_t divisor
+) {
+    if (!ctx || !keypair || !input || divisor == 0) {
+        set_cnn_error("Invalid parameters for square_activate");
+        return nullptr;
+    }
+    
+    try {
+        // Decrypt to get plaintext values
+        Plaintext input_plain;
+        ctx->cryptoContext->Decrypt(
+            keypair->keyPair.secretKey,
+            input->ciphertext,
+            &input_plain
+        );
+        std::vector<int64_t> input_vec = input_plain->GetPackedValue();
+        
+        size_t slot_count = ctx->cryptoContext->GetEncodingParams()->GetBatchSize();
+        int64_t p = ctx->cryptoContext->GetCryptoParameters()->GetPlaintextModulus();
+        int64_t half_p = p / 2;
+        std::vector<int64_t> output_vec(slot_count, 0);
+        
+        // Compute x² / divisor for each value in 64-bit space (no overflow)
+        // Handle signed representation: BFV stores negative values as p-|x|
+        for (size_t i = 0; i < input_vec.size() && i < slot_count; i++) {
+            int64_t val = input_vec[i];
+            if (val > half_p) val -= p;  // Convert from [0, p) to [-p/2, p/2)
+            output_vec[i] = (val * val) / divisor;  // Always non-negative in 64-bit
+        }
+        
+        // Re-encrypt
+        auto output_pt = ctx->cryptoContext->MakePackedPlaintext(output_vec);
+        auto output_ct = ctx->cryptoContext->Encrypt(
+            keypair->keyPair.publicKey,
+            output_pt
+        );
+        
+        OpenFHECiphertext* result = new OpenFHECiphertext();
+        result->ciphertext = output_ct;
+        result->ctx = ctx;
+        
+        set_cnn_error("");
+        return result;
+        
+    } catch (const std::exception& e) {
+        set_cnn_error(std::string("Square activation failed: ") + e.what());
+        return nullptr;
+    }
+}
+
+// Polynomial ReLU Approximation (homomorphic version)
+// Computes x² using HE ciphertext-ciphertext multiplication.
+// WARNING: This consumes multiplicative depth and values must fit in plaintext modulus.
+// For large values, use openfhe_square_activate instead (decrypt→compute→re-encrypt).
 extern "C" OpenFHECiphertext* openfhe_poly_relu(
     OpenFHEContext* ctx,
     OpenFHECiphertext* input,
@@ -230,18 +306,6 @@ extern "C" OpenFHECiphertext* openfhe_poly_relu(
     }
     
     try {
-        // Polynomial activation approximating ReLU
-        // HE cannot do "if x < 0, set to 0" (comparisons not supported on encrypted data).
-        // Instead, use a polynomial approximation that HE CAN compute (multiply + add only).
-        //
-        // Implementation: f(x) = x^2  (square activation from CryptoNets paper)
-        //   - Requires only 1 ciphertext-ciphertext multiplication
-        //   - Outputs are always non-negative (just like ReLU)
-        //   - Large inputs produce large outputs, small inputs produce small outputs
-        //   - Widely used in HE-based neural networks
-        //   - Reference: CryptoNets (Gilad-Bachrach et al., ICML 2016)
-        
-        // Compute x^2: one ciphertext * ciphertext multiplication
         auto x_squared = input->ctx->cryptoContext->EvalMult(
             input->ciphertext,
             input->ciphertext
@@ -295,6 +359,11 @@ extern "C" OpenFHECiphertext* openfhe_avgpool(
         );
         std::vector<int64_t> input_vec = input_plain->GetPackedValue();
         
+        // Convert to signed representation
+        int64_t p = ctx->cryptoContext->GetCryptoParameters()->GetPlaintextModulus();
+        int64_t half_p = p / 2;
+        for (auto& v : input_vec) { if (v > half_p) v -= p; }
+        
         // Compute average pooling output
         std::vector<int64_t> output_vec(slot_count, 0);
         int64_t pool_area = pool_size * pool_size;
@@ -335,6 +404,66 @@ extern "C" OpenFHECiphertext* openfhe_avgpool(
         
     } catch (const std::exception& e) {
         set_cnn_error(std::string("Average pooling failed: ") + e.what());
+        return nullptr;
+    }
+}
+
+// Rescale (divide all values by a divisor)
+// Used after polynomial activation (x²) to prevent scale accumulation.
+// After x² with scale_factor S, values are proportional to S².
+// Dividing by S brings them back to proportional to S.
+//
+// Uses decrypt→divide→re-encrypt approach.
+extern "C" OpenFHECiphertext* openfhe_rescale(
+    OpenFHEContext* ctx,
+    OpenFHEKeyPair* keypair,
+    OpenFHECiphertext* input,
+    int64_t divisor
+) {
+    if (!ctx || !keypair || !input || divisor == 0) {
+        set_cnn_error("Invalid parameters for rescale");
+        return nullptr;
+    }
+    
+    try {
+        // Decrypt input
+        Plaintext input_plain;
+        ctx->cryptoContext->Decrypt(
+            keypair->keyPair.secretKey,
+            input->ciphertext,
+            &input_plain
+        );
+        std::vector<int64_t> input_vec = input_plain->GetPackedValue();
+        
+        size_t slot_count = ctx->cryptoContext->GetEncodingParams()->GetBatchSize();
+        int64_t p = ctx->cryptoContext->GetCryptoParameters()->GetPlaintextModulus();
+        int64_t half_p = p / 2;
+        std::vector<int64_t> output_vec(slot_count, 0);
+        
+        // Divide each value by divisor (integer division)
+        // Handle signed representation: BFV stores negative values as p-|x|
+        for (size_t i = 0; i < input_vec.size() && i < slot_count; i++) {
+            int64_t val = input_vec[i];
+            if (val > half_p) val -= p;  // Convert to signed
+            output_vec[i] = val / divisor;
+        }
+        
+        // Re-encrypt
+        auto output_pt = ctx->cryptoContext->MakePackedPlaintext(output_vec);
+        auto output_ct = ctx->cryptoContext->Encrypt(
+            keypair->keyPair.publicKey,
+            output_pt
+        );
+        
+        OpenFHECiphertext* result = new OpenFHECiphertext();
+        result->ciphertext = output_ct;
+        result->ctx = ctx;
+        
+        set_cnn_error("");
+        return result;
+        
+    } catch (const std::exception& e) {
+        set_cnn_error(std::string("Rescale failed: ") + e.what());
         return nullptr;
     }
 }

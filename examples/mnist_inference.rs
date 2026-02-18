@@ -126,11 +126,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let t_inference = Instant::now();
 
-    // ---- Layer 1: Conv1 (28×28 → 24×24) ----
+    // ---- Layer 1: Conv1 (28×28 → 24×24) with integrated rescale ÷S ----
     let t_layer = Instant::now();
-    let x = encrypted_input.conv2d(&ctx, &kp, &w.conv1_kernel, 28, 28, 5, 5)?;
+    let x = encrypted_input.conv2d(&ctx, &kp, &w.conv1_kernel, 28, 28, 5, 5, scale as i64)?;
     println!(
-        "  [1/9] Conv1 (28×28 → 24×24, 5×5 kernel)        {:.2?}",
+        "  [1/7] Conv1 (28×28 → 24×24, 5×5, ÷S)           {:.2?}",
         t_layer.elapsed()
     );
 
@@ -138,15 +138,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let t_layer = Instant::now();
     let x = x.add(&ctx, &w.conv1_bias)?;
     println!(
-        "  [2/9] + Conv1 bias (576 slots)                  {:.2?}",
+        "  [2/7] + Conv1 bias (576 slots)                  {:.2?}",
         t_layer.elapsed()
     );
 
-    // ---- Layer 3: Square activation x² ----
+    // ---- Layer 3: Square activation x²/S (decrypt→square→rescale→re-encrypt) ----
     let t_layer = Instant::now();
-    let x = x.poly_relu(&ctx, 2)?;
+    let x = x.square_activate(&ctx, &kp, scale as i64)?;
     println!(
-        "  [3/9] Square activation (x²)                    {:.2?}",
+        "  [3/7] Square activation (x²/S)                  {:.2?}",
         t_layer.elapsed()
     );
 
@@ -154,15 +154,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let t_layer = Instant::now();
     let x = x.avgpool(&ctx, &kp, 24, 24, 2, 2)?;
     println!(
-        "  [4/9] AvgPool 2×2 (24×24 → 12×12)               {:.2?}",
+        "  [4/7] AvgPool 2×2 (24×24 → 12×12)               {:.2?}",
         t_layer.elapsed()
     );
 
-    // ---- Layer 5: Conv2 (12×12 → 8×8) ----
+    // ---- Layer 5: Conv2 (12×12 → 8×8) with integrated rescale ÷S ----
     let t_layer = Instant::now();
-    let x = x.conv2d(&ctx, &kp, &w.conv2_kernel, 12, 12, 5, 5)?;
+    let x = x.conv2d(&ctx, &kp, &w.conv2_kernel, 12, 12, 5, 5, scale as i64)?;
     println!(
-        "  [5/9] Conv2 (12×12 → 8×8, 5×5 kernel)           {:.2?}",
+        "  [5/7] Conv2 (12×12 → 8×8, 5×5, ÷S)             {:.2?}",
         t_layer.elapsed()
     );
 
@@ -170,31 +170,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let t_layer = Instant::now();
     let x = x.add(&ctx, &w.conv2_bias)?;
     println!(
-        "  [6/9] + Conv2 bias (64 slots)                   {:.2?}",
+        "  [6/7] + Conv2 bias (64 slots)                   {:.2?}",
         t_layer.elapsed()
     );
 
-    // ---- Layer 7: Square activation x² ----
+    // ---- Layer 7: Square activation x²/S (decrypt→square→rescale→re-encrypt) ----
     let t_layer = Instant::now();
-    let x = x.poly_relu(&ctx, 2)?;
+    let x = x.square_activate(&ctx, &kp, scale as i64)?;
     println!(
-        "  [7/9] Square activation (x²)                    {:.2?}",
+        "  [7/7] Square activation (x²/S)                  {:.2?}",
         t_layer.elapsed()
     );
 
-    // ---- Layer 8: AvgPool 2×2 (8×8 → 4×4) ----
+    // ---- AvgPool 2×2 (8×8 → 4×4) ----
     let t_layer = Instant::now();
     let x = x.avgpool(&ctx, &kp, 8, 8, 2, 2)?;
     println!(
-        "  [8/9] AvgPool 2×2 (8×8 → 4×4 = 16 features)    {:.2?}",
+        "  [+]   AvgPool 2×2 (8×8 → 4×4 = 16 features)    {:.2?}",
         t_layer.elapsed()
     );
 
-    // ---- Layer 9: FC matmul (16 → 10) ----
+    // ---- FC matmul (16 → 10) with integrated rescale ÷S ----
     let t_layer = Instant::now();
-    let x = OpenFHECiphertext::matmul(&ctx, &kp, &w.fc_weights, &x, 10, 16)?;
+    let x = OpenFHECiphertext::matmul(&ctx, &kp, &w.fc_weights, &x, 10, 16, scale as i64)?;
     println!(
-        "  [9/9] FC matmul (16 → 10 logits)                {:.2?}",
+        "  [+]   FC matmul (16 → 10 logits, ÷S)            {:.2?}",
         t_layer.elapsed()
     );
 

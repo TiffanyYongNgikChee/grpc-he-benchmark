@@ -278,6 +278,7 @@ pub fn subtract(&self, _context: &OpenFHEContext, other: &OpenFHECiphertext) -> 
 /// - weights: Plaintext weight matrix (flattened row-major)
 /// - rows: Number of output rows
 /// - cols: Number of input columns
+/// - divisor: Value to divide each output element by (e.g., scale_factor). Use 1 for no division.
 /// 
 /// # Returns
 /// Encrypted result vector (size: rows)
@@ -288,6 +289,7 @@ pub fn matmul(
     input: &OpenFHECiphertext,
     rows: usize,
     cols: usize,
+    divisor: i64,
 ) -> Result<OpenFHECiphertext> {
     let ptr = unsafe {
         open_fhe_binding::openfhe_matmul(
@@ -297,6 +299,7 @@ pub fn matmul(
             input.ptr.as_ptr(),
             rows,
             cols,
+            divisor,
         )
     };
     
@@ -324,6 +327,7 @@ pub fn matmul(
 /// - input_width: Width of input image
 /// - kernel_height: Height of convolution kernel
 /// - kernel_width: Width of convolution kernel
+/// - divisor: Value to divide each output element by (e.g., scale_factor). Use 1 for no division.
 /// 
 /// # Returns
 /// Encrypted feature map with dimensions:
@@ -338,6 +342,7 @@ pub fn conv2d(
     input_width: usize,
     kernel_height: usize,
     kernel_width: usize,
+    divisor: i64,
 ) -> Result<OpenFHECiphertext> {
     let ptr = unsafe {
         open_fhe_binding::openfhe_conv2d(
@@ -349,6 +354,7 @@ pub fn conv2d(
             input_width,
             kernel_height,
             kernel_width,
+            divisor,
         )
     };
     
@@ -402,6 +408,49 @@ pub fn poly_relu(&self, context: &OpenFHEContext, degree: i32) -> Result<OpenFHE
         })
 }
 
+/// Square activation using decrypt→compute→re-encrypt approach
+/// 
+/// Computes f(x) = x² for each value without modular overflow.
+/// Unlike `poly_relu` (which uses homomorphic multiplication), this
+/// decrypts, squares in 64-bit integer space, and re-encrypts.
+/// 
+/// # Parameters
+/// - context: OpenFHE context
+/// - keypair: Key pair for decrypt/re-encrypt
+/// - divisor: Value to divide by after squaring (e.g., scale_factor)
+/// 
+/// # Returns
+/// Encrypted squared+rescaled values (x² / divisor)
+pub fn square_activate(
+    &self,
+    context: &OpenFHEContext,
+    keypair: &OpenFHEKeyPair,
+    divisor: i64,
+) -> Result<OpenFHECiphertext> {
+    let ptr = unsafe {
+        open_fhe_binding::openfhe_square_activate(
+            context.as_ptr(),
+            keypair.as_ptr(),
+            self.ptr.as_ptr(),
+            divisor,
+        )
+    };
+    
+    NonNull::new(ptr)
+        .map(|ptr| OpenFHECiphertext { ptr })
+        .ok_or_else(|| {
+            let err = unsafe {
+                let err_ptr = open_fhe_binding::openfhe_cnn_get_last_error();
+                if !err_ptr.is_null() {
+                    CStr::from_ptr(err_ptr).to_string_lossy().into_owned()
+                } else {
+                    String::from("Square activation failed")
+                }
+            };
+            OpenFHEError::Unknown(err)
+        })
+}
+
 /// Average pooling for downsampling feature maps
 /// 
 /// # Parameters
@@ -445,6 +494,49 @@ pub fn avgpool(
                     CStr::from_ptr(err_ptr).to_string_lossy().into_owned()
                 } else {
                     String::from("Average pooling failed")
+                }
+            };
+            OpenFHEError::Unknown(err)
+        })
+}
+
+/// Rescale encrypted values by dividing by a divisor
+/// 
+/// Used after polynomial activation (x²) to prevent scale accumulation.
+/// After x² with scale_factor S, intermediate values grow as S².
+/// Dividing by S brings them back to the expected range (~S).
+/// 
+/// # Parameters
+/// - context: OpenFHE context
+/// - keypair: Key pair for decrypt/re-encrypt
+/// - divisor: Value to divide by (e.g., scale_factor after x²)
+/// 
+/// # Returns
+/// Rescaled encrypted values
+pub fn rescale(
+    &self,
+    context: &OpenFHEContext,
+    keypair: &OpenFHEKeyPair,
+    divisor: i64,
+) -> Result<OpenFHECiphertext> {
+    let ptr = unsafe {
+        open_fhe_binding::openfhe_rescale(
+            context.as_ptr(),
+            keypair.as_ptr(),
+            self.ptr.as_ptr(),
+            divisor,
+        )
+    };
+    
+    NonNull::new(ptr)
+        .map(|ptr| OpenFHECiphertext { ptr })
+        .ok_or_else(|| {
+            let err = unsafe {
+                let err_ptr = open_fhe_binding::openfhe_cnn_get_last_error();
+                if !err_ptr.is_null() {
+                    CStr::from_ptr(err_ptr).to_string_lossy().into_owned()
+                } else {
+                    String::from("Rescale failed")
                 }
             };
             OpenFHEError::Unknown(err)

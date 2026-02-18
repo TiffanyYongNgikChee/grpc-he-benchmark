@@ -6,6 +6,13 @@ edition = "2024"
 [dependencies]
 libc = "0.2"
 
+[features]
+default = ["openfhe"]
+seal = []
+helib = []
+openfhe = []
+all_he = ["seal", "helib", "openfhe"]
+
 [build-dependencies]
 cc = "1.0"
 
@@ -16,6 +23,12 @@ path = "src/lib.rs"
 [[example]]
 name = "benchmark"
 path = "examples/benchmark.rs"
+required-features = ["all_he"]
+
+[[example]]
+name = "medical_data"
+path = "examples/medical_data.rs"
+required-features = ["seal"]
 
 [[example]]
 name = "openfhe_cnn_demo"
@@ -28,4 +41,8 @@ path = "examples/test_weight_loader.rs"
 [[example]]
 name = "mnist_inference"
 path = "examples/mnist_inference.rs"
+
+[[example]]
+name = "mnist_verify"
+path = "examples/mnist_verify.rs"
 

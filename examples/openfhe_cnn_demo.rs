@@ -85,7 +85,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let kernel_pt = OpenFHEPlaintext::from_vec(&context, &conv_kernel)?;
     
     println!("  Applying convolution on encrypted data...");
-    encrypted_layer = encrypted_layer.conv2d(&context, &keypair, &kernel_pt, 8, 8, 3, 3)?;
+    encrypted_layer = encrypted_layer.conv2d(&context, &keypair, &kernel_pt, 8, 8, 3, 3, 1)?;
     println!("  Convolution complete (8x8 -> 6x6 feature map)\n");
     
     // Decrypt to verify

@@ -557,6 +557,130 @@ pub struct EncodedWeights {
 }
 
 // ============================================================================
+// Test image loading (Step 6d — verification with real MNIST images)
+// ============================================================================
+
+/// A single MNIST test image with its ground-truth label.
+#[derive(Debug, Clone)]
+pub struct TestImage {
+    /// Pixel values in 0-255 range (28×28 = 784 values, row-major)
+    pub pixels: Vec<i64>,
+    /// Ground-truth digit (0-9)
+    pub label: usize,
+    /// Image index in the test set
+    pub index: usize,
+}
+
+impl TestImage {
+    /// Scale pixel values for BFV encryption.
+    ///
+    /// Applies the same transform as PyTorch's ToTensor + quantization:
+    ///   scaled = round(pixel / 255.0 * scale_factor)
+    ///
+    /// This matches how the model was trained:
+    ///   - ToTensor() scales 0-255 → 0.0-1.0
+    ///   - Weights were quantized with scale_factor (e.g., 1000)
+    ///   - So input must also be scaled by the same factor
+    pub fn scaled_pixels(&self, scale_factor: i64) -> Vec<i64> {
+        self.pixels
+            .iter()
+            .map(|&p| ((p as f64 / 255.0) * scale_factor as f64).round() as i64)
+            .collect()
+    }
+}
+
+/// Load test images exported by `export_test_images.py`.
+///
+/// Expects two files in `weights_dir`:
+///   - `test_images.csv`: N rows × 784 columns (pixel values 0-255)
+///   - `test_labels.csv`: N labels (one per image)
+///
+/// # Arguments
+/// * `weights_dir` - Path to the weights directory (e.g., "mnist_training/weights")
+///
+/// # Returns
+/// Vector of `TestImage` structs, sorted by label (digit 0-9)
+pub fn load_test_images(weights_dir: &str) -> Result<Vec<TestImage>, WeightLoadError> {
+    let dir = Path::new(weights_dir);
+    if !dir.is_dir() {
+        return Err(WeightLoadError::DirectoryNotFound(weights_dir.to_string()));
+    }
+
+    // Load labels
+    let labels_path = dir.join("test_labels.csv");
+    let labels_content = fs::read_to_string(&labels_path)?;
+    let labels: Vec<usize> = labels_content
+        .trim()
+        .split(',')
+        .map(|s| s.trim().parse::<usize>())
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(|_| WeightLoadError::ParseJson("Invalid label in test_labels.csv".to_string()))?;
+
+    let num_images = labels.len();
+
+    // Load images (each row = 784 pixels)
+    let images_path = dir.join("test_images.csv");
+    let images_file = fs::File::open(&images_path)?;
+    let reader = io::BufReader::new(images_file);
+
+    let mut test_images = Vec::with_capacity(num_images);
+
+    for (idx, line) in reader.lines().enumerate() {
+        let line = line?;
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let pixels: Vec<i64> = trimmed
+            .split(',')
+            .map(|s| s.trim().parse::<i64>())
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+
+        if pixels.len() != 784 {
+            return Err(WeightLoadError::ShapeMismatch {
+                file: format!("test_images.csv row {}", idx),
+                expected: 784,
+                actual: pixels.len(),
+            });
+        }
+
+        if idx >= labels.len() {
+            return Err(WeightLoadError::ParseJson(format!(
+                "More image rows ({}) than labels ({})",
+                idx + 1,
+                labels.len()
+            )));
+        }
+
+        test_images.push(TestImage {
+            pixels,
+            label: labels[idx],
+            index: idx,
+        });
+    }
+
+    if test_images.len() != num_images {
+        return Err(WeightLoadError::ShapeMismatch {
+            file: "test_images.csv".to_string(),
+            expected: num_images,
+            actual: test_images.len(),
+        });
+    }
+
+    println!("Loaded {} test images from {}", num_images, weights_dir);
+    for img in &test_images {
+        let nonzero = img.pixels.iter().filter(|&&p| p > 0).count();
+        println!(
+            "  Image {}: digit={}, non-zero pixels={}/784",
+            img.index, img.label, nonzero
+        );
+    }
+
+    Ok(test_images)
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 

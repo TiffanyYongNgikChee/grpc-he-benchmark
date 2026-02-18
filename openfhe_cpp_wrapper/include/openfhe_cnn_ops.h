@@ -24,6 +24,8 @@ typedef struct OpenFHEPlaintext OpenFHEPlaintext;
 /// @param input: Encrypted input vector (size: cols)
 /// @param rows: Number of output rows
 /// @param cols: Number of input columns
+/// @param divisor: Value to divide each output element by (e.g., scale_factor).
+///                 Use 1 for no division.
 /// @return Encrypted result vector (size: rows) or NULL on failure
 OpenFHECiphertext* openfhe_matmul(
     OpenFHEContext* ctx,
@@ -31,7 +33,8 @@ OpenFHECiphertext* openfhe_matmul(
     OpenFHEPlaintext* weights,
     OpenFHECiphertext* input,
     size_t rows,
-    size_t cols
+    size_t cols,
+    int64_t divisor
 );
 
 /// 2D convolution for CNN layers
@@ -44,6 +47,8 @@ OpenFHECiphertext* openfhe_matmul(
 /// @param input_width: Width of input image
 /// @param kernel_height: Height of convolution kernel
 /// @param kernel_width: Width of convolution kernel
+/// @param divisor: Value to divide each output element by (e.g., scale_factor).
+///                 Use 1 for no division.
 /// @return Encrypted feature map (size: out_height × out_width) or NULL on failure
 ///         where out_height = input_height - kernel_height + 1
 ///               out_width = input_width - kernel_width + 1
@@ -55,7 +60,8 @@ OpenFHECiphertext* openfhe_conv2d(
     size_t input_height,
     size_t input_width,
     size_t kernel_height,
-    size_t kernel_width
+    size_t kernel_width,
+    int64_t divisor
 );
 
 /// Polynomial approximation of ReLU activation function
@@ -67,10 +73,28 @@ OpenFHECiphertext* openfhe_conv2d(
 ///                degree=5: Better accuracy (not yet implemented)
 ///                degree=7: Best accuracy (not yet implemented)
 /// @return Encrypted activated values or NULL on failure
+/// WARNING: Uses homomorphic EvalMult, values must fit in plaintext modulus
 OpenFHECiphertext* openfhe_poly_relu(
     OpenFHEContext* ctx,
     OpenFHECiphertext* input,
     int degree
+);
+
+/// Square activation with integrated rescale using decrypt→compute→re-encrypt
+/// Computes f(x) = x² / divisor for each value. Avoids modular overflow by
+/// computing in plaintext space (64-bit integers) before re-encrypting.
+/// The divisor prevents the squared values from exceeding the plaintext modulus.
+/// Preferred over openfhe_poly_relu for large intermediate values.
+/// @param ctx: OpenFHE context
+/// @param keypair: Key pair for decrypt/re-encrypt
+/// @param input: Encrypted input values
+/// @param divisor: Value to divide by after squaring (e.g., scale_factor)
+/// @return Encrypted squared+rescaled values or NULL on failure
+OpenFHECiphertext* openfhe_square_activate(
+    OpenFHEContext* ctx,
+    OpenFHEKeyPair* keypair,
+    OpenFHECiphertext* input,
+    int64_t divisor
 );
 
 /// Average pooling for downsampling feature maps
@@ -91,6 +115,23 @@ OpenFHECiphertext* openfhe_avgpool(
     size_t input_width,
     size_t pool_size,
     size_t stride
+);
+
+/// Rescale encrypted values by dividing by a divisor
+/// Used after polynomial activation (x²) to prevent scale accumulation.
+/// After x² with scale_factor S, values grow as S². Dividing by S
+/// brings them back to the expected range.
+/// Uses decrypt→divide→re-encrypt approach.
+/// @param ctx: OpenFHE context
+/// @param keypair: Key pair for decrypt/re-encrypt
+/// @param input: Encrypted values to rescale
+/// @param divisor: Value to divide by (e.g., scale_factor after x²)
+/// @return Rescaled encrypted values or NULL on failure
+OpenFHECiphertext* openfhe_rescale(
+    OpenFHEContext* ctx,
+    OpenFHEKeyPair* keypair,
+    OpenFHECiphertext* input,
+    int64_t divisor
 );
 
 // Error Handling

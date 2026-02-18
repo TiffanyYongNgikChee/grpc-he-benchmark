@@ -104,6 +104,7 @@ unsafe extern "C" {
         input: *mut OpenFHECiphertext,
         rows: usize,
         cols: usize,
+        divisor: i64,
     ) -> *mut OpenFHECiphertext;
     
     /// 2D convolution for CNN layers
@@ -119,6 +120,7 @@ unsafe extern "C" {
         input_width: usize,
         kernel_height: usize,
         kernel_width: usize,
+        divisor: i64,
     ) -> *mut OpenFHECiphertext;
     
     /// Polynomial ReLU approximation
@@ -128,6 +130,15 @@ unsafe extern "C" {
         ctx: *mut OpenFHEContext,
         input: *mut OpenFHECiphertext,
         degree: i32,
+    ) -> *mut OpenFHECiphertext;
+    
+    /// Square activation with integrated rescale using decrypt→compute→re-encrypt
+    /// Computes f(x) = x² / divisor without modular overflow
+    pub fn openfhe_square_activate(
+        ctx: *mut OpenFHEContext,
+        keypair: *mut OpenFHEKeyPair,
+        input: *mut OpenFHECiphertext,
+        divisor: i64,
     ) -> *mut OpenFHECiphertext;
     
     /// Average pooling for downsampling
@@ -143,6 +154,15 @@ unsafe extern "C" {
         input_width: usize,
         pool_size: usize,
         stride: usize,
+    ) -> *mut OpenFHECiphertext;
+    
+    /// Rescale encrypted values by dividing by a divisor
+    /// Used after x² activation to prevent scale accumulation
+    pub fn openfhe_rescale(
+        ctx: *mut OpenFHEContext,
+        keypair: *mut OpenFHEKeyPair,
+        input: *mut OpenFHECiphertext,
+        divisor: i64,
     ) -> *mut OpenFHECiphertext;
     
     /// Get last error from CNN operations

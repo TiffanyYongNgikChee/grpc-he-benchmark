@@ -38,6 +38,7 @@ services:
       - ./rebuild_and_run.sh:/app/rebuild_and_run.sh
       - ./rebuild_cpp.sh:/app/rebuild_cpp.sh
       - ./test_cnn_ops_simple.sh:/app/test_cnn_ops_simple.sh
+      - ./mnist_training/weights:/app/mnist_training/weights
       # Cache volumes
       - cargo-cache:/root/.cargo/registry
       - target-cache:/app/target
