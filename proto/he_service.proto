@@ -105,3 +105,9 @@ message ComparisonBenchmarkResponse {
   string fastest_library = 4;         // Which library was fastest overall
   string recommendation = 5;          // Usage recommendation based on results
 }
+
+// Request for encrypted MNIST digit prediction
+message PredictRequest {
+  repeated int64 pixels = 1;          // 784 pixel values (28×28 image, row-major, 0-255 range)
+  int64 scale_factor = 2;             // Quantization scale factor (default: 1000)
+}
