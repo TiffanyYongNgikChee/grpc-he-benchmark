@@ -24,6 +24,9 @@ service HEService {
   
   // Run comparison benchmark for all three libraries
   rpc RunComparisonBenchmark(BenchmarkRequest) returns (ComparisonBenchmarkResponse);
+
+  // Run encrypted MNIST digit inference (full HE-CNN pipeline)
+  rpc PredictDigit(PredictRequest) returns (PredictResponse);
 }
 
 // Request to generate keys
