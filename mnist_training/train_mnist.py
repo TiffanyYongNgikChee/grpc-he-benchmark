@@ -28,7 +28,7 @@ import os
 import matplotlib.pyplot as plt
 
 # ============================================================================
-# Step 1: Prepare the Dataset
+# Prepare the Dataset
 # ============================================================================
 
 def prepare_dataset():
@@ -161,7 +161,7 @@ def verify_dataset(train_loader, test_loader):
 
 
 # ============================================================================
-# Step 2a: Custom x² Activation Function
+# Custom x² Activation Function
 # ============================================================================
 
 class SquareActivation(nn.Module):
@@ -217,7 +217,7 @@ def verify_activation():
 
 
 # ============================================================================
-# Step 2b: Define the CNN Model
+# Define the CNN Model
 # ============================================================================
 
 class HE_CNN(nn.Module):
@@ -320,7 +320,7 @@ class HE_CNN(nn.Module):
 
 
 # ============================================================================
-# Step 2c: Verify Forward Pass
+# Verify Forward Pass
 # ============================================================================
 
 def verify_model(model):
@@ -382,7 +382,7 @@ def verify_model(model):
 
 
 # ============================================================================
-# Step 3a: Training Function
+# Training Function
 # ============================================================================
 
 def train_one_epoch(model, train_loader, optimizer, criterion, epoch):
@@ -426,7 +426,7 @@ def train_one_epoch(model, train_loader, optimizer, criterion, epoch):
 
 
 # ============================================================================
-# Step 3b: Evaluation Function
+# Evaluation Function
 # ============================================================================
 
 def evaluate(model, test_loader):
@@ -477,7 +477,7 @@ def evaluate(model, test_loader):
 
 
 # ============================================================================
-# Step 3c: Full Training Loop
+# Full Training Loop
 # ============================================================================
 
 def train_full(model, train_loader, test_loader, num_epochs=10, lr=0.001):
@@ -573,7 +573,7 @@ def train_full(model, train_loader, test_loader, num_epochs=10, lr=0.001):
 
 
 # ============================================================================
-# Step 4a: Final Accuracy Report
+# Final Accuracy Report
 # ============================================================================
 
 def evaluate_final(model, test_loader):
@@ -653,7 +653,7 @@ def evaluate_final(model, test_loader):
 
 
 # ============================================================================
-# Step 4b: Confusion Matrix
+# Confusion Matrix
 # ============================================================================
 
 def confusion_matrix_report(model, test_loader):
@@ -770,7 +770,7 @@ def confusion_matrix_report(model, test_loader):
 
 
 # ============================================================================
-# Step 4c: Sample Predictions
+# Sample Predictions
 # ============================================================================
 
 def sample_predictions(model, test_loader):
@@ -874,7 +874,7 @@ def sample_predictions(model, test_loader):
 
 
 # ============================================================================
-# Step 5a: Quantize Weights to Integers
+# Quantize Weights to Integers
 # ============================================================================
 
 def quantize_weights(model, scale_factor=1000):
@@ -991,7 +991,7 @@ def quantize_weights(model, scale_factor=1000):
 
 
 # ============================================================================
-# Step 5b: Export Weights to CSV
+# Export Weights to CSV
 # ============================================================================
 
 def export_weights_csv(quantized, model, test_loader):
@@ -1135,7 +1135,7 @@ def export_weights_csv(quantized, model, test_loader):
 
 
 # ============================================================================
-# Step 5c: Verify Quantized Accuracy
+# Verify Quantized Accuracy
 # ============================================================================
 
 def verify_quantized_accuracy(quantized, model, test_loader):

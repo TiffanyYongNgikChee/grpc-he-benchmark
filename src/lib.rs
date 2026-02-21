@@ -24,6 +24,7 @@ pub mod helib;
 mod open_fhe_binding;
 pub mod open_fhe_lib;
 pub mod weight_loader;
+pub mod encrypted_inference;
 
 // ============================================================================
 // SEAL wrapper (only compiled with --features seal)

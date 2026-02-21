@@ -1,4 +1,4 @@
-/// Step 6d: Encrypted Inference Verification with Real MNIST Images
+/// Encrypted Inference Verification with Real MNIST Images
 ///
 /// Runs the full encrypted CNN pipeline (from Step 6c) on real MNIST
 /// test images exported by `export_test_images.py`, and compares the
@@ -13,8 +13,8 @@
 ///   6. Compare with ground-truth label
 ///
 /// Prerequisites:
-///   - Run `train_mnist.py` (Steps 1-5) to train and export weights
-///   - Run `export_test_images.py` (Step 6d) to export test images
+///   - Run `train_mnist.py` to train and export weights
+///   - Run `export_test_images.py` to export test images
 ///   - Build inside Docker where OpenFHE is installed
 ///
 /// Run with: cargo run --example mnist_verify
