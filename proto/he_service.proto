@@ -111,3 +111,29 @@ message PredictRequest {
   repeated int64 pixels = 1;          // 784 pixel values (28×28 image, row-major, 0-255 range)
   int64 scale_factor = 2;             // Quantization scale factor (default: 1000)
 }
+
+// Response from encrypted MNIST digit prediction
+message PredictResponse {
+  int32 predicted_digit = 1;          // Predicted digit (0-9), argmax of logits
+  repeated int64 logits = 2;          // Raw output logits (10 values, one per digit class)
+  double confidence = 3;              // Softmax-like confidence score for the predicted digit
+  string status = 4;                  // "success" or error message
+
+  // Per-layer timing breakdown (milliseconds)
+  double encryption_ms = 5;           // Encrypt input pixels → ciphertext
+  double conv1_ms = 6;               // Conv1: 28×28 → 24×24 (5×5 kernel, ÷scale)
+  double bias1_ms = 7;               // Add Conv1 bias
+  double act1_ms = 8;                // Square activation x²/scale after Conv1
+  double pool1_ms = 9;               // AvgPool 2×2 (24×24 → 12×12)
+  double conv2_ms = 10;              // Conv2: 12×12 → 8×8 (5×5 kernel, ÷scale)
+  double bias2_ms = 11;              // Add Conv2 bias
+  double act2_ms = 12;               // Square activation x²/scale after Conv2
+  double pool2_ms = 13;              // AvgPool 2×2 (8×8 → 4×4)
+  double fc_ms = 14;                 // FC matmul: 16 → 10 (÷scale)
+  double bias_fc_ms = 15;            // Add FC bias
+  double decryption_ms = 16;         // Decrypt output → plaintext logits
+  double total_ms = 17;              // Total wall-clock time (encrypt → decrypt)
+
+  // Model metadata
+  double float_model_accuracy = 18;  // Float model accuracy from training (e.g., 97.5)
+}
