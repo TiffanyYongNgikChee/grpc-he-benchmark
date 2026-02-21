@@ -1048,6 +1048,79 @@ impl HeService for HEServiceImpl {
             recommendation,
         }))
     }
+
+    // ============================================
+    // PredictDigit — Encrypted MNIST Inference
+    // ============================================
+
+    async fn predict_digit(
+        &self,
+        request: Request<PredictRequest>,
+    ) -> Result<Response<PredictResponse>, Status> {
+        let req = request.into_inner();
+
+        println!("📥 Received PredictDigit request ({} pixels)", req.pixels.len());
+
+        // Validate input
+        if req.pixels.len() != 784 {
+            return Err(Status::invalid_argument(format!(
+                "Expected 784 pixels (28×28 image), got {}",
+                req.pixels.len()
+            )));
+        }
+
+        // Clone the Arc so we can move it into the blocking task
+        let engine = Arc::clone(&self.inference_engine);
+        let pixels = req.pixels;
+
+        // Run inference on a blocking thread (FFI calls are not async-safe)
+        let result = tokio::task::spawn_blocking(move || {
+            engine.predict(&pixels)
+        })
+        .await
+        .map_err(|e| Status::internal(format!("Inference task panicked: {}", e)))?
+        .map_err(|e| Status::internal(format!("Inference failed: {}", e)))?;
+
+        // Compute a simple confidence score from the logits
+        // Use softmax-style: max_logit / sum_of_positive_logits (approximate)
+        let max_logit = *result.logits.iter().max().unwrap_or(&0) as f64;
+        let sum_positive: f64 = result.logits.iter().filter(|&&v| v > 0).map(|&v| v as f64).sum();
+        let confidence = if sum_positive > 0.0 {
+            max_logit / sum_positive
+        } else {
+            0.0
+        };
+
+        let float_accuracy = engine.float_accuracy;
+
+        println!(
+            "   ✓ Predicted digit: {} (confidence: {:.2}%, time: {:.1}ms)",
+            result.predicted_digit,
+            confidence * 100.0,
+            result.timing.total_ms
+        );
+
+        Ok(Response::new(PredictResponse {
+            predicted_digit: result.predicted_digit as i32,
+            logits: result.logits,
+            confidence,
+            status: "success".to_string(),
+            encryption_ms: result.timing.encryption_ms,
+            conv1_ms: result.timing.conv1_ms,
+            bias1_ms: result.timing.bias1_ms,
+            act1_ms: result.timing.act1_ms,
+            pool1_ms: result.timing.pool1_ms,
+            conv2_ms: result.timing.conv2_ms,
+            bias2_ms: result.timing.bias2_ms,
+            act2_ms: result.timing.act2_ms,
+            pool2_ms: result.timing.pool2_ms,
+            fc_ms: result.timing.fc_ms,
+            bias_fc_ms: result.timing.bias_fc_ms,
+            decryption_ms: result.timing.decryption_ms,
+            total_ms: result.timing.total_ms,
+            float_model_accuracy: float_accuracy,
+        }))
+    }
 }
 
 #[tokio::main]
