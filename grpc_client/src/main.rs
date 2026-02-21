@@ -15,7 +15,8 @@ use he_service::{
     EncryptRequest,
     DecryptRequest,
     BinaryOpRequest,
-    BenchmarkRequest
+    BenchmarkRequest,
+    PredictRequest,
 };
 
 #[tokio::main]
