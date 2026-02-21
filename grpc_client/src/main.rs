@@ -37,6 +37,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Test comparison benchmark
     test_comparison_benchmark(&mut client).await?;
 
+    // Test digit prediction
+    test_predict_digit(&mut client).await?;
+
     println!("\n╔═══════════════════════════════════════════════════════════════╗");
     println!("║       ALL TESTS PASSED - All three libraries working!         ║");
     println!("╚═══════════════════════════════════════════════════════════════╝\n");
@@ -359,4 +362,137 @@ async fn test_comparison_benchmark(client: &mut HeServiceClient<tonic::transport
     
     println!("   Comparison benchmark completed successfully!\n");
     Ok(())
+}
+
+async fn test_predict_digit(client: &mut HeServiceClient<tonic::transport::Channel>) -> Result<(), Box<dyn std::error::Error>> {
+    println!("╔═══════════════════════════════════════════════════════════════╗");
+    println!("║       Testing PredictDigit (Encrypted MNIST Inference)        ║");
+    println!("╚═══════════════════════════════════════════════════════════════╝\n");
+
+    // Build a hardcoded digit "7" image (28×28 = 784 pixels, values 0-255)
+    let pixels = create_test_digit_7();
+
+    // Print ASCII art preview
+    println!("   Input image (digit 7):");
+    print_image_ascii(&pixels, 28, 28);
+    println!();
+
+    // Send PredictRequest
+    println!("   Sending PredictDigit request (784 pixels, scale_factor=1000)...");
+    let request = Request::new(PredictRequest {
+        pixels: pixels.clone(),
+        scale_factor: 1000,
+    });
+
+    let response = client.predict_digit(request).await?;
+    let resp = response.into_inner();
+
+    // Display results
+    println!("\n┌─────────────────────────────────────────────────────────────────┐");
+    println!("│     Encrypted Inference Results                                 │");
+    println!("├─────────────────────────────────────────────────────────────────┤");
+    println!("│  Predicted Digit:  {:>10}                                    │", resp.predicted_digit);
+    println!("│  Confidence:       {:>10.4}                                    │", resp.confidence);
+    println!("│  Status:           {:>42}  │", resp.status);
+    println!("├─────────────────────────────────────────────────────────────────┤");
+    println!("│     Logits (raw encrypted outputs)                              │");
+    println!("├─────────────────────────────────────────────────────────────────┤");
+    for (i, logit) in resp.logits.iter().enumerate() {
+        let marker = if i as i32 == resp.predicted_digit { " ◄" } else { "" };
+        println!("│  Class {}: {:>12}{:>40}  │", i, logit, marker);
+    }
+    println!("├─────────────────────────────────────────────────────────────────┤");
+    println!("│     Timing Breakdown                                            │");
+    println!("├─────────────────────────────────────────────────────────────────┤");
+    println!("│  Encryption:           {:>10.2} ms                             │", resp.encryption_ms);
+    println!("│  Conv1:                {:>10.2} ms                             │", resp.conv1_ms);
+    println!("│  Square Act 1:         {:>10.2} ms                             │", resp.square_activation1_ms);
+    println!("│  Pool 1:               {:>10.2} ms                             │", resp.pool1_ms);
+    println!("│  Conv2:                {:>10.2} ms                             │", resp.conv2_ms);
+    println!("│  Square Act 2:         {:>10.2} ms                             │", resp.square_activation2_ms);
+    println!("│  Pool 2:               {:>10.2} ms                             │", resp.pool2_ms);
+    println!("│  Flatten:              {:>10.2} ms                             │", resp.flatten_ms);
+    println!("│  Fully Connected:      {:>10.2} ms                             │", resp.fc_ms);
+    println!("│  Decryption:           {:>10.2} ms                             │", resp.decryption_ms);
+    println!("│  Post-processing:      {:>10.2} ms                             │", resp.postprocess_ms);
+    println!("│  Weight Loading:       {:>10.2} ms                             │", resp.weight_loading_ms);
+    println!("│  ──────────────────────────────────────                        │");
+    println!("│  TOTAL:                {:>10.2} ms                             │", resp.total_ms);
+    println!("├─────────────────────────────────────────────────────────────────┤");
+    println!("│  Float Model Accuracy: {:>10.2}%                              │", resp.float_model_accuracy * 100.0);
+    println!("└─────────────────────────────────────────────────────────────────┘\n");
+
+    // Verify prediction
+    let correct = resp.predicted_digit == 7;
+    if correct {
+        println!("   ✓ CORRECT! Encrypted inference predicted digit 7\n");
+    } else {
+        println!("   ✗ INCORRECT: Expected 7, got {}. May need tuning.\n", resp.predicted_digit);
+    }
+
+    println!("   PredictDigit test completed!\n");
+    Ok(())
+}
+
+/// Create a hardcoded test image of digit "7" (28×28, pixel values 0-255)
+fn create_test_digit_7() -> Vec<i64> {
+    let mut img = vec![0i64; 28 * 28];
+
+    let set = |img: &mut Vec<i64>, r: usize, c: usize, val: i64| {
+        if r < 28 && c < 28 {
+            img[r * 28 + c] = val;
+        }
+    };
+
+    // Top horizontal bar of the "7" (rows 5-7, cols 7-22)
+    for r in 5..=7 {
+        for c in 7..=22 {
+            set(&mut img, r, c, 220);
+        }
+    }
+    // Slightly dimmer edges on top bar
+    for c in 7..=22 {
+        set(&mut img, 4, c, 120);
+        set(&mut img, 8, c, 80);
+    }
+
+    // Diagonal stroke of "7" going from top-right to bottom-center
+    for i in 0..17 {
+        let r = 8 + i;
+        let c_center = 20.0 - (i as f64 * 0.5);
+        let c = c_center as usize;
+
+        if r < 28 && c < 28 {
+            set(&mut img, r, c, 240);
+            if c > 0 {
+                set(&mut img, r, c - 1, 180);
+            }
+            if c + 1 < 28 {
+                set(&mut img, r, c + 1, 140);
+            }
+        }
+    }
+
+    img
+}
+
+/// Print a 28×28 image as compact ASCII art
+fn print_image_ascii(pixels: &[i64], height: usize, width: usize) {
+    for r in (0..height).step_by(2) {
+        print!("    ");
+        for c in 0..width {
+            let val = pixels[r * width + c];
+            let ch = if val > 200 {
+                '█'
+            } else if val > 100 {
+                '▓'
+            } else if val > 50 {
+                '░'
+            } else {
+                ' '
+            };
+            print!("{}", ch);
+        }
+        println!();
+    }
 }
