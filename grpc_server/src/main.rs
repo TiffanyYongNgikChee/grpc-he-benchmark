@@ -11,6 +11,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+use he_benchmark::encrypted_inference::EncryptedInferenceEngine;
+
 // Include the generated proto code
 pub mod he_service {
     tonic::include_proto!("he_service");
@@ -34,12 +36,16 @@ struct SessionConfig {
 // Our gRPC service implementation
 pub struct HEServiceImpl {
     sessions: Arc<Mutex<HashMap<String, SessionConfig>>>,
+    /// Pre-initialized encrypted inference engine (OpenFHE BFV).
+    /// Wrapped in Arc so it can be shared across async tasks.
+    inference_engine: Arc<EncryptedInferenceEngine>,
 }
 
 impl HEServiceImpl {
-    fn new() -> Self {
+    fn new(engine: EncryptedInferenceEngine) -> Self {
         HEServiceImpl {
             sessions: Arc::new(Mutex::new(HashMap::new())),
+            inference_engine: Arc::new(engine),
         }
     }
 }
@@ -1049,7 +1055,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Use environment variable or default to [::]:50051 (all interfaces, IPv6+IPv4)
     let bind_addr = std::env::var("GRPC_BIND_ADDR").unwrap_or_else(|_| "[::]:50051".to_string());
     let addr = bind_addr.parse()?;
-    let service = HEServiceImpl::new();
+
+    // Initialize the encrypted inference engine (loads weights, creates BFV context, keygen)
+    // This takes ~2-5 seconds — done once at startup
+    let weights_dir = std::env::var("MNIST_WEIGHTS_DIR")
+        .unwrap_or_else(|_| "mnist_training/weights".to_string());
+    println!("Initializing encrypted inference engine (weights: {})...", weights_dir);
+    let engine = EncryptedInferenceEngine::new(&weights_dir)
+        .expect("Failed to initialize EncryptedInferenceEngine");
+    println!("Encrypted inference engine ready (float accuracy: {:.2}%)\n", engine.float_accuracy);
+
+    let service = HEServiceImpl::new(engine);
 
     println!("╔════════════════════════════════════════════════════════════╗");
     println!("║      Homomorphic Encryption gRPC Server                    ║");
@@ -1066,6 +1082,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("    • Multiply               - Homomorphic multiplication");
     println!("    • RunBenchmark           - Benchmark single library");
     println!("    • RunComparisonBenchmark - Compare all three libraries");
+    println!("    • PredictDigit           - Encrypted MNIST digit inference");
     println!();
     println!("  Ready to accept connections!");
     println!();
