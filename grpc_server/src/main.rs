@@ -13,6 +13,14 @@ use std::time::Instant;
 
 use he_benchmark::encrypted_inference::EncryptedInferenceEngine;
 
+// Safety wrapper: EncryptedInferenceEngine contains FFI pointers (NonNull<...>)
+// that don't implement Send/Sync. We guarantee safety by only accessing
+// the engine inside tokio::task::spawn_blocking (single-threaded access
+// guarded by Mutex).
+struct SendSyncEngine(EncryptedInferenceEngine);
+unsafe impl Send for SendSyncEngine {}
+unsafe impl Sync for SendSyncEngine {}
+
 // Include the generated proto code
 pub mod he_service {
     tonic::include_proto!("he_service");
@@ -37,15 +45,15 @@ struct SessionConfig {
 pub struct HEServiceImpl {
     sessions: Arc<Mutex<HashMap<String, SessionConfig>>>,
     /// Pre-initialized encrypted inference engine (OpenFHE BFV).
-    /// Wrapped in Arc so it can be shared across async tasks.
-    inference_engine: Arc<EncryptedInferenceEngine>,
+    /// Wrapped in SendSyncEngine for async safety; only accessed in spawn_blocking.
+    inference_engine: Arc<SendSyncEngine>,
 }
 
 impl HEServiceImpl {
     fn new(engine: EncryptedInferenceEngine) -> Self {
         HEServiceImpl {
             sessions: Arc::new(Mutex::new(HashMap::new())),
-            inference_engine: Arc::new(engine),
+            inference_engine: Arc::new(SendSyncEngine(engine)),
         }
     }
 }
@@ -1074,12 +1082,16 @@ impl HeService for HEServiceImpl {
         let pixels = req.pixels;
 
         // Run inference on a blocking thread (FFI calls are not async-safe)
-        let result = tokio::task::spawn_blocking(move || {
-            engine.predict(&pixels)
+        let (result, float_accuracy) = tokio::task::spawn_blocking(move || {
+            let res = engine.0.predict(&pixels);
+            let acc = engine.0.float_accuracy;
+            (res, acc)
         })
         .await
-        .map_err(|e| Status::internal(format!("Inference task panicked: {}", e)))?
-        .map_err(|e| Status::internal(format!("Inference failed: {}", e)))?;
+        .map_err(|e| Status::internal(format!("Inference task panicked: {}", e)))?;
+
+        let result = result
+            .map_err(|e| Status::internal(format!("Inference failed: {}", e)))?;
 
         // Compute a simple confidence score from the logits
         // Use softmax-style: max_logit / sum_of_positive_logits (approximate)
@@ -1090,8 +1102,6 @@ impl HeService for HEServiceImpl {
         } else {
             0.0
         };
-
-        let float_accuracy = engine.float_accuracy;
 
         println!(
             "   ✓ Predicted digit: {} (confidence: {:.2}%, time: {:.1}ms)",
