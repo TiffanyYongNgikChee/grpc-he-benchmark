@@ -16,7 +16,7 @@ serde_json = "1.0"
 
 # This gives access to SEAL, HELib, and OpenFHE wrappers
 # Package name is "he-benchmark-spike", library name is "he_benchmark"
-he-benchmark-spike = { path = ".." }
+he-benchmark-spike = { path = "..", features = ["all_he"] }
 
 [build-dependencies]
 tonic-build = "0.11"
