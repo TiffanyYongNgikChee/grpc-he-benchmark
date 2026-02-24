@@ -149,6 +149,8 @@ COPY build.rs ./
 # gRPC server files
 COPY proto ./proto
 COPY grpc_server ./grpc_server
+# MNIST weights (needed for encrypted inference)
+COPY mnist_training/weights ./mnist_training/weights
 
 # Build the wrappers
 RUN echo "=== Building HElib wrapper ===" && \
@@ -195,8 +197,8 @@ ENV LD_LIBRARY_PATH=/app/lib:/usr/local/lib:/usr/local/helib_pack/helib_pack/lib
 
 # Build the Rust project (both examples)
 RUN echo "=== Building Rust examples ===" && \
-    cargo build --release --example benchmark && \
-    cargo build --release --example medical_data && \
+    cargo build --release --features all_he --example benchmark && \
+    cargo build --release --features all_he --example medical_data && \
     echo "Rust examples built successfully" && \
     ls -lh /app/target/release/examples/benchmark && \
     ls -lh /app/target/release/examples/medical_data
@@ -261,6 +263,9 @@ COPY --from=builder /app/lib/libopenfhe_wrapper.so* /app/lib/
 COPY --from=builder /app/target/release/examples/benchmark /app/benchmark
 COPY --from=builder /app/target/release/examples/medical_data /app/medical_data
 COPY --from=builder /app/grpc_server/target/release/he-grpc-server /app/he-grpc-server
+
+# Copy MNIST weights for encrypted inference
+COPY --from=builder /app/mnist_training/weights /app/mnist_training/weights
 
 # Update library cache so the system can find all .so files
 RUN ldconfig
