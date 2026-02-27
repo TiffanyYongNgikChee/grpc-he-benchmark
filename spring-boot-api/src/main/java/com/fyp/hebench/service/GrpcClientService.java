@@ -5,6 +5,8 @@ import org.springframework.stereotype.Service;
 import com.fyp.hebench.grpc.BenchmarkRequest;      // Generated from .proto message
 import com.fyp.hebench.grpc.BenchmarkResponse;     // Generated from .proto message
 import com.fyp.hebench.grpc.ComparisonBenchmarkResponse;  // Generated from .proto message
+import com.fyp.hebench.grpc.PredictRequest;         // Generated from .proto PredictRequest message
+import com.fyp.hebench.grpc.PredictResponse;        // Generated from .proto PredictResponse message
 import com.fyp.hebench.grpc.HEServiceGrpc;         // Generated gRPC client stub
 
 import io.grpc.ManagedChannel;           // gRPC network connection handler
@@ -204,5 +206,75 @@ public class GrpcClientService {
         
         // Return wrapped in ComparisonResponse for JSON serialization
         return new com.fyp.hebench.model.ComparisonResponse(libraryResults);
+    }
+
+    /**
+     * Run encrypted MNIST digit prediction via the Rust gRPC server
+     * 
+     * This is the key method for the /api/predict endpoint.
+     * It sends 784 pixel values to the Rust server, which:
+     *   1. Encrypts the pixels using BFV homomorphic encryption
+     *   2. Runs the CNN layers entirely on encrypted data
+     *   3. Decrypts the output to get 10 logits (one per digit)
+     *   4. Returns the predicted digit (argmax of logits)
+     * 
+     * Flow:
+     *   Controller calls this with (pixels, scaleFactor)
+     *        |
+     *   Build Protobuf PredictRequest
+     *        |
+     *   stub.predictDigit() sends to Rust via gRPC
+     *        |
+     *   Rust encrypts → CNN inference → decrypts (inside Docker)
+     *        |
+     *   Receive Protobuf PredictResponse
+     *        |
+     *   Convert to Java POJO for JSON response
+     * 
+     * @param pixels - 784 pixel values (28×28 image, values 0-255)
+     * @param scaleFactor - Quantisation scale factor (default: 1000)
+     * @return PredictResponse with predicted digit, confidence, timing breakdown
+     */
+    public com.fyp.hebench.model.PredictResponse predictDigit(java.util.List<Long> pixels, long scaleFactor) {
+        // Step 1: Build Protobuf PredictRequest
+        // .addAllPixels() converts Java List<Long> to protobuf repeated int64
+        // .setScaleFactor() sets the quantisation scale (1000 = multiply weights by 1000)
+        PredictRequest request = PredictRequest.newBuilder()
+                .addAllPixels(pixels)
+                .setScaleFactor(scaleFactor)
+                .build();
+
+        // Step 2: Call the Rust gRPC server's PredictDigit RPC
+        // This is where the magic happens — the Rust server runs the full
+        // encrypted CNN inference pipeline inside Docker
+        // Takes ~50ms for one image
+        PredictResponse result = stub.predictDigit(request);
+
+        // Step 3: Convert Protobuf response → Java POJO for JSON
+        com.fyp.hebench.model.PredictResponse response = new com.fyp.hebench.model.PredictResponse();
+        response.setPredictedDigit(result.getPredictedDigit());
+        response.setConfidence(result.getConfidence());
+        response.setLogits(result.getLogitsList());
+        response.setStatus(result.getStatus());
+
+        // Per-layer timing breakdown
+        response.setEncryptionMs(result.getEncryptionMs());
+        response.setConv1Ms(result.getConv1Ms());
+        response.setBias1Ms(result.getBias1Ms());
+        response.setAct1Ms(result.getAct1Ms());
+        response.setPool1Ms(result.getPool1Ms());
+        response.setConv2Ms(result.getConv2Ms());
+        response.setBias2Ms(result.getBias2Ms());
+        response.setAct2Ms(result.getAct2Ms());
+        response.setPool2Ms(result.getPool2Ms());
+        response.setFcMs(result.getFcMs());
+        response.setBiasFcMs(result.getBiasFcMs());
+        response.setDecryptionMs(result.getDecryptionMs());
+        response.setTotalMs(result.getTotalMs());
+
+        // Model metadata
+        response.setFloatModelAccuracy(result.getFloatModelAccuracy());
+
+        return response;
     }
 }
