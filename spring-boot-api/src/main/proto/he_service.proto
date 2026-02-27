@@ -28,6 +28,9 @@ service HEService {
   
   // Run comparison benchmark for all three libraries
   rpc RunComparisonBenchmark(BenchmarkRequest) returns (ComparisonBenchmarkResponse);
+
+  // Run encrypted MNIST digit inference (full HE-CNN pipeline)
+  rpc PredictDigit(PredictRequest) returns (PredictResponse);
 }
 
 // Request to generate keys
@@ -105,4 +108,36 @@ message ComparisonBenchmarkResponse {
   BenchmarkResponse openfhe = 3;
   string fastest_library = 4;
   string recommendation = 5;
+}
+
+// Request for encrypted MNIST digit prediction
+message PredictRequest {
+  repeated int64 pixels = 1;          // 784 pixel values (28×28 image, row-major, 0-255 range)
+  int64 scale_factor = 2;             // Quantization scale factor (default: 1000)
+}
+
+// Response from encrypted MNIST digit prediction
+message PredictResponse {
+  int32 predicted_digit = 1;          // Predicted digit (0-9), argmax of logits
+  repeated int64 logits = 2;          // Raw output logits (10 values, one per digit class)
+  double confidence = 3;              // Softmax-like confidence score for the predicted digit
+  string status = 4;                  // "success" or error message
+
+  // Per-layer timing breakdown (milliseconds)
+  double encryption_ms = 5;
+  double conv1_ms = 6;
+  double bias1_ms = 7;
+  double act1_ms = 8;
+  double pool1_ms = 9;
+  double conv2_ms = 10;
+  double bias2_ms = 11;
+  double act2_ms = 12;
+  double pool2_ms = 13;
+  double fc_ms = 14;
+  double bias_fc_ms = 15;
+  double decryption_ms = 16;
+  double total_ms = 17;
+
+  // Model metadata
+  double float_model_accuracy = 18;
 }
