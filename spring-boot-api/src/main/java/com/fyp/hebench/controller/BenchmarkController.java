@@ -1,14 +1,20 @@
 package com.fyp.hebench.controller;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.fyp.hebench.model.BenchmarkRequest;
 import com.fyp.hebench.model.BenchmarkResponse;
 import com.fyp.hebench.model.ComparisonResponse;
 import com.fyp.hebench.model.PredictRequest;
 import com.fyp.hebench.model.PredictResponse;
 import com.fyp.hebench.service.GrpcClientService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api")
