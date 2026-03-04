@@ -1,0 +1,75 @@
+/**
+ * API client for communicating with the Spring Boot backend.
+ * All fetch calls to localhost:8080 go through here.
+ */
+
+const API_BASE = "http://localhost:8080/api";
+
+/**
+ * Check if the backend server is running.
+ * GET /api/health → "OK"
+ */
+export async function checkHealth() {
+  try {
+    const res = await fetch(`${API_BASE}/health`);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Run encrypted MNIST digit prediction.
+ * POST /api/predict
+ * @param {number[]} pixels - 784 pixel values (28×28 image)
+ * @param {number} scaleFactor - BFV quantisation scale (default: 1000)
+ */
+export async function predictDigit(pixels, scaleFactor = 1000) {
+  const res = await fetch(`${API_BASE}/predict`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pixels, scaleFactor }),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: "Unknown error" }));
+    throw new Error(error.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+/**
+ * Run benchmark for a single HE library.
+ * POST /api/benchmark/run
+ * @param {string} library - "SEAL", "HELib", or "OpenFHE"
+ * @param {number} numOperations - How many times to repeat each operation
+ */
+export async function runBenchmark(library, numOperations = 10) {
+  const res = await fetch(`${API_BASE}/benchmark/run`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ library, numOperations }),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: "Unknown error" }));
+    throw new Error(error.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+/**
+ * Run comparison benchmark for all 3 HE libraries.
+ * POST /api/benchmark/compare
+ * @param {number} numOperations - How many times to repeat each operation
+ */
+export async function runComparisonBenchmark(numOperations = 10) {
+  const res = await fetch(`${API_BASE}/benchmark/compare`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ library: "ALL", numOperations }),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: "Unknown error" }));
+    throw new Error(error.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
