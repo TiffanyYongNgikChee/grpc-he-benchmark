@@ -1,5 +1,6 @@
 import { useState } from "react";
 import DrawingCanvas from "../components/DrawingCanvas";
+import LogitsChart from "../components/LogitsChart";
 import { predictDigit } from "../api/client";
 
 /**
@@ -214,33 +215,15 @@ export default function PredictPage() {
                 </div>
               </div>
 
-              {/* Logits (raw output values) */}
+              {/* Logits bar chart (Chart.js) */}
               <div>
                 <h3 className="text-sm font-medium text-slate-300 mb-3">
                   Output Logits (per digit)
                 </h3>
-                <div className="grid grid-cols-10 gap-1">
-                  {result.logits.map((logit, i) => {
-                    const isMax = i === result.predictedDigit;
-                    return (
-                      <div
-                        key={i}
-                        className={`text-center p-2 rounded ${
-                          isMax
-                            ? "bg-emerald-900/50 border border-emerald-600"
-                            : "bg-slate-900"
-                        }`}
-                      >
-                        <p className={`text-xs ${isMax ? "text-emerald-400 font-bold" : "text-slate-500"}`}>
-                          {i}
-                        </p>
-                        <p className={`text-xs font-mono ${isMax ? "text-emerald-300" : "text-slate-400"}`}>
-                          {logit}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
+                <LogitsChart
+                  logits={result.logits}
+                  predictedDigit={result.predictedDigit}
+                />
               </div>
             </div>
           )}
