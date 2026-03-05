@@ -1,13 +1,32 @@
 import { useState } from "react";
 import DrawingCanvas from "../components/DrawingCanvas";
+import { predictDigit } from "../api/client";
 
 /**
  * PredictPage - Draw a digit and get an encrypted prediction.
- * This page will contain the drawing canvas, result display,
- * logits chart, and layer timing breakdown.
+ * Left column: drawing canvas + 28×28 preview
+ * Right column: predict button + result display + timing breakdown
  */
 export default function PredictPage() {
   const [pixels, setPixels] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+
+  async function handlePredict() {
+    if (!pixels) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await predictDigit(pixels, 1000);
+      setResult(response);
+    } catch (err) {
+      setError(err.message);
+      setResult(null);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -22,7 +41,28 @@ export default function PredictPage() {
         {/* Left column: Drawing canvas */}
         <div className="bg-slate-800 rounded-lg border border-slate-700 p-6">
           <h2 className="text-lg font-semibold text-white mb-4">Draw a Digit</h2>
-          <DrawingCanvas onPixelsReady={setPixels} />
+          <DrawingCanvas onPixelsReady={setPixels} disabled={loading} />
+
+          {/* Predict button */}
+          <button
+            onClick={handlePredict}
+            disabled={!pixels || loading}
+            className="mt-4 w-full py-3 rounded-lg font-semibold text-lg transition-all
+                       bg-emerald-600 hover:bg-emerald-500 text-white
+                       disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Running Encrypted Inference...
+              </span>
+            ) : (
+              " Predict with HE"
+            )}
+          </button>
 
           {/* Pixel preview — shows the 28×28 downscaled version */}
           {pixels && (
@@ -53,14 +93,157 @@ export default function PredictPage() {
           )}
         </div>
 
-        {/* Right column: Results (coming next commit) */}
+        {/* Right column: Prediction results */}
         <div className="bg-slate-800 rounded-lg border border-slate-700 p-6">
           <h2 className="text-lg font-semibold text-white mb-4">Prediction Result</h2>
-          <div className="text-center text-slate-500 py-12">
-            {pixels
-              ? "Predict button and results coming next..."
-              : "Draw a digit on the left to get started"}
-          </div>
+
+          {/* Error state */}
+          {error && (
+            <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 mb-4">
+              <p className="text-red-400 text-sm font-medium">Prediction failed</p>
+              <p className="text-red-300 text-xs mt-1">{error}</p>
+              <p className="text-red-400/60 text-xs mt-2">
+                Make sure Docker and Spring Boot are running.
+              </p>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!result && !error && !loading && (
+            <div className="text-center text-slate-500 py-12">
+              {pixels
+                ? 'Click "Predict with HE" to run encrypted inference'
+                : "Draw a digit on the left to get started"}
+            </div>
+          )}
+
+          {/* Loading state */}
+          {loading && (
+            <div className="text-center py-12">
+              <div className="inline-flex items-center gap-3 text-emerald-400">
+                <svg className="animate-spin h-6 w-6" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                <span className="text-sm">Encrypting and running CNN...</span>
+              </div>
+            </div>
+          )}
+
+          {/* Result display */}
+          {result && !loading && (
+            <div className="space-y-6">
+              {/* Big predicted digit */}
+              <div className="text-center">
+                <p className="text-sm text-slate-400 mb-1">Predicted Digit</p>
+                <p className="text-7xl font-bold text-emerald-400">
+                  {result.predictedDigit}
+                </p>
+              </div>
+
+              {/* Confidence and status */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-900 rounded-lg p-3 text-center">
+                  <p className="text-xs text-slate-500 mb-1">Confidence</p>
+                  <p className="text-xl font-semibold text-white">
+                    {(result.confidence * 100).toFixed(1)}%
+                  </p>
+                </div>
+                <div className="bg-slate-900 rounded-lg p-3 text-center">
+                  <p className="text-xs text-slate-500 mb-1">Total Time</p>
+                  <p className="text-xl font-semibold text-white">
+                    {result.totalMs.toFixed(1)}ms
+                  </p>
+                </div>
+              </div>
+
+              {/* Status badge */}
+              <div className="flex items-center justify-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+                    result.status === "success"
+                      ? "bg-emerald-900/40 text-emerald-400 border border-emerald-700"
+                      : "bg-red-900/40 text-red-400 border border-red-700"
+                  }`}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      result.status === "success" ? "bg-emerald-400" : "bg-red-400"
+                    }`}
+                  />
+                  {result.status}
+                </span>
+                <span className="text-xs text-slate-500">
+                  Float model accuracy: {result.floatModelAccuracy}%
+                </span>
+              </div>
+
+              {/* Per-layer timing breakdown */}
+              <div>
+                <h3 className="text-sm font-medium text-slate-300 mb-3">
+                  Layer Timing Breakdown
+                </h3>
+                <div className="space-y-1.5">
+                  {[
+                    { label: "Encryption", value: result.encryptionMs, color: "bg-cyan-500" },
+                    { label: "Conv1", value: result.conv1Ms, color: "bg-violet-500" },
+                    { label: "Bias1", value: result.bias1Ms, color: "bg-violet-400" },
+                    { label: "ReLU1", value: result.act1Ms, color: "bg-amber-500" },
+                    { label: "Pool1", value: result.pool1Ms, color: "bg-amber-400" },
+                    { label: "Conv2", value: result.conv2Ms, color: "bg-violet-500" },
+                    { label: "Bias2", value: result.bias2Ms, color: "bg-violet-400" },
+                    { label: "ReLU2", value: result.act2Ms, color: "bg-amber-500" },
+                    { label: "Pool2", value: result.pool2Ms, color: "bg-amber-400" },
+                    { label: "FC", value: result.fcMs, color: "bg-rose-500" },
+                    { label: "BiasFc", value: result.biasFcMs, color: "bg-rose-400" },
+                    { label: "Decryption", value: result.decryptionMs, color: "bg-cyan-400" },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} className="flex items-center gap-2 text-xs">
+                      <span className="w-16 text-right text-slate-400">{label}</span>
+                      <div className="flex-1 bg-slate-900 rounded-full h-3 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${color}`}
+                          style={{
+                            width: `${Math.max(2, (value / result.totalMs) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="w-16 text-slate-400">{value.toFixed(1)}ms</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Logits (raw output values) */}
+              <div>
+                <h3 className="text-sm font-medium text-slate-300 mb-3">
+                  Output Logits (per digit)
+                </h3>
+                <div className="grid grid-cols-10 gap-1">
+                  {result.logits.map((logit, i) => {
+                    const isMax = i === result.predictedDigit;
+                    return (
+                      <div
+                        key={i}
+                        className={`text-center p-2 rounded ${
+                          isMax
+                            ? "bg-emerald-900/50 border border-emerald-600"
+                            : "bg-slate-900"
+                        }`}
+                      >
+                        <p className={`text-xs ${isMax ? "text-emerald-400 font-bold" : "text-slate-500"}`}>
+                          {i}
+                        </p>
+                        <p className={`text-xs font-mono ${isMax ? "text-emerald-300" : "text-slate-400"}`}>
+                          {logit}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
