@@ -1,8 +1,20 @@
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import DrawingCanvas from "../components/DrawingCanvas";
 import LogitsChart from "../components/LogitsChart";
 import TimingChart from "../components/TimingChart";
+import CountUp from "../components/CountUp";
 import { predictDigit } from "../api/client";
+
+/* Framer Motion variants */
+const fadeIn = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 },
+};
+
+const stagger = {
+  visible: { transition: { staggerChildren: 0.12 } },
+};
 
 /**
  * PredictPage - Draw a digit and get an encrypted prediction.
@@ -133,34 +145,42 @@ export default function PredictPage() {
           )}
 
           {/* Result display */}
+          <AnimatePresence mode="wait">
           {result && !loading && (
-            <div className="space-y-6">
+            <motion.div
+              key={result.predictedDigit + "-" + result.totalMs}
+              className="space-y-6"
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
+              variants={stagger}
+            >
               {/* Big predicted digit */}
-              <div className="text-center">
+              <motion.div className="text-center" variants={fadeIn}>
                 <p className="text-sm text-slate-400 mb-1">Predicted Digit</p>
                 <p className="text-7xl font-bold text-emerald-400">
-                  {result.predictedDigit}
+                  <CountUp end={result.predictedDigit} duration={400} decimals={0} />
                 </p>
-              </div>
+              </motion.div>
 
-              {/* Confidence and status */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Confidence and total time */}
+              <motion.div className="grid grid-cols-2 gap-4" variants={fadeIn}>
                 <div className="bg-slate-900 rounded-lg p-3 text-center">
                   <p className="text-xs text-slate-500 mb-1">Confidence</p>
                   <p className="text-xl font-semibold text-white">
-                    {(result.confidence * 100).toFixed(1)}%
+                    <CountUp end={result.confidence * 100} duration={900} decimals={1} suffix="%" />
                   </p>
                 </div>
                 <div className="bg-slate-900 rounded-lg p-3 text-center">
                   <p className="text-xs text-slate-500 mb-1">Total Time</p>
                   <p className="text-xl font-semibold text-white">
-                    {result.totalMs.toFixed(1)}ms
+                    <CountUp end={result.totalMs} duration={900} decimals={1} suffix="ms" />
                   </p>
                 </div>
-              </div>
+              </motion.div>
 
               {/* Status badge */}
-              <div className="flex items-center justify-center gap-2">
+              <motion.div className="flex items-center justify-center gap-2" variants={fadeIn}>
                 <span
                   className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
                     result.status === "success"
@@ -178,18 +198,18 @@ export default function PredictPage() {
                 <span className="text-xs text-slate-500">
                   Float model accuracy: {result.floatModelAccuracy}%
                 </span>
-              </div>
+              </motion.div>
 
               {/* Per-layer timing breakdown (Chart.js horizontal bar) */}
-              <div>
+              <motion.div variants={fadeIn}>
                 <h3 className="text-sm font-medium text-slate-300 mb-3">
                   Layer Timing Breakdown
                 </h3>
                 <TimingChart result={result} />
-              </div>
+              </motion.div>
 
               {/* Logits bar chart (Chart.js) */}
-              <div>
+              <motion.div variants={fadeIn}>
                 <h3 className="text-sm font-medium text-slate-300 mb-3">
                   Output Logits (per digit)
                 </h3>
@@ -197,9 +217,10 @@ export default function PredictPage() {
                   logits={result.logits}
                   predictedDigit={result.predictedDigit}
                 />
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
           )}
+          </AnimatePresence>
         </div>
       </div>
     </div>
