@@ -1,6 +1,7 @@
 import { useState } from "react";
 import DrawingCanvas from "../components/DrawingCanvas";
 import LogitsChart from "../components/LogitsChart";
+import TimingChart from "../components/TimingChart";
 import { predictDigit } from "../api/client";
 
 /**
@@ -179,40 +180,12 @@ export default function PredictPage() {
                 </span>
               </div>
 
-              {/* Per-layer timing breakdown */}
+              {/* Per-layer timing breakdown (Chart.js horizontal bar) */}
               <div>
                 <h3 className="text-sm font-medium text-slate-300 mb-3">
                   Layer Timing Breakdown
                 </h3>
-                <div className="space-y-1.5">
-                  {[
-                    { label: "Encryption", value: result.encryptionMs, color: "bg-cyan-500" },
-                    { label: "Conv1", value: result.conv1Ms, color: "bg-violet-500" },
-                    { label: "Bias1", value: result.bias1Ms, color: "bg-violet-400" },
-                    { label: "ReLU1", value: result.act1Ms, color: "bg-amber-500" },
-                    { label: "Pool1", value: result.pool1Ms, color: "bg-amber-400" },
-                    { label: "Conv2", value: result.conv2Ms, color: "bg-violet-500" },
-                    { label: "Bias2", value: result.bias2Ms, color: "bg-violet-400" },
-                    { label: "ReLU2", value: result.act2Ms, color: "bg-amber-500" },
-                    { label: "Pool2", value: result.pool2Ms, color: "bg-amber-400" },
-                    { label: "FC", value: result.fcMs, color: "bg-rose-500" },
-                    { label: "BiasFc", value: result.biasFcMs, color: "bg-rose-400" },
-                    { label: "Decryption", value: result.decryptionMs, color: "bg-cyan-400" },
-                  ].map(({ label, value, color }) => (
-                    <div key={label} className="flex items-center gap-2 text-xs">
-                      <span className="w-16 text-right text-slate-400">{label}</span>
-                      <div className="flex-1 bg-slate-900 rounded-full h-3 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${color}`}
-                          style={{
-                            width: `${Math.max(2, (value / result.totalMs) * 100)}%`,
-                          }}
-                        />
-                      </div>
-                      <span className="w-16 text-slate-400">{value.toFixed(1)}ms</span>
-                    </div>
-                  ))}
-                </div>
+                <TimingChart result={result} />
               </div>
 
               {/* Logits bar chart (Chart.js) */}
