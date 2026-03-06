@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { runBenchmark, runComparisonBenchmark } from "../api/client";
 
 const LIBRARIES = ["SEAL", "HELib", "OpenFHE"];
 const OPERATIONS_OPTIONS = [1, 5, 10, 25, 50, 100];
@@ -11,17 +12,44 @@ const OPERATIONS_OPTIONS = [1, 5, 10, 25, 50, 100];
  *   • "compare" – benchmark all three and compare side-by-side
  *
  * Commit 12: layout, mode toggle, library selector, operations dropdown.
- * API calls, chart, and table will follow in Commits 13–15.
+ * Commit 13: API integration — calls runBenchmark / runComparisonBenchmark.
+ * Chart and table will follow in Commits 14–15.
  */
 export default function BenchmarkPage() {
   const [mode, setMode] = useState("compare"); // "single" | "compare"
   const [library, setLibrary] = useState("SEAL");
   const [numOperations, setNumOperations] = useState(10);
 
-  /* Placeholders — wired up in Commit 13 */
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
+  const [results, setResults] = useState(null);   // always an array of LibraryResult
   const [error, setError] = useState(null);
+
+  /**
+   * Call the correct endpoint based on mode, then normalise into
+   * a consistent results[] array for the chart / table (Commits 14–15).
+   */
+  async function handleRun() {
+    setLoading(true);
+    setError(null);
+    setResults(null);
+    try {
+      if (mode === "compare") {
+        const res = await runComparisonBenchmark(numOperations);
+        // POST /api/benchmark/compare → { results: [LibraryResult …] }
+        setResults(res.results);
+      } else {
+        const res = await runBenchmark(library, numOperations);
+        // POST /api/benchmark/run → single LibraryResult object
+        // Wrap in an array so downstream code can always iterate
+        setResults([res]);
+      }
+    } catch (err) {
+      setError(err.message);
+      setResults(null);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -116,6 +144,7 @@ export default function BenchmarkPage() {
           {/* Run button */}
           <div className="sm:ml-auto">
             <button
+              onClick={handleRun}
               disabled={loading}
               className="px-6 py-2.5 rounded-lg font-semibold text-sm transition-all
                          bg-emerald-600 hover:bg-emerald-500 text-white
@@ -160,7 +189,7 @@ export default function BenchmarkPage() {
         )}
 
         {/* Empty state */}
-        {!result && !error && !loading && (
+        {!results && !error && !loading && (
           <div className="text-center text-slate-500 py-16">
             <p className="text-4xl mb-3">📊</p>
             <p className="text-sm">
@@ -189,13 +218,13 @@ export default function BenchmarkPage() {
         )}
 
         {/* Chart + Table placeholder — Commits 14–15 */}
-        {result && !loading && (
+        {results && !loading && (
           <div className="text-center text-slate-500 py-8">
             <p className="text-sm">
               Results received ✅ — chart and table coming in Commits 14–15.
             </p>
             <pre className="mt-4 text-left text-xs bg-slate-900 rounded-lg p-4 overflow-x-auto">
-              {JSON.stringify(result, null, 2)}
+              {JSON.stringify(results, null, 2)}
             </pre>
           </div>
         )}
