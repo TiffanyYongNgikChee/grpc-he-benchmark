@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { runBenchmark, runComparisonBenchmark } from "../api/client";
+import BenchmarkChart from "../components/BenchmarkChart";
 
 const LIBRARIES = ["SEAL", "HELib", "OpenFHE"];
 const OPERATIONS_OPTIONS = [1, 5, 10, 25, 50, 100];
@@ -217,15 +218,15 @@ export default function BenchmarkPage() {
           </div>
         )}
 
-        {/* Chart + Table placeholder — Commits 14–15 */}
+        {/* Chart + Table (table coming in Commit 15) */}
         {results && !loading && (
-          <div className="text-center text-slate-500 py-8">
-            <p className="text-sm">
-              Results received ✅ — chart and table coming in Commits 14–15.
-            </p>
-            <pre className="mt-4 text-left text-xs bg-slate-900 rounded-lg p-4 overflow-x-auto">
-              {JSON.stringify(results, null, 2)}
-            </pre>
+          <div>
+            <h3 className="text-sm font-medium text-slate-300 mb-4">
+              {results.length > 1
+                ? "Performance Comparison — Time per Operation"
+                : `${results[0].library} — Time per Operation`}
+            </h3>
+            <BenchmarkChart results={results} />
           </div>
         )}
       </div>
