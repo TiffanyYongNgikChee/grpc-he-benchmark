@@ -4,7 +4,8 @@ import CnnPipeline, { LAYERS } from "./CnnPipeline";
 import MiniCanvas from "./MiniCanvas";
 import OutputPanel from "./OutputPanel";
 import MetricsStrip from "./MetricsStrip";
-import { checkHealth, predictDigit } from "../api/client";
+import LibraryComparison from "./LibraryComparison";
+import { checkHealth, predictDigit, runComparisonBenchmark } from "../api/client";
 
 /**
  * Playground — TensorFlow-Playground-inspired single-page layout.
@@ -29,6 +30,11 @@ export default function Playground() {
   const [hoveredLayer, setHoveredLayer] = useState(null);
   const [runCount, setRunCount] = useState(0);
   const animTimers = useRef([]);
+
+  /* Library comparison */
+  const [compData, setCompData] = useState(null);
+  const [compLoading, setCompLoading] = useState(false);
+  const [compError, setCompError] = useState(null);
 
   /* Health check */
   useEffect(() => {
@@ -77,6 +83,21 @@ export default function Playground() {
     setError(null);
     setActiveStep(-1);
   };
+
+  /* ─── Run library comparison ─── */
+  const handleComparison = useCallback(async () => {
+    if (compLoading) return;
+    setCompLoading(true);
+    setCompError(null);
+    try {
+      const data = await runComparisonBenchmark(10);
+      setCompData(data);
+    } catch (err) {
+      setCompError(err.message);
+    } finally {
+      setCompLoading(false);
+    }
+  }, [compLoading]);
 
   useEffect(() => () => animTimers.current.forEach(clearTimeout), []);
 
@@ -161,7 +182,7 @@ export default function Playground() {
         <Divider />
 
         {/* Dropdowns */}
-        <ControlDropdown label="Library" options={["OpenFHE"]} />
+        <ControlDropdown label="Library" options={["OpenFHE", "SEAL", "HElib"]} />
         <ControlDropdown label="Encryption" options={["BFV"]} />
         <ControlDropdown label="Activation" options={["x² (Square)"]} />
         <ControlDropdown label="Scale factor" options={["1000"]} />
@@ -316,6 +337,34 @@ export default function Playground() {
         </div>
       </div>
 
+      {/* ═══════════ LIBRARY COMPARISON ═══════════ */}
+      <div className="px-4 md:px-8 py-8" style={{ background: "#f7f7f7", borderTop: "1px solid #e5e5e5" }}>
+        <div className="max-w-[1100px] mx-auto">
+          <div className="flex items-center gap-3 mb-4">
+            <h3
+              className="text-xs font-medium uppercase tracking-widest"
+              style={{ color: "#888", letterSpacing: "0.12em" }}
+            >
+              LIBRARY COMPARISON
+            </h3>
+            <span className="text-[10px]" style={{ color: "#bbb" }}>
+              SEAL vs HElib vs OpenFHE
+            </span>
+          </div>
+          <div
+            className="rounded-lg p-5"
+            style={{ background: "#fafafa", border: "1px solid #e5e5e5" }}
+          >
+            <LibraryComparison
+              data={compData}
+              loading={compLoading}
+              error={compError}
+              onRun={handleComparison}
+            />
+          </div>
+        </div>
+      </div>
+
       {/* ═══════════ EXPAND ARROW ═══════════ */}
       <div className="flex justify-center py-3" style={{ background: "#ebeaea" }}>
         <a href="#info" className="w-9 h-9 rounded-full border border-gray-300 bg-white flex items-center justify-center hover:bg-gray-100 transition">
@@ -336,11 +385,10 @@ export default function Playground() {
               Homomorphic encryption (HE) lets you <b>compute on encrypted data</b> without
               ever decrypting it. The server never sees your raw input — it performs the
               entire CNN inference on ciphertext. Only you, the data owner, can decrypt
-              the result. This project uses the{" "}
-              <b style={{ color: "#0db7c4" }}>BFV scheme</b> from{" "}
-              <a href="https://www.openfhe.org/" target="_blank" rel="noreferrer" className="underline" style={{ color: "#f4743a" }}>
-                OpenFHE
-              </a>, a leading open-source HE library.
+              the result. This project benchmarks three leading HE libraries:{" "}
+              <b style={{ color: "#0db7c4" }}>OpenFHE</b>,{" "}
+              <b style={{ color: "#3b82f6" }}>Microsoft SEAL</b>, and{" "}
+              <b style={{ color: "#8b5cf6" }}>HElib</b> — all using the BFV scheme.
             </p>
           </div>
 
@@ -388,7 +436,7 @@ export default function Playground() {
 
       {/* ═══════════ FOOTER ═══════════ */}
       <footer className="text-center py-4 text-xs" style={{ color: "#999", background: "#f7f7f7", borderTop: "1px solid #e5e5e5" }}>
-        Built by Tiffany Yong · FYP 2025-2026 · Powered by OpenFHE, Spring Boot &amp; React
+        Built by Tiffany Yong · FYP 2025-2026 · Powered by OpenFHE, SEAL, HElib, Spring Boot &amp; React
       </footer>
     </div>
   );
