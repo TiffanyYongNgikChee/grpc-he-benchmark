@@ -175,8 +175,8 @@ export default function MiniCanvas({ onPixelsReady, disabled = false }) {
         ref={canvasRef}
         width={CANVAS_SIZE}
         height={CANVAS_SIZE}
-        className="rounded border-2 border-slate-600 cursor-crosshair w-full max-w-[196px]"
-        style={{ imageRendering: "pixelated", touchAction: "none" }}
+        className="rounded border-2 cursor-crosshair w-full max-w-[196px]"
+        style={{ imageRendering: "pixelated", touchAction: "none", borderColor: "#d9d9d9" }}
         onMouseDown={handleStart}
         onMouseMove={handleMove}
         onMouseUp={handleEnd}
@@ -188,8 +188,8 @@ export default function MiniCanvas({ onPixelsReady, disabled = false }) {
       {hasDrawn && (
         <button
           onClick={handleClear}
-          className="absolute top-1 right-1 bg-slate-700/80 hover:bg-slate-600 text-slate-300
-                     rounded px-2 py-0.5 text-xs transition-colors"
+          className="absolute top-1 right-1 bg-white/80 hover:bg-gray-100 text-gray-500
+                     rounded px-2 py-0.5 text-xs transition-colors border border-gray-300"
         >
           Clear
         </button>

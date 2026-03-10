@@ -1,27 +1,25 @@
 import { LAYERS, CATEGORY_COLORS } from "./CnnPipeline";
 
 /**
- * MetricsStrip — Bottom bar showing per-layer timing breakdown in a
- * horizontal stacked-bar style, similar to a flame chart or TF Playground's
- * epoch/loss strip.
+ * MetricsStrip — Bottom bar with per-layer timing breakdown.
+ * Light theme stacked-bar matching TF Playground's minimal aesthetic.
  */
 export default function MetricsStrip({ result }) {
   if (!result) {
     return (
-      <div className="text-center text-slate-600 text-xs py-1">
+      <div className="text-center text-xs py-1" style={{ color: "#bbb" }}>
         Run inference to see per-layer timing breakdown
       </div>
     );
   }
 
-  /* Collect layers that have timing data */
   const timedLayers = LAYERS.filter((l) => l.key && result[l.key] != null);
   const total = result.totalMs || 1;
 
   return (
     <div>
-      {/* Horizontal stacked bar */}
-      <div className="flex rounded-md overflow-hidden h-6 mb-2">
+      {/* Stacked bar */}
+      <div className="flex rounded-md overflow-hidden h-6 mb-2" style={{ border: "1px solid #d9d9d9" }}>
         {timedLayers.map((layer) => {
           const ms = result[layer.key] || 0;
           const pct = (ms / total) * 100;
@@ -30,27 +28,22 @@ export default function MetricsStrip({ result }) {
           return (
             <div
               key={layer.id}
-              className="relative group flex items-center justify-center text-[9px] font-medium
-                         transition-opacity hover:opacity-90 cursor-default"
+              className="relative group flex items-center justify-center text-[9px] font-medium transition-opacity hover:opacity-80 cursor-default"
               style={{
                 width: `${Math.max(pct, 1.5)}%`,
                 backgroundColor: cat.active,
-                color: "#0f172a",
+                color: "#fff",
               }}
               title={`${layer.label}: ${ms.toFixed(2)}ms (${pct.toFixed(1)}%)`}
             >
-              {pct > 5 && (
-                <span className="truncate px-1">
-                  {layer.label}
-                </span>
-              )}
+              {pct > 5 && <span className="truncate px-1">{layer.label}</span>}
             </div>
           );
         })}
       </div>
 
-      {/* Legend row */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-400">
+      {/* Legend */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px]" style={{ color: "#999" }}>
         {timedLayers.map((layer) => {
           const ms = result[layer.key] || 0;
           const cat = CATEGORY_COLORS[layer.category];
@@ -60,12 +53,12 @@ export default function MetricsStrip({ result }) {
                 className="inline-block w-2 h-2 rounded-sm"
                 style={{ backgroundColor: cat.active }}
               />
-              <span className="text-slate-500">{layer.label}</span>
-              <span className="font-mono text-slate-300">{ms.toFixed(1)}ms</span>
+              <span style={{ color: "#888" }}>{layer.label}</span>
+              <span className="font-mono" style={{ color: "#555" }}>{ms.toFixed(1)}ms</span>
             </span>
           );
         })}
-        <span className="ml-auto font-medium text-emerald-400 font-mono">
+        <span className="ml-auto font-medium font-mono" style={{ color: "#f4743a" }}>
           Total: {total.toFixed(1)}ms
         </span>
       </div>

@@ -1,20 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import CnnPipeline, { LAYERS, CATEGORY_COLORS } from "./CnnPipeline";
+import { AnimatePresence, motion } from "framer-motion";
+import CnnPipeline, { LAYERS } from "./CnnPipeline";
 import MiniCanvas from "./MiniCanvas";
 import OutputPanel from "./OutputPanel";
 import MetricsStrip from "./MetricsStrip";
 import { checkHealth, predictDigit } from "../api/client";
 
 /**
- * Playground — Single-page interactive visualization of the encrypted CNN
- * inference pipeline, inspired by TensorFlow Playground.
+ * Playground — TensorFlow-Playground-inspired single-page layout.
  *
- * Layout (top → bottom):
- *   1. Header bar — title + tagline + health dot
- *   2. Top controls — play/run button, library info, epoch counter
- *   3. Main area (3 columns):  Input | CNN Pipeline | Output
- *   4. Bottom metrics — layer timing breakdown + hover tooltip
+ * Visual hierarchy (top → bottom):
+ *   1. Orange header — hero text + tagline
+ *   2. Controls bar — play, reset, epoch, dropdowns (scheme, model, scale)
+ *   3. Main area — INPUT | CNN PIPELINE (vertical groups) | OUTPUT
+ *   4. Bottom metrics — timing stacked bar
+ *   5. Info section — "What is HE?" + "About this project"
  */
 export default function Playground() {
   /* ─── State ─── */
@@ -24,11 +24,11 @@ export default function Playground() {
   const [error, setError] = useState(null);
   const [healthy, setHealthy] = useState(null);
 
-  /* Animation state */
-  const [activeStep, setActiveStep] = useState(-1);    // -1 = idle
+  /* Animation */
+  const [activeStep, setActiveStep] = useState(-1);
   const [hoveredLayer, setHoveredLayer] = useState(null);
   const [runCount, setRunCount] = useState(0);
-  const animTimerRef = useRef(null);
+  const animTimers = useRef([]);
 
   /* Health check */
   useEffect(() => {
@@ -51,19 +51,18 @@ export default function Playground() {
       setResult(response);
       setRunCount((c) => c + 1);
 
-      /* Animate layers sequentially using real timing data */
+      /* Animate layers sequentially */
       let elapsed = 0;
       const timingKeys = LAYERS.map((l) => l.key);
-      clearTimeout(animTimerRef.current);
+      animTimers.current.forEach(clearTimeout);
+      animTimers.current = [];
 
       for (let step = 1; step <= LAYERS.length; step++) {
         const key = timingKeys[step - 1];
-        const ms = key && response[key] ? response[key] : 60; // default 60ms visual delay
-        elapsed += Math.min(ms * 1.5, 500); // scale for visual effect, cap at 500ms
-
-        animTimerRef.current = setTimeout(() => {
-          setActiveStep(step);
-        }, elapsed);
+        const ms = key && response[key] ? response[key] : 60;
+        elapsed += Math.min(ms * 1.5, 500);
+        const t = setTimeout(() => setActiveStep(step), elapsed);
+        animTimers.current.push(t);
       }
     } catch (err) {
       setError(err.message);
@@ -73,70 +72,62 @@ export default function Playground() {
     }
   }, [pixels, loading]);
 
-  /* Cleanup timers */
-  useEffect(() => {
-    return () => clearTimeout(animTimerRef.current);
-  }, []);
+  const handleReset = () => {
+    setResult(null);
+    setError(null);
+    setActiveStep(-1);
+  };
 
-  /* ─── Hover tooltip data ─── */
-  const tooltipLayer = hoveredLayer !== null ? LAYERS[hoveredLayer] : null;
-  const tooltipTime =
-    tooltipLayer && tooltipLayer.key && result
-      ? result[tooltipLayer.key]
-      : null;
+  useEffect(() => () => animTimers.current.forEach(clearTimeout), []);
+
+  /* Tooltip */
+  const tl = hoveredLayer !== null ? LAYERS[hoveredLayer] : null;
+  const tTime = tl && tl.key && result ? result[tl.key] : null;
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col">
-      {/* ═══════════ HEADER ═══════════ */}
-      <header className="bg-slate-800 border-b border-slate-700 px-6 py-3">
-        <div className="max-w-[1400px] mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">🔐</span>
-            <div>
-              <h1 className="text-lg font-bold text-white leading-tight">
-                Encrypted ML Playground
-              </h1>
-              <p className="text-xs text-slate-400 leading-tight">
-                Tinker with <b className="text-emerald-400">homomorphic encryption</b> on a real CNN. Don't worry, your data stays encrypted.
-              </p>
-            </div>
-          </div>
+    <div className="min-h-screen flex flex-col" style={{ background: "#f7f7f7" }}>
 
-          {/* Health dot */}
-          <div className="flex items-center gap-2">
-            <div
-              className={`w-2.5 h-2.5 rounded-full transition-colors ${
-                healthy === null
-                  ? "bg-slate-500"
-                  : healthy
-                  ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]"
-                  : "bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.6)]"
-              }`}
-            />
-            <span className="text-xs text-slate-500">
-              {healthy === null ? "Checking…" : healthy ? "Backend Online" : "Backend Offline"}
-            </span>
-          </div>
-        </div>
+      {/* ═══════════ HEADER ═══════════ */}
+      <header
+        className="text-center py-8 px-4"
+        style={{ background: "#1a1a2e" }}
+      >
+        <h1 className="text-white text-xl md:text-2xl font-light tracking-wide leading-snug">
+          Tinker With{" "}
+          <span className="font-bold">Encrypted Neural Networks</span>{" "}
+          Right Here in Your Browser.
+        </h1>
+        <p className="text-sm mt-1 font-light" style={{ color: "rgba(255,255,255,0.65)" }}>
+          Don't Worry, Your Data Stays <b className="text-white">Encrypted</b>. We Promise.
+        </p>
       </header>
 
-      {/* ═══════════ TOP CONTROLS ═══════════ */}
-      <div className="bg-slate-800/50 border-b border-slate-700/50 px-6 py-3">
-        <div className="max-w-[1400px] mx-auto flex items-center gap-6">
-          {/* Run button — big and colorful like TF playground's play button */}
+      {/* ═══════════ CONTROLS BAR ═══════════ */}
+      <div
+        className="border-b flex items-center gap-1 md:gap-0 px-4 py-2 flex-wrap"
+        style={{ background: "#ebeaea", borderColor: "#d9d9d9" }}
+      >
+        <div className="flex items-center gap-2 mr-4 md:mr-6">
+          {/* Reset */}
+          <button
+            onClick={handleReset}
+            className="w-9 h-9 rounded-full flex items-center justify-center border border-gray-300 bg-white hover:bg-gray-100 text-gray-500 transition-colors"
+            title="Reset"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M5.09 15A8 8 0 0119 9M18.91 9A8 8 0 015 15" />
+            </svg>
+          </button>
+
+          {/* Play */}
           <button
             onClick={handleRun}
             disabled={!pixels || loading}
-            className={`
-              w-12 h-12 rounded-full flex items-center justify-center
-              text-white font-bold text-xl
-              transition-all shadow-lg
-              ${
-                !pixels || loading
-                  ? "bg-slate-700 text-slate-500 cursor-not-allowed"
-                  : "bg-emerald-500 hover:bg-emerald-400 hover:shadow-emerald-500/30 hover:scale-105 active:scale-95"
-              }
-            `}
+            className={`w-11 h-11 rounded-full flex items-center justify-center text-white shadow transition-all ${
+              !pixels || loading
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-[#f4743a] hover:bg-[#e05a20] hover:scale-105 active:scale-95"
+            }`}
             title={loading ? "Running…" : "Run Encrypted Inference"}
           >
             {loading ? (
@@ -151,84 +142,79 @@ export default function Playground() {
             )}
           </button>
 
-          {/* Run count */}
-          <div className="text-sm">
-            <span className="text-slate-500">Epoch</span>{" "}
-            <span className="text-white font-mono font-semibold text-lg">
-              {String(runCount).padStart(3, "0")}
+          {/* Step */}
+          <button
+            onClick={handleRun}
+            disabled={!pixels || loading}
+            className="w-9 h-9 rounded-full flex items-center justify-center border border-gray-300 bg-white hover:bg-gray-100 text-gray-500 disabled:opacity-40 transition-colors"
+            title="Step"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M6 4v16l10-8z" /><rect x="16" y="4" width="3" height="16" rx="0.5" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Epoch */}
+        <ControlLabel label="Epoch" value={String(runCount).padStart(6, "0")} mono />
+
+        <Divider />
+
+        {/* Dropdowns */}
+        <ControlDropdown label="Library" options={["OpenFHE"]} />
+        <ControlDropdown label="Encryption" options={["BFV"]} />
+        <ControlDropdown label="Activation" options={["x² (Square)"]} />
+        <ControlDropdown label="Scale factor" options={["1000"]} />
+        <ControlDropdown label="Model" options={["CNN (LeNet-5)"]} />
+
+        {/* Spacer + health + total time */}
+        <div className="ml-auto flex items-center gap-3">
+          {result && (
+            <span className="text-xs font-medium" style={{ color: "#0aa35e" }}>
+              {result.totalMs?.toFixed(1)}ms total
             </span>
-          </div>
-
-          {/* Divider */}
-          <div className="w-px h-8 bg-slate-700" />
-
-          {/* Library info */}
-          <div>
-            <label className="text-xs text-slate-500 block">Library</label>
-            <span className="text-sm text-cyan-400 font-medium">OpenFHE (BFV)</span>
-          </div>
-
-          <div className="w-px h-8 bg-slate-700" />
-
-          {/* Encryption scheme */}
-          <div>
-            <label className="text-xs text-slate-500 block">Scheme</label>
-            <span className="text-sm text-violet-400 font-medium">BFV</span>
-          </div>
-
-          <div className="w-px h-8 bg-slate-700" />
-
-          {/* Model */}
-          <div>
-            <label className="text-xs text-slate-500 block">Model</label>
-            <span className="text-sm text-amber-400 font-medium">LeNet-5 CNN</span>
-          </div>
-
-          <div className="w-px h-8 bg-slate-700" />
-
-          {/* Scale factor */}
-          <div>
-            <label className="text-xs text-slate-500 block">Scale factor</label>
-            <span className="text-sm text-slate-300 font-mono">1000</span>
-          </div>
-
-          {/* Spacer + total time */}
-          <div className="ml-auto text-right">
-            {result && (
-              <>
-                <label className="text-xs text-slate-500 block">Total inference</label>
-                <span className="text-sm text-emerald-400 font-mono font-semibold">
-                  {result.totalMs?.toFixed(1)}ms
-                </span>
-              </>
-            )}
+          )}
+          <div className="flex items-center gap-1.5">
+            <div
+              className="w-2 h-2 rounded-full"
+              style={{
+                background: healthy === null ? "#aaa" : healthy ? "#0aa35e" : "#e03e52",
+                boxShadow: healthy ? "0 0 6px rgba(10,163,94,0.5)" : "none",
+              }}
+            />
+            <span className="text-[11px]" style={{ color: "#999" }}>
+              {healthy === null ? "…" : healthy ? "Online" : "Offline"}
+            </span>
           </div>
         </div>
       </div>
 
       {/* ═══════════ MAIN AREA ═══════════ */}
-      <div className="flex-1 px-6 py-4">
-        <div className="max-w-[1400px] mx-auto flex gap-4 h-full" style={{ minHeight: 480 }}>
+      <div className="flex-1 px-4 md:px-8 py-6">
+        <div className="max-w-[1440px] mx-auto flex gap-6" style={{ minHeight: 420 }}>
 
           {/* ── INPUT COLUMN ── */}
-          <div className="w-52 flex-shrink-0">
-            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              Input
-            </h4>
-            <p className="text-[11px] text-slate-500 mb-3">
-              Draw a digit (0-9) below, then click the play button.
+          <div className="flex-shrink-0" style={{ width: 210 }}>
+            <SectionTitle>INPUT</SectionTitle>
+            <p className="text-xs mb-3" style={{ color: "#999" }}>
+              Draw a digit (0-9)
             </p>
             <MiniCanvas onPixelsReady={setPixels} disabled={loading} />
 
             {/* 28×28 preview */}
             {pixels && (
               <div className="mt-3">
-                <p className="text-[10px] text-slate-500 mb-1">28×28 model input</p>
+                <p className="text-[10px] mb-1" style={{ color: "#aaa" }}>28×28 model input</p>
                 <canvas
                   width={28}
                   height={28}
-                  className="border border-slate-600 rounded"
-                  style={{ width: 56, height: 56, imageRendering: "pixelated" }}
+                  className="rounded"
+                  style={{
+                    width: 56,
+                    height: 56,
+                    imageRendering: "pixelated",
+                    border: "1px solid #d9d9d9",
+                  }}
                   ref={(el) => {
                     if (!el || !pixels) return;
                     const ctx = el.getContext("2d");
@@ -246,40 +232,39 @@ export default function Playground() {
               </div>
             )}
 
-            {/* Colour legend */}
-            <div className="mt-5">
-              <p className="text-[10px] text-slate-500 mb-2 font-medium">Layer colours</p>
+            <div className="mt-5 text-[10px]" style={{ color: "#999" }}>
+              <p className="font-medium text-[11px] mb-1" style={{ color: "#666" }}>
+                Layer colours
+              </p>
               {[
-                ["Encrypt / Decrypt", "crypto"],
-                ["Conv / Bias",       "conv"],
-                ["ReLU / Pool",       "act"],
-                ["FC Layer",          "fc"],
-              ].map(([label, cat]) => (
-                <div key={cat} className="flex items-center gap-2 mb-1">
-                  <div
-                    className="w-3 h-3 rounded-sm"
-                    style={{ backgroundColor: CATEGORY_COLORS[cat].active }}
-                  />
-                  <span className="text-[10px] text-slate-400">{label}</span>
+                ["Crypto", "#0db7c4"],
+                ["Conv / Bias", "#7b3ff2"],
+                ["Activation / Pool", "#e68a00"],
+                ["Fully Connected", "#e03e52"],
+                ["I/O", "#0aa35e"],
+              ].map(([label, color]) => (
+                <div key={label} className="flex items-center gap-2 mb-0.5">
+                  <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: color }} />
+                  <span>{label}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* ── NETWORK COLUMN (CNN Pipeline) ── */}
-          <div className="flex-1 flex flex-col min-w-0">
-            {/* Column headers like TF playground */}
-            <div className="flex items-center mb-2">
-              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                Encrypted CNN Pipeline
-              </h4>
-              <span className="ml-2 text-[10px] text-slate-600">
-                ({LAYERS.length} layers)
+          {/* ── NETWORK COLUMN ── */}
+          <div className="flex-1 min-w-0 flex flex-col">
+            <div className="flex items-center gap-2 mb-2">
+              <SectionTitle>ENCRYPTED CNN PIPELINE</SectionTitle>
+              <span className="text-[10px]" style={{ color: "#bbb" }}>
+                {LAYERS.length} layers
               </span>
             </div>
 
-            {/* The SVG pipeline */}
-            <div className="bg-slate-800/40 rounded-lg border border-slate-700/50 p-3 flex-1 flex items-center">
+            {/* Pipeline card */}
+            <div
+              className="flex-1 rounded-lg p-3 flex items-center"
+              style={{ background: "#fff", border: "1px solid #d9d9d9" }}
+            >
               <CnnPipeline
                 timings={result}
                 activeStep={activeStep}
@@ -290,25 +275,26 @@ export default function Playground() {
 
             {/* Hover tooltip */}
             <AnimatePresence>
-              {tooltipLayer && (
+              {tl && (
                 <motion.div
-                  initial={{ opacity: 0, y: 5 }}
+                  initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 5 }}
-                  className="mt-2 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-xs"
+                  exit={{ opacity: 0 }}
+                  className="mt-2 rounded-lg px-4 py-2 text-xs"
+                  style={{ background: "#fff", border: "1px solid #d9d9d9" }}
                 >
-                  <span className="font-semibold text-white">{tooltipLayer.label}</span>
-                  <span className="text-slate-500 ml-2">{tooltipLayer.sub}</span>
-                  {tooltipTime !== null && (
-                    <span className="ml-3 text-emerald-400 font-mono">
-                      {tooltipTime.toFixed(2)}ms
-                      <span className="text-slate-500 ml-1">
-                        ({((tooltipTime / result.totalMs) * 100).toFixed(1)}%)
+                  <span className="font-medium" style={{ color: "#333" }}>{tl.label}</span>
+                  <span className="ml-2" style={{ color: "#999" }}>{tl.sub}</span>
+                  {tTime !== null && (
+                    <span className="ml-3 font-mono" style={{ color: "#0aa35e" }}>
+                      {tTime.toFixed(2)}ms
+                      <span className="ml-1" style={{ color: "#bbb" }}>
+                        ({((tTime / result.totalMs) * 100).toFixed(1)}%)
                       </span>
                     </span>
                   )}
-                  <span className="ml-3 text-slate-600">
-                    {getLayerDescription(tooltipLayer.id)}
+                  <span className="ml-3" style={{ color: "#999" }}>
+                    — {getLayerDescription(tl.id)}
                   </span>
                 </motion.div>
               )}
@@ -316,35 +302,155 @@ export default function Playground() {
           </div>
 
           {/* ── OUTPUT COLUMN ── */}
-          <div className="w-64 flex-shrink-0">
-            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              Output
-            </h4>
+          <div className="flex-shrink-0" style={{ width: 240 }}>
+            <SectionTitle>OUTPUT</SectionTitle>
             <OutputPanel result={result} error={error} loading={loading} pixels={pixels} />
           </div>
         </div>
       </div>
 
-      {/* ═══════════ BOTTOM METRICS ═══════════ */}
-      <div className="border-t border-slate-700/50 bg-slate-800/30">
-        <div className="max-w-[1400px] mx-auto px-6 py-3">
+      {/* ═══════════ METRICS BAR ═══════════ */}
+      <div style={{ background: "#ebeaea", borderTop: "1px solid #d9d9d9" }}>
+        <div className="max-w-[1440px] mx-auto px-4 md:px-8 py-3">
           <MetricsStrip result={result} />
         </div>
+      </div>
+
+      {/* ═══════════ EXPAND ARROW ═══════════ */}
+      <div className="flex justify-center py-3" style={{ background: "#ebeaea" }}>
+        <a href="#info" className="w-9 h-9 rounded-full border border-gray-300 bg-white flex items-center justify-center hover:bg-gray-100 transition">
+          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </a>
+      </div>
+
+      {/* ═══════════ INFO SECTION ═══════════ */}
+      <section id="info" className="px-4 md:px-8 py-12" style={{ background: "#fff" }}>
+        <div className="max-w-2xl mx-auto space-y-10 text-[15px] leading-relaxed" style={{ color: "#555" }}>
+          <div>
+            <h2 className="text-xl font-medium mb-3" style={{ color: "#333" }}>
+              What Is Homomorphic Encryption?
+            </h2>
+            <p>
+              Homomorphic encryption (HE) lets you <b>compute on encrypted data</b> without
+              ever decrypting it. The server never sees your raw input — it performs the
+              entire CNN inference on ciphertext. Only you, the data owner, can decrypt
+              the result. This project uses the{" "}
+              <b style={{ color: "#0db7c4" }}>BFV scheme</b> from{" "}
+              <a href="https://www.openfhe.org/" target="_blank" rel="noreferrer" className="underline" style={{ color: "#f4743a" }}>
+                OpenFHE
+              </a>, a leading open-source HE library.
+            </p>
+          </div>
+
+          <div>
+            <h2 className="text-xl font-medium mb-3" style={{ color: "#333" }}>
+              How Does This Demo Work?
+            </h2>
+            <p className="mb-2">
+              You draw a digit on the canvas. The pixel values are sent to our backend, which:
+            </p>
+            <ol className="list-decimal ml-5 space-y-1">
+              <li><b>Encrypts</b> the 784 pixels into BFV ciphertext.</li>
+              <li>Runs the full <b>CNN pipeline</b> (Conv → x² → AvgPool → FC) entirely on encrypted data.</li>
+              <li><b>Decrypts</b> the 10 output logits and returns the predicted digit.</li>
+            </ol>
+            <p className="mt-2">
+              The model uses <b>x² activation</b> (instead of ReLU) because HE only supports
+              addition and multiplication — no comparisons. It was trained on MNIST with
+              this constraint from the start.
+            </p>
+          </div>
+
+          <div>
+            <h2 className="text-xl font-medium mb-3" style={{ color: "#333" }}>
+              This Is Cool, Can I Repurpose It?
+            </h2>
+            <p>
+              Absolutely! This is an open-source FYP (Final Year Project) — an{" "}
+              <b>Encrypted Machine Learning Benchmark Framework</b> comparing three HE
+              libraries: <b>OpenFHE</b>, <b>Microsoft SEAL</b>, and <b>HElib</b>.
+              Check out the source on{" "}
+              <a
+                href="https://github.com/TiffanyYongNgikChee/Encrypted-Machine-Learning-Benchmark-Framework"
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+                style={{ color: "#f4743a" }}
+              >
+                GitHub
+              </a>.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════ FOOTER ═══════════ */}
+      <footer className="text-center py-4 text-xs" style={{ color: "#999", background: "#f7f7f7", borderTop: "1px solid #e5e5e5" }}>
+        Built by Tiffany Yong · FYP 2025-2026 · Powered by OpenFHE, Spring Boot &amp; React
+      </footer>
+    </div>
+  );
+}
+
+/* ─── Reusable sub-components ─── */
+
+function SectionTitle({ children }) {
+  return (
+    <h3
+      className="text-xs font-medium uppercase tracking-widest mb-1"
+      style={{ color: "#888", letterSpacing: "0.12em" }}
+    >
+      {children}
+    </h3>
+  );
+}
+
+function ControlLabel({ label, value, mono }) {
+  return (
+    <div className="px-3">
+      <div className="text-[10px] uppercase tracking-wide" style={{ color: "#999" }}>{label}</div>
+      <div
+        className={`text-sm font-medium ${mono ? "font-mono" : ""}`}
+        style={{ color: "#333" }}
+      >
+        {value}
       </div>
     </div>
   );
 }
 
-/* ── Layer descriptions for hover tooltip ── */
+function ControlDropdown({ label, options }) {
+  return (
+    <div className="px-2 md:px-3">
+      <div className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: "#999" }}>{label}</div>
+      <select
+        className="text-sm font-medium bg-white border rounded px-2 py-0.5 cursor-pointer appearance-none pr-6"
+        style={{ color: "#333", borderColor: "#ccc", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}
+      >
+        {options.map((o) => (
+          <option key={o}>{o}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function Divider() {
+  return <div className="w-px h-8 mx-1" style={{ background: "#ccc" }} />;
+}
+
+/* ── Layer descriptions ── */
 function getLayerDescription(id) {
   const map = {
     input:   "Raw 28×28 pixel image in plaintext",
     encrypt: "Encode & encrypt using BFV scheme (OpenFHE)",
-    conv1:   "Encrypted 5×5 convolution, 5 output channels",
+    conv1:   "Encrypted 5×5 convolution, single channel",
     bias1:   "Add encrypted bias vector to conv1 output",
     relu1:   "Square activation (x² approximation of ReLU)",
     pool1:   "2×2 average pooling on encrypted data",
-    conv2:   "Encrypted 5×5 convolution, 10 output channels",
+    conv2:   "Encrypted 5×5 convolution, single channel",
     bias2:   "Add encrypted bias vector to conv2 output",
     relu2:   "Square activation (x² approximation of ReLU)",
     pool2:   "2×2 average pooling on encrypted data",

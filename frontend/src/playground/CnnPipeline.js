@@ -1,80 +1,116 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * CnnPipeline — Interactive SVG visualization of the CNN architecture,
- * inspired by TensorFlow Playground's network diagram.
+ * CnnPipeline — TensorFlow-Playground-style neural network visualization.
  *
- * Shows the full encrypted inference pipeline:
- *   Input → 🔒 Encrypt → Conv1 → ReLU1 → Pool1 → Conv2 → ReLU2 → Pool2 → FC → Decrypt 🔓 → Output
+ * Instead of flat rectangles, layers are grouped into vertical columns
+ * with circle "neuron" nodes connected by weighted lines — matching
+ * the bubble aesthetic of playground.tensorflow.org.
  *
- * Layers light up sequentially when timing data is provided, with animated
- * connections showing data flow between layers.
+ * Groups (columns):
+ *   Input | Encrypt | Conv Block 1 | Conv Block 2 | FC | Decrypt | Output
  *
- * Props:
- *   timings    — prediction result object with *Ms fields (null if no result yet)
- *   activeStep — index of the currently-animating layer (-1 = idle, 12 = done)
- *   hovered    — index of the currently hovered layer (or null)
- *   onHover    — callback(index | null)
+ * Each group contains 1-4 stacked bubbles representing sub-layers.
  */
 
 /* ── Layer definitions ── */
 const LAYERS = [
-  { id: "input",      label: "Input",      sub: "28×28",        category: "io",      key: null },
-  { id: "encrypt",    label: "Encrypt",    sub: "🔒 BFV",       category: "crypto",  key: "encryptionMs" },
-  { id: "conv1",      label: "Conv1",      sub: "5×5, 5 filters", category: "conv",  key: "conv1Ms" },
-  { id: "bias1",      label: "Bias1",      sub: "+bias",        category: "conv",    key: "bias1Ms" },
-  { id: "relu1",      label: "ReLU1",      sub: "x²",           category: "act",     key: "act1Ms" },
-  { id: "pool1",      label: "Pool1",      sub: "2×2 avg",      category: "pool",    key: "pool1Ms" },
-  { id: "conv2",      label: "Conv2",      sub: "5×5, 10 filters", category: "conv", key: "conv2Ms" },
-  { id: "bias2",      label: "Bias2",      sub: "+bias",        category: "conv",    key: "bias2Ms" },
-  { id: "relu2",      label: "ReLU2",      sub: "x²",           category: "act",     key: "act2Ms" },
-  { id: "pool2",      label: "Pool2",      sub: "2×2 avg",      category: "pool",    key: "pool2Ms" },
-  { id: "fc",         label: "FC",         sub: "→ 10 classes",  category: "fc",      key: "fcMs" },
-  { id: "biasfc",     label: "BiasFc",     sub: "+bias",        category: "fc",      key: "biasFcMs" },
-  { id: "decrypt",    label: "Decrypt",    sub: "🔓 BFV",       category: "crypto",  key: "decryptionMs" },
-  { id: "output",     label: "Output",     sub: "logits",       category: "io",      key: null },
+  { id: "input",   label: "Input",   sub: "28x28 pixels",  category: "io",     key: null },
+  { id: "encrypt", label: "Encrypt", sub: "BFV scheme",    category: "crypto", key: "encryptionMs" },
+  { id: "conv1",   label: "Conv1",   sub: "5x5 kernel",    category: "conv",   key: "conv1Ms" },
+  { id: "bias1",   label: "Bias1",   sub: "+bias",         category: "conv",   key: "bias1Ms" },
+  { id: "relu1",   label: "x\u00B2", sub: "activation",    category: "act",    key: "act1Ms" },
+  { id: "pool1",   label: "Pool1",   sub: "2x2 avg",       category: "pool",   key: "pool1Ms" },
+  { id: "conv2",   label: "Conv2",   sub: "5x5 kernel",    category: "conv",   key: "conv2Ms" },
+  { id: "bias2",   label: "Bias2",   sub: "+bias",         category: "conv",   key: "bias2Ms" },
+  { id: "relu2",   label: "x\u00B2", sub: "activation",    category: "act",    key: "act2Ms" },
+  { id: "pool2",   label: "Pool2",   sub: "2x2 avg",       category: "pool",   key: "pool2Ms" },
+  { id: "fc",      label: "FC",      sub: "16 to 10",      category: "fc",     key: "fcMs" },
+  { id: "biasfc",  label: "BiasFc",  sub: "+bias",         category: "fc",     key: "biasFcMs" },
+  { id: "decrypt", label: "Decrypt", sub: "BFV scheme",    category: "crypto", key: "decryptionMs" },
+  { id: "output",  label: "Output",  sub: "argmax",        category: "io",     key: null },
 ];
 
-/* ── Category colour map (matches TF playground colour language) ── */
+/* ── Category colours ── */
 const CATEGORY_COLORS = {
-  io:     { fill: "#334155", stroke: "#64748b", active: "#10b981", glow: "rgba(16,185,129,0.5)" },
-  crypto: { fill: "#1e293b", stroke: "#06b6d4", active: "#22d3ee", glow: "rgba(34,211,238,0.5)" },
-  conv:   { fill: "#1e293b", stroke: "#8b5cf6", active: "#a78bfa", glow: "rgba(139,92,246,0.5)" },
-  act:    { fill: "#1e293b", stroke: "#f59e0b", active: "#fbbf24", glow: "rgba(245,158,11,0.5)" },
-  pool:   { fill: "#1e293b", stroke: "#f59e0b", active: "#fbbf24", glow: "rgba(251,191,36,0.5)" },
-  fc:     { fill: "#1e293b", stroke: "#f43f5e", active: "#fb7185", glow: "rgba(244,63,94,0.5)" },
+  io:     { stroke: "#0aa35e", fill: "#e6f7ef", active: "#0aa35e", glow: "rgba(10,163,94,0.3)" },
+  crypto: { stroke: "#0db7c4", fill: "#e6f8fa", active: "#0db7c4", glow: "rgba(13,183,196,0.3)" },
+  conv:   { stroke: "#7b3ff2", fill: "#f0ebfe", active: "#7b3ff2", glow: "rgba(123,63,242,0.3)" },
+  act:    { stroke: "#e68a00", fill: "#fef3e2", active: "#e68a00", glow: "rgba(230,138,0,0.3)" },
+  pool:   { stroke: "#e68a00", fill: "#fef3e2", active: "#e68a00", glow: "rgba(230,138,0,0.3)" },
+  fc:     { stroke: "#e03e52", fill: "#fde8eb", active: "#e03e52", glow: "rgba(224,62,82,0.3)" },
 };
 
-/* ── Geometry constants ── */
-const NODE_W = 72;
-const NODE_H = 52;
-const GAP_X  = 14;
-const PAD_Y  = 30;
-const PAD_X  = 20;
+/* ── Group layers into vertical columns (like TF Playground hidden layers) ── */
+const GROUPS = [
+  { title: "INPUT",        layers: [0] },
+  { title: "ENCRYPT",      layers: [1] },
+  { title: "CONV BLOCK 1", layers: [2, 3, 4, 5] },
+  { title: "CONV BLOCK 2", layers: [6, 7, 8, 9] },
+  { title: "FC",           layers: [10, 11] },
+  { title: "DECRYPT",      layers: [12] },
+  { title: "OUTPUT",       layers: [13] },
+];
 
-/* Total SVG dimensions */
-const COLS = LAYERS.length;
-const SVG_W = PAD_X * 2 + COLS * NODE_W + (COLS - 1) * GAP_X;
-const SVG_H = PAD_Y * 2 + NODE_H + 40; // extra for sub-labels
+/* ── Geometry ── */
+const R         = 24;          // bubble radius
+const BUBBLE_GAP = 14;         // vertical gap between bubbles in a group
+const GROUP_GAP  = 80;         // horizontal gap between groups
+const PAD_X      = 30;
+const PAD_TOP    = 40;         // top padding for group titles
+const MAX_STACK  = 4;          // max bubbles in one group
 
-/* Node position helper */
-function nodeX(i) { return PAD_X + i * (NODE_W + GAP_X); }
-function nodeY()  { return PAD_Y; }
+const GROUP_W  = R * 2;
+const SVG_W    = PAD_X * 2 + GROUPS.length * GROUP_W + (GROUPS.length - 1) * GROUP_GAP;
+const COL_H    = MAX_STACK * (R * 2 + BUBBLE_GAP) - BUBBLE_GAP;
+const SVG_H    = PAD_TOP + COL_H + 60;
+
+/* Position helpers */
+function groupCenterX(gi) {
+  return PAD_X + R + gi * (GROUP_W + GROUP_GAP);
+}
+function bubbleY(indexInGroup, totalInGroup) {
+  const stackH = totalInGroup * (R * 2 + BUBBLE_GAP) - BUBBLE_GAP;
+  const startY = PAD_TOP + (COL_H - stackH) / 2 + R;
+  return startY + indexInGroup * (R * 2 + BUBBLE_GAP);
+}
+
+/* Build a lookup: layer index → {cx, cy} */
+function buildPositions() {
+  const pos = {};
+  GROUPS.forEach((g, gi) => {
+    const cx = groupCenterX(gi);
+    g.layers.forEach((li, bi) => {
+      pos[li] = { cx, cy: bubbleY(bi, g.layers.length) };
+    });
+  });
+  return pos;
+}
+const POS = buildPositions();
 
 export default function CnnPipeline({ timings, activeStep = -1, hovered, onHover }) {
   const svgRef = useRef(null);
 
-  /* Dash-offset animation for active links */
-  const [dashOffset, setDashOffset] = useState(0);
+  /* Animated dash offset for flowing connections */
+  const [dashOff, setDashOff] = useState(0);
   useEffect(() => {
     let raf;
-    const animate = () => {
-      setDashOffset((prev) => (prev - 0.6) % 20);
-      raf = requestAnimationFrame(animate);
-    };
-    raf = requestAnimationFrame(animate);
+    const tick = () => { setDashOff(p => (p - 0.8) % 24); raf = requestAnimationFrame(tick); };
+    raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, []);
+
+  /* Build all inter-group connections (every bubble in group i → every bubble in group i+1) */
+  const connections = [];
+  for (let gi = 0; gi < GROUPS.length - 1; gi++) {
+    const srcLayers = GROUPS[gi].layers;
+    const dstLayers = GROUPS[gi + 1].layers;
+    for (const si of srcLayers) {
+      for (const di of dstLayers) {
+        connections.push({ from: si, to: di });
+      }
+    }
+  }
 
   return (
     <div className="w-full overflow-x-auto">
@@ -82,104 +118,93 @@ export default function CnnPipeline({ timings, activeStep = -1, hovered, onHover
         ref={svgRef}
         viewBox={`0 0 ${SVG_W} ${SVG_H}`}
         className="w-full"
-        style={{ minWidth: 900 }}
+        style={{ minWidth: 860 }}
       >
         <defs>
-          {/* Arrow marker */}
-          <marker
-            id="arrowHead"
-            markerWidth="7"
-            markerHeight="7"
-            refX="6"
-            refY="3.5"
-            orient="auto"
-            markerUnits="userSpaceOnUse"
-          >
-            <path d="M0,0 L7,3.5 L0,7 z" fill="#475569" />
-          </marker>
-
-          {/* Glow filters per category */}
+          {/* Glow filters */}
           {Object.entries(CATEGORY_COLORS).map(([cat, c]) => (
             <filter key={cat} id={`glow-${cat}`} x="-50%" y="-50%" width="200%" height="200%">
-              <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor={c.glow} floodOpacity="0.8" />
+              <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor={c.glow} floodOpacity="1" />
             </filter>
           ))}
         </defs>
 
-        {/* ── Connection lines ── */}
-        {LAYERS.slice(0, -1).map((layer, i) => {
-          const x1 = nodeX(i) + NODE_W;
-          const y1 = nodeY() + NODE_H / 2;
-          const x2 = nodeX(i + 1);
-          const y2 = y1;
-          const isActive = i < activeStep;
-          const isFlowing = i === activeStep - 1;
+        {/* ── Group titles ── */}
+        {GROUPS.map((g, gi) => (
+          <text
+            key={`title-${gi}`}
+            x={groupCenterX(gi)}
+            y={14}
+            textAnchor="middle"
+            fill="#999"
+            fontSize={9}
+            fontWeight={500}
+            fontFamily="'Roboto', sans-serif"
+            letterSpacing="0.05em"
+          >
+            {g.title}
+          </text>
+        ))}
+
+        {/* ── Encrypted domain bracket ── */}
+        {(() => {
+          const x1 = groupCenterX(1) - R - 10;
+          const x2 = groupCenterX(5) + R + 10;
+          const y  = 26;
+          return (
+            <g opacity={0.45}>
+              <line x1={x1} y1={y} x2={x2} y2={y} stroke="#0db7c4" strokeWidth={1.5} />
+              <line x1={x1} y1={y - 4} x2={x1} y2={y + 4} stroke="#0db7c4" strokeWidth={1.5} />
+              <line x1={x2} y1={y - 4} x2={x2} y2={y + 4} stroke="#0db7c4" strokeWidth={1.5} />
+              <text x={(x1 + x2) / 2} y={y - 6} textAnchor="middle" fill="#0db7c4" fontSize={8} fontWeight={600}>
+                ENCRYPTED DOMAIN
+              </text>
+            </g>
+          );
+        })()}
+
+        {/* ── Connections (weighted lines like TF Playground) ── */}
+        {connections.map(({ from, to }, ci) => {
+          const p1 = POS[from];
+          const p2 = POS[to];
+          /* Determine if this connection is "active" */
+          const srcDone = from === 0 || from < activeStep;
+          const flowing = from === activeStep - 1;
+          const active  = srcDone && to <= activeStep;
+          const allDone = activeStep >= LAYERS.length;
+
+          /* Line weight varies slightly for visual interest */
+          const weight = active || allDone ? 2.2 : 1;
+          const color  = active || allDone ? "#f4743a" : "#ddd";
 
           return (
             <line
-              key={`link-${i}`}
-              x1={x1}
-              y1={y1}
-              x2={x2}
-              y2={y2}
-              stroke={isActive ? "#10b981" : "#334155"}
-              strokeWidth={isActive ? 2.5 : 1.5}
-              strokeDasharray={isFlowing ? "6 3" : "none"}
-              strokeDashoffset={isFlowing ? dashOffset : 0}
-              markerEnd="url(#arrowHead)"
-              style={{
-                transition: "stroke 0.3s, stroke-width 0.3s",
-              }}
+              key={`conn-${ci}`}
+              x1={p1.cx + R} y1={p1.cy}
+              x2={p2.cx - R} y2={p2.cy}
+              stroke={color}
+              strokeWidth={weight}
+              strokeDasharray={flowing ? "6 4" : "none"}
+              strokeDashoffset={flowing ? dashOff : 0}
+              opacity={active || allDone ? 0.85 : 0.4}
+              style={{ transition: "stroke 0.3s, opacity 0.3s" }}
             />
           );
         })}
 
-        {/* ── Encrypt / Decrypt boundary markers ── */}
-        {[1, 12].map((idx) => {
-          const x = nodeX(idx) - GAP_X / 2;
-          return (
-            <g key={`boundary-${idx}`}>
-              <line
-                x1={x}
-                y1={PAD_Y - 12}
-                x2={x}
-                y2={PAD_Y + NODE_H + 12}
-                stroke={idx === 1 ? "#06b6d4" : "#2dd4bf"}
-                strokeWidth={1.5}
-                strokeDasharray="4 3"
-                opacity={0.5}
-              />
-              <text
-                x={x}
-                y={PAD_Y - 16}
-                textAnchor="middle"
-                fill={idx === 1 ? "#06b6d4" : "#2dd4bf"}
-                fontSize={9}
-                fontWeight={600}
-              >
-                {idx === 1 ? "🔒 ENCRYPTED DOMAIN" : "🔓 PLAINTEXT"}
-              </text>
-            </g>
-          );
-        })}
-
-        {/* ── Layer nodes ── */}
+        {/* ── Neuron bubbles ── */}
         {LAYERS.map((layer, i) => {
-          const x = nodeX(i);
-          const y = nodeY();
+          const { cx, cy } = POS[i];
           const cat = CATEGORY_COLORS[layer.category];
-          const isActive = i > 0 && i <= activeStep;
-          const isDone = activeStep >= LAYERS.length;
-          const isHovered = hovered === i;
-          const timeMs = timings && layer.key ? timings[layer.key] : null;
+          const isActive  = i > 0 && i <= activeStep;
+          const allDone   = activeStep >= LAYERS.length;
+          const lit       = isActive || allDone;
+          const isHov     = hovered === i;
+          const timeMs    = timings && layer.key ? timings[layer.key] : null;
 
-          const fillColor = (isActive || isDone) ? cat.active : cat.fill;
-          const strokeColor = isHovered
-            ? "#fff"
-            : (isActive || isDone)
-            ? cat.active
-            : cat.stroke;
-          const filterAttr = (isActive || isHovered) ? `url(#glow-${layer.category})` : "none";
+          const bubbleFill   = lit ? cat.active : cat.fill;
+          const bubbleStroke = isHov ? "#333" : cat.stroke;
+          const filterAttr   = (lit || isHov) ? `url(#glow-${layer.category})` : "none";
 
           return (
             <g
@@ -188,65 +213,45 @@ export default function CnnPipeline({ timings, activeStep = -1, hovered, onHover
               onMouseLeave={() => onHover?.(null)}
               style={{ cursor: "pointer" }}
             >
-              {/* Node rectangle */}
-              <rect
-                x={x}
-                y={y}
-                width={NODE_W}
-                height={NODE_H}
-                rx={6}
-                ry={6}
-                fill={fillColor}
-                stroke={strokeColor}
-                strokeWidth={isHovered ? 2 : 1.5}
+              {/* Circle node */}
+              <circle
+                cx={cx} cy={cy} r={R}
+                fill={bubbleFill}
+                stroke={bubbleStroke}
+                strokeWidth={isHov ? 2.5 : 1.5}
                 filter={filterAttr}
-                opacity={(isActive || isDone || i === 0) ? 1 : 0.6}
+                opacity={(lit || i === 0 || i === LAYERS.length - 1) ? 1 : 0.9}
                 style={{ transition: "all 0.3s ease" }}
               />
 
-              {/* Layer name */}
+              {/* Label inside bubble */}
               <text
-                x={x + NODE_W / 2}
-                y={y + (timeMs !== null ? 16 : NODE_H / 2)}
+                x={cx} y={cy + (timeMs !== null ? -4 : 1)}
                 textAnchor="middle"
                 dominantBaseline="middle"
-                fill={(isActive || isDone) ? "#0f172a" : "#e2e8f0"}
-                fontSize={11}
+                fill={lit ? "#fff" : cat.stroke}
+                fontSize={10}
                 fontWeight={600}
+                fontFamily="'Roboto', sans-serif"
                 style={{ pointerEvents: "none", transition: "fill 0.3s" }}
               >
                 {layer.label}
               </text>
 
-              {/* Timing value (when available) */}
+              {/* Timing inside bubble */}
               {timeMs !== null && (
                 <text
-                  x={x + NODE_W / 2}
-                  y={y + 33}
+                  x={cx} y={cy + 10}
                   textAnchor="middle"
                   dominantBaseline="middle"
-                  fill={(isActive || isDone) ? "#1e293b" : "#94a3b8"}
-                  fontSize={10}
-                  fontWeight={400}
-                  fontFamily="'JetBrains Mono', monospace"
+                  fill={lit ? "rgba(255,255,255,0.85)" : "#aaa"}
+                  fontSize={8}
+                  fontFamily="'Roboto Mono', monospace"
                   style={{ pointerEvents: "none" }}
                 >
                   {timeMs.toFixed(1)}ms
                 </text>
               )}
-
-              {/* Sub-label below node */}
-              <text
-                x={x + NODE_W / 2}
-                y={y + NODE_H + 14}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fill="#64748b"
-                fontSize={9}
-                style={{ pointerEvents: "none" }}
-              >
-                {layer.sub}
-              </text>
             </g>
           );
         })}
