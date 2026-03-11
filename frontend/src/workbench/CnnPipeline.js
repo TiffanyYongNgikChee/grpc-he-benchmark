@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * CnnPipeline — TensorFlow-Playground-style neural network visualization.
+ * CnnPipeline — Neural network visualisation for the encrypted CNN.
  *
- * Instead of flat rectangles, layers are grouped into vertical columns
- * with circle "neuron" nodes connected by weighted lines — matching
- * the bubble aesthetic of playground.tensorflow.org.
+ * Layers are grouped into vertical columns with circle "neuron" nodes
+ * connected by weighted lines.
  *
  * Groups (columns):
  *   Input | Encrypt | Conv Block 1 | Conv Block 2 | FC | Decrypt | Output
@@ -41,7 +40,7 @@ const CATEGORY_COLORS = {
   fc:     { stroke: "#e03e52", fill: "#fde8eb", active: "#e03e52", glow: "rgba(224,62,82,0.3)" },
 };
 
-/* ── Group layers into vertical columns (like TF Playground hidden layers) ── */
+/* ── Group layers into vertical columns ── */
 const GROUPS = [
   { title: "INPUT",        layers: [0] },
   { title: "ENCRYPT",      layers: [1] },
@@ -163,7 +162,7 @@ export default function CnnPipeline({ timings, activeStep = -1, hovered, onHover
           );
         })()}
 
-        {/* ── Connections (weighted lines like TF Playground) ── */}
+        {/* ── Connections (weighted lines between groups) ── */}
         {connections.map(({ from, to }, ci) => {
           const p1 = POS[from];
           const p2 = POS[to];

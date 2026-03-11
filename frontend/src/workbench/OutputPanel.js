@@ -12,7 +12,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip);
 
 /**
  * OutputPanel — Right column showing prediction results.
- * Light theme matching TF Playground's clean, minimal style.
+ * Light theme with clean, minimal style.
  */
 export default function OutputPanel({ result, error, loading, pixels }) {
   /* Empty state */

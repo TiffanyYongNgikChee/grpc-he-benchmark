@@ -2,7 +2,7 @@ import { LAYERS, CATEGORY_COLORS } from "./CnnPipeline";
 
 /**
  * MetricsStrip — Bottom bar with per-layer timing breakdown.
- * Light theme stacked-bar matching TF Playground's minimal aesthetic.
+ * Light theme stacked-bar with minimal aesthetic.
  */
 export default function MetricsStrip({ result }) {
   if (!result) {

@@ -1,7 +1,7 @@
-import Playground from "./playground/Playground";
+import Workbench from "./workbench/Workbench";
 
 function App() {
-  return <Playground />;
+  return <Workbench />;
 }
 
 export default App;

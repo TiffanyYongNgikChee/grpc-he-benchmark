@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 
 /**
- * MiniCanvas — A compact drawing canvas for the playground layout.
+ * MiniCanvas — A compact drawing canvas for the workbench layout.
  * Draws white strokes on a black background, then extracts a centered
  * 28×28 grayscale image matching MNIST preprocessing:
  *   1. Find bounding box of drawn strokes

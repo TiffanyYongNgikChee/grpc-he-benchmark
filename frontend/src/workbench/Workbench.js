@@ -8,16 +8,17 @@ import LibraryComparison from "./LibraryComparison";
 import { checkHealth, predictDigit, runComparisonBenchmark } from "../api/client";
 
 /**
- * Playground — TensorFlow-Playground-inspired single-page layout.
+ * Workbench — Single-page encrypted ML inference & benchmarking interface.
  *
  * Visual hierarchy (top → bottom):
- *   1. Orange header — hero text + tagline
+ *   1. Header — hero text + tagline
  *   2. Controls bar — play, reset, epoch, dropdowns (scheme, model, scale)
  *   3. Main area — INPUT | CNN PIPELINE (vertical groups) | OUTPUT
  *   4. Bottom metrics — timing stacked bar
- *   5. Info section — "What is HE?" + "About this project"
+ *   5. Library comparison — SEAL vs HElib vs OpenFHE
+ *   6. Info section — "What is HE?" + "About this project"
  */
-export default function Playground() {
+export default function Workbench() {
   /* ─── State ─── */
   const [pixels, setPixels] = useState(null);
   const [loading, setLoading] = useState(false);
