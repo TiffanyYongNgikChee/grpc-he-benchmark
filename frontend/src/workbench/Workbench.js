@@ -377,50 +377,191 @@ export default function Workbench() {
 
       {/* ═══════════ INFO SECTION ═══════════ */}
       <section id="info" className="px-4 md:px-8 py-12" style={{ background: "#fff" }}>
-        <div className="max-w-2xl mx-auto space-y-10 text-[15px] leading-relaxed" style={{ color: "#555" }}>
+        <div className="max-w-3xl mx-auto space-y-12 text-[15px] leading-relaxed" style={{ color: "#555" }}>
+
+          {/* ── What This System Does ── */}
+          <div>
+            <h2 className="text-xl font-medium mb-3" style={{ color: "#333" }}>
+              What Does This System Do?
+            </h2>
+            <p className="mb-3">
+              This is an <b>Encrypted Machine Learning Benchmark Framework</b> — a Final Year
+              Project that demonstrates and benchmarks <b>machine learning inference on
+              fully encrypted data</b>. It has two main capabilities:
+            </p>
+            <div className="space-y-3 ml-1">
+              <div className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: "#0db7c4" }}>1</span>
+                <p>
+                  <b style={{ color: "#333" }}>Encrypted Digit Recognition</b> — You draw a handwritten
+                  digit (0–9) on the canvas. The system encrypts your pixel data, runs a full
+                  convolutional neural network (CNN) <em>entirely on the encrypted data</em>, then
+                  decrypts only the final result. The server <b>never sees your raw input</b>.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: "#3b82f6" }}>2</span>
+                <p>
+                  <b style={{ color: "#333" }}>Library Benchmarking</b> — The system compares three
+                  leading homomorphic encryption libraries —{" "}
+                  <b style={{ color: "#0db7c4" }}>OpenFHE</b>,{" "}
+                  <b style={{ color: "#3b82f6" }}>Microsoft SEAL</b>, and{" "}
+                  <b style={{ color: "#8b5cf6" }}>HElib</b> — on identical cryptographic operations
+                  (key generation, encryption, addition, multiplication, decryption), so you
+                  can see which library is fastest for each task.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* ── What Is Homomorphic Encryption? ── */}
           <div>
             <h2 className="text-xl font-medium mb-3" style={{ color: "#333" }}>
               What Is Homomorphic Encryption?
             </h2>
-            <p>
-              Homomorphic encryption (HE) lets you <b>compute on encrypted data</b> without
-              ever decrypting it. The server never sees your raw input — it performs the
-              entire CNN inference on ciphertext. Only you, the data owner, can decrypt
-              the result. This project benchmarks three leading HE libraries:{" "}
-              <b style={{ color: "#0db7c4" }}>OpenFHE</b>,{" "}
-              <b style={{ color: "#3b82f6" }}>Microsoft SEAL</b>, and{" "}
-              <b style={{ color: "#8b5cf6" }}>HElib</b> — all using the BFV scheme.
+            <p className="mb-3">
+              <b>Homomorphic Encryption (HE)</b> is a form of encryption that allows you to
+              perform computations on encrypted data (called <b>ciphertext</b>) without
+              decrypting it first. The result, when decrypted, is the same as if you had
+              performed the computation on the original unencrypted data (called{" "}
+              <b>plaintext</b>).
             </p>
+            <p className="mb-3">
+              In simple terms: the server can do maths on your data <b>without ever seeing
+              it</b>. This is extremely useful for privacy-sensitive applications like
+              medical records, financial data, or biometric analysis.
+            </p>
+            <p className="mb-3">
+              This project uses the <b>BFV (Brakerski/Fan–Vercauteren) scheme</b>, which
+              supports addition and multiplication on encrypted integers. These two
+              operations are enough to build a full neural network — convolutions, pooling,
+              and fully-connected layers are all just combinations of additions and
+              multiplications.
+            </p>
+            <div className="rounded-lg p-4 text-sm" style={{ background: "#f8f8f8", border: "1px solid #e5e5e5" }}>
+              <p className="font-medium mb-2" style={{ color: "#333" }}>The three HE libraries compared:</p>
+              <ul className="space-y-1.5 ml-1">
+                <li className="flex gap-2">
+                  <span className="inline-block w-2.5 h-2.5 rounded-sm mt-1.5 flex-shrink-0" style={{ background: "#0db7c4" }} />
+                  <span><b style={{ color: "#0db7c4" }}>OpenFHE</b> — A modern, open-source library supporting BFV, CKKS, and TFHE schemes. Developed by Duality Technologies and a broad academic consortium.</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="inline-block w-2.5 h-2.5 rounded-sm mt-1.5 flex-shrink-0" style={{ background: "#3b82f6" }} />
+                  <span><b style={{ color: "#3b82f6" }}>Microsoft SEAL</b> — Microsoft Research's widely used HE library supporting BFV and CKKS schemes.</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="inline-block w-2.5 h-2.5 rounded-sm mt-1.5 flex-shrink-0" style={{ background: "#8b5cf6" }} />
+                  <span><b style={{ color: "#8b5cf6" }}>HElib</b> — IBM's pioneering HE library, primarily supporting the BGV scheme.</span>
+                </li>
+              </ul>
+            </div>
           </div>
 
+          {/* ── How Does the Encrypted Inference Work? ── */}
           <div>
             <h2 className="text-xl font-medium mb-3" style={{ color: "#333" }}>
-              How Does This Demo Work?
+              How Does the Encrypted Inference Work?
             </h2>
             <p className="mb-2">
-              You draw a digit on the canvas. The pixel values are sent to our backend, which:
+              When you draw a digit and press run, the following pipeline executes
+              end-to-end:
             </p>
-            <ol className="list-decimal ml-5 space-y-1">
-              <li><b>Encrypts</b> the 784 pixels into BFV ciphertext.</li>
-              <li>Runs the full <b>CNN pipeline</b> (Conv → x² → AvgPool → FC) entirely on encrypted data.</li>
-              <li><b>Decrypts</b> the 10 output logits and returns the predicted digit.</li>
+            <ol className="list-decimal ml-5 space-y-1.5 mb-4">
+              <li>Your 28×28 pixel drawing is extracted and sent to the backend server.</li>
+              <li>The server <b>encrypts</b> all 784 pixel values into BFV ciphertext using OpenFHE.</li>
+              <li>A full <b>CNN (Convolutional Neural Network)</b> runs on the encrypted data — 12 layers, all computed without decrypting.</li>
+              <li>The server <b>decrypts</b> only the 10 final output values (logits) and returns the predicted digit.</li>
             </ol>
-            <p className="mt-2">
-              The model uses <b>x² activation</b> (instead of ReLU) because HE only supports
-              addition and multiplication — no comparisons. It was trained on MNIST with
-              this constraint from the start.
+            <p>
+              The model was trained in PyTorch on the MNIST dataset with an{" "}
+              <b>x² (square) activation function</b> instead of the usual ReLU. This is because
+              HE can only do addition and multiplication — it cannot do comparisons like
+              max(0, x). The x² function is fully polynomial and works natively in encrypted
+              arithmetic.
             </p>
           </div>
 
+          {/* ── CNN Layer Glossary ── */}
+          <div>
+            <h2 className="text-xl font-medium mb-4" style={{ color: "#333" }}>
+              CNN Layer Glossary
+            </h2>
+            <p className="mb-4">
+              Each bubble in the network visualisation above represents a layer. Here is
+              what each one does:
+            </p>
+            <div className="space-y-4">
+              {[
+                {
+                  term: "Input",
+                  color: "#0aa35e",
+                  desc: "The raw 28×28 grayscale image (784 pixel values, 0 = black, 255 = white). This is the handwritten digit you drew on the canvas.",
+                },
+                {
+                  term: "Encrypt",
+                  color: "#0db7c4",
+                  desc: "Encodes and encrypts the 784 pixel values into BFV ciphertext using the OpenFHE library. After this step, the server can no longer see the raw pixel values — all subsequent computation happens on encrypted data.",
+                },
+                {
+                  term: "Convolution (Conv1, Conv2)",
+                  color: "#7b3ff2",
+                  desc: "A convolution slides a small filter (5×5 kernel) across the image and computes a weighted sum at each position. This detects local features like edges, curves, and corners. Conv1 reduces 28×28 → 24×24, and Conv2 reduces 12×12 → 8×8. In encrypted mode, each multiply-and-add is done on ciphertext.",
+                },
+                {
+                  term: "Bias (Bias1, Bias2, BiasFc)",
+                  color: "#7b3ff2",
+                  desc: "A bias is a fixed value added to each output of the previous layer. It shifts the activation, allowing the network to learn patterns that don't pass through zero. In encrypted mode, this is a simple ciphertext addition.",
+                },
+                {
+                  term: "Activation — x² (Square)",
+                  color: "#e68a00",
+                  desc: "An activation function introduces non-linearity so the network can learn complex patterns. Standard CNNs use ReLU (max(0, x)), but ReLU requires a comparison operation, which is impossible in HE. Instead, we use x² (squaring), which is a simple ciphertext multiplication and works natively in BFV.",
+                },
+                {
+                  term: "Average Pooling (Pool1, Pool2)",
+                  color: "#e68a00",
+                  desc: "Pooling reduces the spatial dimensions by averaging groups of pixels. A 2×2 average pool takes each 2×2 block and replaces it with the mean of the four values, halving the width and height. This is just addition and division (scaling), which HE supports natively.",
+                },
+                {
+                  term: "Fully Connected (FC)",
+                  color: "#e03e52",
+                  desc: "The fully-connected layer takes all remaining values (16, after the second pooling) and multiplies them by a weight matrix to produce 10 output values — one for each digit class (0–9). This is a standard matrix multiplication, done entirely on encrypted data.",
+                },
+                {
+                  term: "Decrypt",
+                  color: "#0db7c4",
+                  desc: "Decrypts the 10 encrypted output values (logits) back to plaintext using the secret key. This is the only point where the data becomes readable again.",
+                },
+                {
+                  term: "Output (Argmax)",
+                  color: "#0aa35e",
+                  desc: "Takes the 10 decrypted logit values and picks the index with the highest value — that index is the predicted digit. For example, if logit[7] is the largest, the prediction is \"7\".",
+                },
+              ].map(({ term, color, desc }) => (
+                <div key={term} className="flex gap-3">
+                  <span
+                    className="flex-shrink-0 w-3 h-3 rounded-full mt-1.5"
+                    style={{ background: color }}
+                  />
+                  <div>
+                    <p className="font-medium text-sm" style={{ color: "#333" }}>{term}</p>
+                    <p className="text-sm" style={{ color: "#666" }}>{desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Can I Repurpose It? ── */}
           <div>
             <h2 className="text-xl font-medium mb-3" style={{ color: "#333" }}>
-              This Is Cool, Can I Repurpose It?
+              Can I Repurpose This?
             </h2>
             <p>
-              Absolutely! This is an open-source FYP (Final Year Project) — an{" "}
+              Absolutely. This is an open-source Final Year Project — an{" "}
               <b>Encrypted Machine Learning Benchmark Framework</b> comparing three HE
-              libraries: <b>OpenFHE</b>, <b>Microsoft SEAL</b>, and <b>HElib</b>.
-              Check out the source on{" "}
+              libraries on standardised workloads. The entire system (Rust gRPC server,
+              Spring Boot API, React frontend) is available on{" "}
               <a
                 href="https://github.com/TiffanyYongNgikChee/Encrypted-Machine-Learning-Benchmark-Framework"
                 target="_blank"
