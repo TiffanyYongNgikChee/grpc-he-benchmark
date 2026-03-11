@@ -29,7 +29,8 @@ public class BenchmarkController {
         try {
             BenchmarkResponse response = grpcClientService.runBenchmark(
                 request.getLibrary(), 
-                request.getNumOperations()
+                request.getNumOperations(),
+                request.getTestValues()
             );
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -41,7 +42,8 @@ public class BenchmarkController {
     public ResponseEntity<ComparisonResponse> compareBenchmarks(@RequestBody BenchmarkRequest request) {
         try {
             ComparisonResponse response = grpcClientService.runComparisonBenchmark(
-                request.getNumOperations()
+                request.getNumOperations(),
+                request.getTestValues()
             );
             return ResponseEntity.ok(response);
         } catch (Exception e) {

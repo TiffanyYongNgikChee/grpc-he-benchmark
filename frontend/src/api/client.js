@@ -60,12 +60,17 @@ export async function runBenchmark(library, numOperations = 10) {
  * Run comparison benchmark for all 3 HE libraries.
  * POST /api/benchmark/compare
  * @param {number} numOperations - How many times to repeat each operation
+ * @param {number[]|null} testValues - Custom integers to encrypt (null = use defaults)
  */
-export async function runComparisonBenchmark(numOperations = 10) {
+export async function runComparisonBenchmark(numOperations = 10, testValues = null) {
+  const body = { library: "ALL", numOperations };
+  if (testValues && testValues.length > 0) {
+    body.testValues = testValues;
+  }
   const res = await fetch(`${API_BASE}/benchmark/compare`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ library: "ALL", numOperations }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: "Unknown error" }));

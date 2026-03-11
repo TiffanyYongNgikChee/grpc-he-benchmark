@@ -90,14 +90,21 @@ public class GrpcClientService {
      * @return BenchmarkResponse with timing metrics
      */
     public com.fyp.hebench.model.BenchmarkResponse runBenchmark(String library, int numOperations) {
+        return runBenchmark(library, numOperations, null);
+    }
+
+    public com.fyp.hebench.model.BenchmarkResponse runBenchmark(String library, int numOperations, java.util.List<Long> testValues) {
         // Step 1: Build Protobuf request using the generated Builder pattern
         // BenchmarkRequest.newBuilder() creates a mutable builder
         // .setLibrary() and .setNumOperations() set the fields
         // .build() creates an immutable Protobuf object
-        BenchmarkRequest request = BenchmarkRequest.newBuilder()
+        BenchmarkRequest.Builder builder = BenchmarkRequest.newBuilder()
                 .setLibrary(library)
-                .setNumOperations(numOperations)
-                .build();
+                .setNumOperations(numOperations);
+        if (testValues != null && !testValues.isEmpty()) {
+            builder.addAllTestValues(testValues);
+        }
+        BenchmarkRequest request = builder.build();
         
         // Step 2: Call the Rust server via gRPC
         // stub.runBenchmark() sends the request over the network
@@ -143,11 +150,18 @@ public class GrpcClientService {
      * @return ComparisonResponse containing results for all 3 libraries
      */
     public com.fyp.hebench.model.ComparisonResponse runComparisonBenchmark(int numOperations) {
+        return runComparisonBenchmark(numOperations, null);
+    }
+
+    public com.fyp.hebench.model.ComparisonResponse runComparisonBenchmark(int numOperations, java.util.List<Long> testValues) {
         // Build request - "ALL" tells Rust to benchmark all 3 libraries
-        BenchmarkRequest request = BenchmarkRequest.newBuilder()
+        BenchmarkRequest.Builder builder = BenchmarkRequest.newBuilder()
                 .setLibrary("ALL")
-                .setNumOperations(numOperations)
-                .build();
+                .setNumOperations(numOperations);
+        if (testValues != null && !testValues.isEmpty()) {
+            builder.addAllTestValues(testValues);
+        }
+        BenchmarkRequest request = builder.build();
         
         // Call Rust server - this takes longer because it runs 3 benchmarks
         ComparisonBenchmarkResponse result = stub.runComparisonBenchmark(request);

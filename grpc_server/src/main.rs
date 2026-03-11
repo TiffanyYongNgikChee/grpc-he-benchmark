@@ -222,7 +222,7 @@ fn run_seal_multiply(
     Ok(result[..values1.len().max(values2.len())].to_vec())
 }
 
-fn run_seal_benchmark(poly_modulus_degree: u64, num_operations: i32) -> BenchmarkResponse {
+fn run_seal_benchmark(poly_modulus_degree: u64, num_operations: i32, custom_values: Vec<i64>) -> BenchmarkResponse {
     use he_benchmark::{
         Context as SealContext,
         Encryptor as SealEncryptor,
@@ -278,7 +278,14 @@ fn run_seal_benchmark(poly_modulus_degree: u64, num_operations: i32) -> Benchmar
     let key_gen_time = key_start.elapsed();
     
     let slot_count = encoder.slot_count();
-    let test_data: Vec<i64> = (0..slot_count as i64).collect();
+    // Use custom test values if provided, otherwise default sequential data
+    let test_data: Vec<i64> = if !custom_values.is_empty() {
+        let mut v = custom_values;
+        v.resize(slot_count, 0); // pad with zeros to fill all slots
+        v
+    } else {
+        (0..slot_count as i64).collect()
+    };
     
     // Encoding phase
     let encode_start = Instant::now();
@@ -432,7 +439,7 @@ fn run_helib_multiply(val1: i64, val2: i64) -> Result<Vec<i64>, String> {
     Ok(vec![decrypted.value()])
 }
 
-fn run_helib_benchmark(num_operations: i32) -> BenchmarkResponse {
+fn run_helib_benchmark(num_operations: i32, custom_values: Vec<i64>) -> BenchmarkResponse {
     use he_benchmark::{HEContext, HESecretKey, HEPlaintext};
     
     let total_start = Instant::now();
@@ -470,10 +477,16 @@ fn run_helib_benchmark(num_operations: i32) -> BenchmarkResponse {
     let key_gen_time = key_start.elapsed();
     
     // Encoding phase (HELib encoding is simpler - just create plaintexts)
+    // Use custom values if provided, otherwise use sequential data
     let encode_start = Instant::now();
     let mut plaintexts = Vec::new();
     for i in 0..num_operations {
-        if let Ok(pt) = HEPlaintext::new(&context, i as i64) {
+        let val = if !custom_values.is_empty() {
+            custom_values[i as usize % custom_values.len()]
+        } else {
+            i as i64
+        };
+        if let Ok(pt) = HEPlaintext::new(&context, val) {
             plaintexts.push(pt);
         }
     }
@@ -624,7 +637,7 @@ fn run_openfhe_multiply(values1: &[i64], values2: &[i64]) -> Result<Vec<i64>, St
     Ok(result[..values1.len().max(values2.len()).min(result.len())].to_vec())
 }
 
-fn run_openfhe_benchmark(num_operations: i32) -> BenchmarkResponse {
+fn run_openfhe_benchmark(num_operations: i32, custom_values: Vec<i64>) -> BenchmarkResponse {
     use he_benchmark::{OpenFHEContext, OpenFHEKeyPair, OpenFHEPlaintext, OpenFHECiphertext};
     
     let total_start = Instant::now();
@@ -652,8 +665,12 @@ fn run_openfhe_benchmark(num_operations: i32) -> BenchmarkResponse {
     };
     let key_gen_time = key_start.elapsed();
     
-    // Test data
-    let test_data: Vec<i64> = (0..64).collect();
+    // Use custom test values if provided, otherwise default sequential data
+    let test_data: Vec<i64> = if !custom_values.is_empty() {
+        custom_values
+    } else {
+        (0..64).collect()
+    };
     
     // Encoding timing
     let encode_start = Instant::now();
@@ -976,16 +993,17 @@ impl HeService for HEServiceImpl {
         
         let library = req.library.clone();
         let num_ops = req.num_operations;
+        let test_vals = req.test_values.clone();
         
         let response = if library == "HELib" {
-            tokio::task::spawn_blocking(move || run_helib_benchmark(num_ops))
+            tokio::task::spawn_blocking(move || run_helib_benchmark(num_ops, test_vals))
                 .await.map_err(|e| Status::internal(format!("Benchmark failed: {}", e)))?
         } else if library == "OpenFHE" {
-            tokio::task::spawn_blocking(move || run_openfhe_benchmark(num_ops))
+            tokio::task::spawn_blocking(move || run_openfhe_benchmark(num_ops, test_vals))
                 .await.map_err(|e| Status::internal(format!("Benchmark failed: {}", e)))?
         } else {
             let poly_degree = 8192u64;
-            tokio::task::spawn_blocking(move || run_seal_benchmark(poly_degree, num_ops))
+            tokio::task::spawn_blocking(move || run_seal_benchmark(poly_degree, num_ops, test_vals))
                 .await.map_err(|e| Status::internal(format!("Benchmark failed: {}", e)))?
         };
         
@@ -1000,26 +1018,30 @@ impl HeService for HEServiceImpl {
     ) -> Result<Response<ComparisonBenchmarkResponse>, Status> {
         let req = request.into_inner();
         let num_ops = req.num_operations;
+        let test_vals = req.test_values;
         
         println!("📥 Comparison benchmark request ({} ops per library)", num_ops);
         println!("   Running SEAL benchmark...");
         
         // Run all three benchmarks
         let seal_ops = num_ops;
+        let seal_vals = test_vals.clone();
         let seal_result = tokio::task::spawn_blocking(move || {
-            run_seal_benchmark(8192, seal_ops)
+            run_seal_benchmark(8192, seal_ops, seal_vals)
         }).await.map_err(|e| Status::internal(format!("SEAL benchmark failed: {}", e)))?;
         
         println!("   Running HELib benchmark...");
         let helib_ops = num_ops;
+        let helib_vals = test_vals.clone();
         let helib_result = tokio::task::spawn_blocking(move || {
-            run_helib_benchmark(helib_ops)
+            run_helib_benchmark(helib_ops, helib_vals)
         }).await.map_err(|e| Status::internal(format!("HELib benchmark failed: {}", e)))?;
         
         println!("   Running OpenFHE benchmark...");
         let openfhe_ops = num_ops;
+        let openfhe_vals = test_vals;
         let openfhe_result = tokio::task::spawn_blocking(move || {
-            run_openfhe_benchmark(openfhe_ops)
+            run_openfhe_benchmark(openfhe_ops, openfhe_vals)
         }).await.map_err(|e| Status::internal(format!("OpenFHE benchmark failed: {}", e)))?;
         
         // Determine fastest library based on total time

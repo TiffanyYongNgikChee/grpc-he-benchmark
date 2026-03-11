@@ -86,12 +86,12 @@ export default function Workbench() {
   };
 
   /* ─── Run library comparison ─── */
-  const handleComparison = useCallback(async () => {
+  const handleComparison = useCallback(async (testValues) => {
     if (compLoading) return;
     setCompLoading(true);
     setCompError(null);
     try {
-      const data = await runComparisonBenchmark(10);
+      const data = await runComparisonBenchmark(10, testValues);
       setCompData(data);
     } catch (err) {
       setCompError(err.message);

@@ -83,6 +83,7 @@ message BinaryOpResponse {
 message BenchmarkRequest {
   string library = 1;          // Which library to benchmark: "SEAL", "HELib", "OpenFHE", or "ALL"
   int32 num_operations = 2;    // Number of operations to run
+  repeated int64 test_values = 3; // Optional custom values to encrypt (empty = use defaults)
 }
 
 // Benchmark results for a single library

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -8,57 +9,145 @@ import {
   Legend,
 } from "chart.js";
 
+// Register the Chart.js components we need for grouped bar charts
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
 /**
  * LibraryComparison — Side-by-side benchmark comparison of 3 HE libraries.
  *
- * Shows grouped bar charts for each primitive operation (keygen, encrypt,
- * add, multiply, decrypt) with SEAL (blue), HElib (purple), OpenFHE (teal).
+ * HOW IT WORKS:
+ *   1. The user types a list of numbers (e.g. "42, 7, 100") into the input field.
+ *      These are the actual values that get encrypted, added, multiplied, and
+ *      decrypted by each library. If left blank, the backend uses its default
+ *      test data (sequential integers 0,1,2,…).
+ *
+ *   2. The user clicks "Run Library Comparison". This sends a POST request to
+ *      /api/benchmark/compare with { library: "ALL", numOperations: 10, testValues: [...] }.
+ *
+ *   3. The Rust gRPC server runs the same 5 operations for each library:
+ *        Key Gen   → create encryption keys
+ *        Encrypt   → turn the plaintext numbers into ciphertexts
+ *        Addition  → add pairs of ciphertexts together (homomorphic add)
+ *        Multiply  → multiply pairs of ciphertexts (homomorphic multiply)
+ *        Decrypt   → turn ciphertexts back into plaintext numbers
+ *      Each operation is repeated 10 times and averaged (to smooth out noise).
+ *
+ *   4. The results come back as timing data (ms per operation per library).
+ *      This component renders:
+ *        • Summary cards — one per library, showing total time + "FASTEST" badge
+ *        • Grouped bar chart — 5 bars per library, side by side
+ *
+ * WHERE THE DATA COMES FROM:
+ *   Frontend (this file)
+ *     → api/client.js  runComparisonBenchmark(10, testValues)
+ *       → Spring Boot  POST /api/benchmark/compare
+ *         → gRPC stub  RunComparisonBenchmark
+ *           → Rust server  run_seal_benchmark() / run_helib_benchmark() / run_openfhe_benchmark()
+ *             → Each calls the real C/C++ HE library (SEAL, HELib, OpenFHE)
+ *
+ * PROPS:
+ *   data     — the comparison response from the backend (null until first run)
+ *   loading  — true while the benchmark is in progress
+ *   error    — error message string, if the benchmark failed
+ *   onRun    — callback to trigger the benchmark (called with testValues array)
  */
 
+// Colour palette for the three HE libraries
 const LIB_COLORS = {
-  SEAL:    { bg: "rgba(59,130,246,0.75)",  border: "#3b82f6"  },
-  HELib:   { bg: "rgba(139,92,246,0.75)",  border: "#8b5cf6"  },
-  OpenFHE: { bg: "rgba(13,183,196,0.75)",  border: "#0db7c4"  },
+  SEAL:    { bg: "rgba(59,130,246,0.75)",  border: "#3b82f6"  },   // blue
+  HELib:   { bg: "rgba(139,92,246,0.75)",  border: "#8b5cf6"  },   // purple
+  OpenFHE: { bg: "rgba(13,183,196,0.75)",  border: "#0db7c4"  },   // teal
 };
 
+// The 5 primitive HE operations we benchmark.
+// Each `key` matches a field name in the JSON response from the backend.
 const OPERATIONS = [
-  { key: "keyGenTimeMs",         label: "Key Gen" },
-  { key: "encryptionTimeMs",     label: "Encrypt" },
-  { key: "additionTimeMs",       label: "Addition" },
-  { key: "multiplicationTimeMs", label: "Multiply" },
-  { key: "decryptionTimeMs",     label: "Decrypt" },
+  { key: "keyGenTimeMs",         label: "Key Gen" },    // time to generate public + secret keys
+  { key: "encryptionTimeMs",     label: "Encrypt" },    // time to encrypt plaintext → ciphertext
+  { key: "additionTimeMs",       label: "Addition" },   // time to add two ciphertexts (homomorphic)
+  { key: "multiplicationTimeMs", label: "Multiply" },   // time to multiply two ciphertexts (homomorphic)
+  { key: "decryptionTimeMs",     label: "Decrypt" },    // time to decrypt ciphertext → plaintext
 ];
 
 export default function LibraryComparison({ data, loading, error, onRun }) {
-  /* ─── Empty state ─── */
+  // The user can type custom numbers to encrypt/benchmark (e.g. "42, 7, 100")
+  // If left empty, the backend uses default sequential test data.
+  const [inputValues, setInputValues] = useState("");
+
+  /**
+   * Parse the user's comma-separated input into an array of integers.
+   * Returns null if empty (meaning "use default data").
+   */
+  function parseTestValues() {
+    const trimmed = inputValues.trim();
+    if (!trimmed) return null; // empty → let backend use defaults
+    return trimmed
+      .split(",")
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => !isNaN(n));
+  }
+
+  /* ─── Shared input section (shown in both empty state and results) ─── */
+  const inputSection = (
+    <div className="mb-5">
+      <label className="block text-xs font-medium mb-1.5" style={{ color: "#666" }}>
+        Test Values
+        <span className="font-normal ml-1" style={{ color: "#aaa" }}>
+          (comma-separated integers to encrypt — leave blank for default)
+        </span>
+      </label>
+      <input
+        type="text"
+        value={inputValues}
+        onChange={(e) => setInputValues(e.target.value)}
+        placeholder="e.g. 42, 7, 100, 256, 999"
+        disabled={loading}
+        className="w-full px-3 py-2 rounded-lg text-sm border focus:outline-none focus:ring-2 transition-all font-mono"
+        style={{
+          borderColor: "#d9d9d9",
+          color: "#333",
+          background: loading ? "#f5f5f5" : "#fff",
+        }}
+      />
+      {inputValues.trim() && (
+        <p className="text-[10px] mt-1" style={{ color: "#999" }}>
+          {parseTestValues()?.length || 0} value(s) will be encrypted by each library
+        </p>
+      )}
+    </div>
+  );
+
+  /* ─── Empty state (no results yet) ─── */
   if (!data && !loading && !error) {
     return (
-      <div className="text-center py-10">
-        <p className="text-sm mb-4" style={{ color: "#888" }}>
-          Compare primitive HE operations across all three libraries
-        </p>
-        <button
-          onClick={onRun}
-          className="px-5 py-2.5 rounded-lg text-sm font-medium text-white shadow-sm hover:shadow transition-all hover:scale-[1.02] active:scale-[0.98]"
-          style={{ background: "#1a1a2e" }}
-        >
-          Run Library Comparison
-        </button>
-        <div className="flex justify-center gap-6 mt-6">
-          {Object.entries(LIB_COLORS).map(([lib, c]) => (
-            <span key={lib} className="flex items-center gap-1.5 text-xs" style={{ color: "#888" }}>
-              <span className="inline-block w-3 h-3 rounded-sm" style={{ background: c.border }} />
-              {lib}
-            </span>
-          ))}
+      <div className="py-6">
+        {inputSection}
+        <div className="text-center">
+          <p className="text-sm mb-4" style={{ color: "#888" }}>
+            Compare primitive HE operations across all three libraries
+          </p>
+          <button
+            onClick={() => onRun(parseTestValues())}
+            className="px-5 py-2.5 rounded-lg text-sm font-medium text-white shadow-sm hover:shadow transition-all hover:scale-[1.02] active:scale-[0.98]"
+            style={{ background: "#1a1a2e" }}
+          >
+            Run Library Comparison
+          </button>
+          {/* Colour legend for the 3 libraries */}
+          <div className="flex justify-center gap-6 mt-6">
+            {Object.entries(LIB_COLORS).map(([lib, c]) => (
+              <span key={lib} className="flex items-center gap-1.5 text-xs" style={{ color: "#888" }}>
+                <span className="inline-block w-3 h-3 rounded-sm" style={{ background: c.border }} />
+                {lib}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     );
   }
 
-  /* ─── Loading ─── */
+  /* ─── Loading spinner (benchmark is running on the server) ─── */
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
@@ -72,7 +161,7 @@ export default function LibraryComparison({ data, loading, error, onRun }) {
     );
   }
 
-  /* ─── Error ─── */
+  /* ─── Error state (backend returned an error or is unreachable) ─── */
   if (error) {
     return (
       <div className="text-center py-8">
@@ -82,7 +171,7 @@ export default function LibraryComparison({ data, loading, error, onRun }) {
         </div>
         <div className="mt-4">
           <button
-            onClick={onRun}
+            onClick={() => onRun(parseTestValues())}
             className="px-4 py-2 rounded-lg text-xs font-medium text-white"
             style={{ background: "#1a1a2e" }}
           >
@@ -94,6 +183,8 @@ export default function LibraryComparison({ data, loading, error, onRun }) {
   }
 
   /* ─── Results ─── */
+  // data.results is an array of 3 objects, one per library:
+  // [{ library: "SEAL", keyGenTimeMs, encryptionTimeMs, additionTimeMs, ... }, ...]
   const results = data.results || [];
   if (results.length === 0) {
     return (
@@ -103,7 +194,7 @@ export default function LibraryComparison({ data, loading, error, onRun }) {
     );
   }
 
-  /* Build datasets for grouped bar chart */
+  // Build one Chart.js dataset per library (each dataset has 5 bars — one per operation)
   const datasets = results.map((lib) => {
     const colors = LIB_COLORS[lib.library] || { bg: "rgba(150,150,150,0.6)", border: "#999" };
     return {
@@ -116,11 +207,13 @@ export default function LibraryComparison({ data, loading, error, onRun }) {
     };
   });
 
+  // Chart.js data object — labels on the x-axis, 3 datasets (one per library)
   const chartData = {
     labels: OPERATIONS.map((op) => op.label),
     datasets,
   };
 
+  // Chart.js config — grouped bars, y-axis in ms, tooltips, etc.
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -168,12 +261,15 @@ export default function LibraryComparison({ data, loading, error, onRun }) {
     },
   };
 
-  /* Summary cards */
+  // Find the fastest library (lowest total time) for the "FASTEST" badge
   const fastest = results.reduce((a, b) => (a.totalTimeMs < b.totalTimeMs ? a : b));
 
   return (
     <div>
-      {/* Summary row */}
+      {/* Test values input — lets user provide custom data to encrypt */}
+      {inputSection}
+
+      {/* Summary row — one card per library with total time + FASTEST badge */}
       <div className="flex gap-3 mb-5 flex-wrap">
         {results.map((lib) => {
           const colors = LIB_COLORS[lib.library] || { border: "#999" };
@@ -210,17 +306,17 @@ export default function LibraryComparison({ data, loading, error, onRun }) {
         })}
       </div>
 
-      {/* Grouped bar chart */}
+      {/* Grouped bar chart — 5 operation categories, 3 bars each */}
       <div className="rounded-lg p-4" style={{ background: "#fff", border: "1px solid #e5e5e5" }}>
         <div style={{ height: 280 }}>
           <Bar data={chartData} options={chartOptions} />
         </div>
       </div>
 
-      {/* Rerun button */}
+      {/* Rerun button — re-runs with the current test values */}
       <div className="text-center mt-4">
         <button
-          onClick={onRun}
+          onClick={() => onRun(parseTestValues())}
           className="px-4 py-1.5 rounded-lg text-xs font-medium border hover:bg-gray-50 transition-colors"
           style={{ borderColor: "#ccc", color: "#666" }}
         >
