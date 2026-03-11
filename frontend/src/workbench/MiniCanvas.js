@@ -1,23 +1,37 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 
 /**
- * MiniCanvas — A compact drawing canvas for the workbench layout.
- * Draws white strokes on a black background, then extracts a centered
- * 28×28 grayscale image matching MNIST preprocessing:
- *   1. Find bounding box of drawn strokes
- *   2. Crop to a square around the digit
- *   3. Scale to 20×20 (MNIST inner region)
- *   4. Center in a 28×28 frame with 4px padding
+ * MiniCanvas — The drawing pad where users write a handwritten digit.
+ *
+ * HOW IT WORKS (in plain English):
+ *
+ * The user draws on a big 280×280 canvas (so it's easy to draw with a mouse).
+ * But the AI model expects a tiny 28×28 image where the digit is centred and
+ * size-normalised — that's how MNIST training images look.
+ *
+ * So after each stroke, we:
+ *   1. FIND the drawing — scan all pixels to locate the bounding box (the
+ *      smallest rectangle that wraps around the drawn digit).
+ *   2. CROP it tight — cut out just the digit, no wasted black space.
+ *   3. MAKE IT SQUARE — if the digit is tall and skinny (like "1"), pad the
+ *      sides with black so it becomes a square.
+ *   4. SHRINK it — scale that square down to 20×20 pixels.
+ *   5. CENTRE it — place the 20×20 image in the middle of a 28×28 black
+ *      frame with 4 pixels of padding on every side.
+ *
+ * The result is 784 grayscale values (28×28) that look just like the training
+ * data, so the AI gets what it expects regardless of where or how big you drew.
  */
 export default function MiniCanvas({ onPixelsReady, disabled = false }) {
-  const canvasRef = useRef(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [hasDrawn, setHasDrawn] = useState(false);
+  const canvasRef = useRef(null);       // reference to the HTML <canvas> element
+  const [isDrawing, setIsDrawing] = useState(false);  // true while mouse/finger is held down
+  const [hasDrawn, setHasDrawn] = useState(false);    // true once the user has drawn anything (shows "Clear" button)
 
-  const CANVAS_SIZE = 280;
-  const BRUSH_SIZE = 14;
-  const MNIST_SIZE = 28;
+  const CANVAS_SIZE = 280;   // internal canvas resolution (px) — big for smooth drawing
+  const BRUSH_SIZE = 14;     // radius of the white brush stroke (px)
+  const MNIST_SIZE = 28;     // output image size the AI model expects
 
+  // Fill the canvas with solid black (fresh start / clear)
   const initCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -26,8 +40,13 @@ export default function MiniCanvas({ onPixelsReady, disabled = false }) {
     ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
   }, []);
 
-  useEffect(() => { initCanvas(); }, [initCanvas]);
+  useEffect(() => { initCanvas(); }, [initCanvas]); // fill black on first render
 
+  /**
+   * getPos — Convert a mouse/touch event to canvas coordinates.
+   * The canvas displays smaller than 280px on screen (max-width 196px),
+   * so we scale the click position up to match the internal 280×280 grid.
+   */
   function getPos(e) {
     const rect = canvasRef.current.getBoundingClientRect();
     const scale = CANVAS_SIZE / rect.width;
@@ -43,6 +62,7 @@ export default function MiniCanvas({ onPixelsReady, disabled = false }) {
     };
   }
 
+  // Draw a white line between two points (called while dragging)
   function drawLine(x1, y1, x2, y2) {
     const ctx = canvasRef.current.getContext("2d");
     ctx.strokeStyle = "#FFFFFF";
@@ -55,6 +75,7 @@ export default function MiniCanvas({ onPixelsReady, disabled = false }) {
     ctx.stroke();
   }
 
+  // Draw a white dot at a single point (called on initial click/tap)
   function drawDot(x, y) {
     const ctx = canvasRef.current.getContext("2d");
     ctx.fillStyle = "#FFFFFF";
@@ -63,8 +84,10 @@ export default function MiniCanvas({ onPixelsReady, disabled = false }) {
     ctx.fill();
   }
 
-  const lastPos = useRef(null);
+  const lastPos = useRef(null); // remembers the previous cursor position for smooth lines
 
+  // --- Mouse / touch event handlers ---
+  // handleStart: user puts finger/mouse down → start drawing
   function handleStart(e) {
     if (disabled) return;
     e.preventDefault();
@@ -75,6 +98,7 @@ export default function MiniCanvas({ onPixelsReady, disabled = false }) {
     lastPos.current = pos;
   }
 
+  // handleMove: user drags across the canvas → draw a line from the last point
   function handleMove(e) {
     if (!isDrawing || disabled) return;
     e.preventDefault();
@@ -85,14 +109,26 @@ export default function MiniCanvas({ onPixelsReady, disabled = false }) {
     lastPos.current = pos;
   }
 
+  // handleEnd: user lifts finger/mouse → stop drawing and extract the digit
   function handleEnd(e) {
     if (!isDrawing) return;
     e.preventDefault();
     setIsDrawing(false);
     lastPos.current = null;
-    extractPixels();
+    extractPixels(); // <-- this is where the 5-step pipeline kicks in
   }
 
+  /**
+   * extractPixels — the core 5-step pipeline that turns a freehand drawing
+   * into a clean 28×28 grayscale image (784 numbers), just like the MNIST
+   * dataset the model was trained on.
+   *
+   *  Step 1 → grab the raw pixel data from the big 280×280 canvas
+   *  Step 2 → find the bounding box (the smallest rectangle around the digit)
+   *  Step 3 → crop it out and stretch it into a perfect square
+   *  Step 4 → shrink that square to 20×20 and centre it inside a 28×28 frame
+   *  Step 5 → read out 784 brightness values (0 = black, 255 = white)
+   */
   function extractPixels() {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -116,31 +152,33 @@ export default function MiniCanvas({ onPixelsReady, disabled = false }) {
       }
     }
 
-    // If nothing drawn, bail
+    // If nothing was drawn (or only tiny speckles), bail out
     if (maxX <= minX || maxY <= minY) {
       onPixelsReady?.(null);
       return;
     }
 
-    // Step 3: Crop to bounding box and fit into a square with padding
-    // MNIST digits occupy ~20×20 inside the 28×28 frame, centered.
-    const bw = maxX - minX + 1;
-    const bh = maxY - minY + 1;
-    const side = Math.max(bw, bh);
+    // Step 3: Make it square so the digit isn't stretched
+    // MNIST digits sit in a ~20×20 area centred inside 28×28, so we need a
+    // square crop first, then we scale down.
+    const bw = maxX - minX + 1; // width of the bounding box
+    const bh = maxY - minY + 1; // height of the bounding box
+    const side = Math.max(bw, bh); // pick the longer edge → square
 
-    // Create a square crop canvas and center the digit
+    // Create a temporary square canvas and paste the digit centred
     const cropCanvas = document.createElement("canvas");
     cropCanvas.width = side;
     cropCanvas.height = side;
     const cropCtx = cropCanvas.getContext("2d");
     cropCtx.fillStyle = "#000000";
     cropCtx.fillRect(0, 0, side, side);
-    const offsetX = Math.floor((side - bw) / 2);
-    const offsetY = Math.floor((side - bh) / 2);
+    const offsetX = Math.floor((side - bw) / 2); // horizontal nudge to centre
+    const offsetY = Math.floor((side - bh) / 2); // vertical nudge to centre
     cropCtx.drawImage(canvas, minX, minY, bw, bh, offsetX, offsetY, bw, bh);
 
-    // Step 4: Scale to 20×20 (MNIST convention) then paste centered in 28×28
-    const INNER = 20; // MNIST digits are roughly 20×20 inside 28×28
+    // Step 4: Shrink to 20×20 and centre inside a 28×28 black frame
+    // (This matches exactly how the MNIST training images are formatted.)
+    const INNER = 20; // the digit lives in a 20×20 area
     const PAD = Math.floor((MNIST_SIZE - INNER) / 2); // 4px padding each side
 
     const outCanvas = document.createElement("canvas");
@@ -148,27 +186,31 @@ export default function MiniCanvas({ onPixelsReady, disabled = false }) {
     outCanvas.height = MNIST_SIZE;
     const outCtx = outCanvas.getContext("2d");
     outCtx.fillStyle = "#000000";
-    outCtx.fillRect(0, 0, MNIST_SIZE, MNIST_SIZE);
-    // Enable smoothing for better anti-aliased downscale
+    outCtx.fillRect(0, 0, MNIST_SIZE, MNIST_SIZE); // start with a black 28×28
+    // Smooth scaling so the digit looks clean when shrunk
     outCtx.imageSmoothingEnabled = true;
     outCtx.imageSmoothingQuality = "high";
     outCtx.drawImage(cropCanvas, 0, 0, side, side, PAD, PAD, INNER, INNER);
 
-    // Step 5: Extract pixel values
+    // Step 5: Read out the 784 pixel brightness values (one per pixel)
     const data = outCtx.getImageData(0, 0, MNIST_SIZE, MNIST_SIZE).data;
     const pixels = [];
     for (let i = 0; i < MNIST_SIZE * MNIST_SIZE; i++) {
-      pixels.push(data[i * 4]); // red channel = grayscale
+      pixels.push(data[i * 4]); // red channel = grayscale (R=G=B for grey)
     }
-    onPixelsReady?.(pixels);
+    onPixelsReady?.(pixels); // send the 784 values up to the parent component
   }
 
+  // handleClear: wipe the canvas back to black and tell the parent there are no pixels
   function handleClear() {
     initCanvas();
     setHasDrawn(false);
     onPixelsReady?.(null);
   }
 
+  // --- Render ---
+  // A <canvas> element wired to mouse + touch events, plus a "Clear" button
+  // that only appears once the user has drawn something.
   return (
     <div className="relative">
       <canvas
