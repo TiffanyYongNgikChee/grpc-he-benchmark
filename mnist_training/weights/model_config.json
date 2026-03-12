@@ -1,0 +1,92 @@
+{
+  "model_name": "HE_CNN",
+  "framework": "PyTorch",
+  "architecture": {
+    "layers": [
+      {
+        "name": "conv1",
+        "type": "Conv2d",
+        "kernel_size": 5,
+        "in_channels": 1,
+        "out_channels": 1,
+        "padding": 0
+      },
+      {
+        "name": "act1",
+        "type": "SquareActivation",
+        "formula": "x^2"
+      },
+      {
+        "name": "pool1",
+        "type": "AvgPool2d",
+        "kernel_size": 2,
+        "stride": 2
+      },
+      {
+        "name": "conv2",
+        "type": "Conv2d",
+        "kernel_size": 5,
+        "in_channels": 1,
+        "out_channels": 1,
+        "padding": 0
+      },
+      {
+        "name": "act2",
+        "type": "SquareActivation",
+        "formula": "x^2"
+      },
+      {
+        "name": "pool2",
+        "type": "AvgPool2d",
+        "kernel_size": 2,
+        "stride": 2
+      },
+      {
+        "name": "fc",
+        "type": "Linear",
+        "in_features": 16,
+        "out_features": 10
+      }
+    ],
+    "input_shape": [
+      1,
+      1,
+      28,
+      28
+    ],
+    "output_shape": [
+      1,
+      10
+    ],
+    "total_parameters": 222
+  },
+  "quantization": {
+    "scale_factor": 1000,
+    "method": "round(weight * scale_factor)",
+    "plaintext_modulus": 7340033,
+    "scheme": "BFV"
+  },
+  "accuracy": {
+    "float_model": 87.68,
+    "per_digit": {
+      "0": 96.94,
+      "1": 95.68,
+      "2": 83.82,
+      "3": 83.17,
+      "4": 88.09,
+      "5": 80.72,
+      "6": 89.35,
+      "7": 88.72,
+      "8": 85.73,
+      "9": 83.15
+    }
+  },
+  "files": {
+    "conv1_weights": "conv1_weights.csv",
+    "conv1_bias": "conv1_bias.csv",
+    "conv2_weights": "conv2_weights.csv",
+    "conv2_bias": "conv2_bias.csv",
+    "fc_weights": "fc_weights.csv",
+    "fc_bias": "fc_bias.csv"
+  }
+}
