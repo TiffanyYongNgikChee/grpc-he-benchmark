@@ -52,7 +52,7 @@ def predict(api_base, pixels, scale_factor=1000):
         headers={"Content-Type": "application/json"}
     )
     
-    with urllib.request.urlopen(req, timeout=300) as resp:
+    with urllib.request.urlopen(req, timeout=600) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
