@@ -539,7 +539,7 @@ fn run_helib_benchmark(num_operations: i32, custom_values: Vec<i64>) -> Benchmar
 // ============================================
 
 const OPENFHE_PLAINTEXT_MOD: u64 = 65537;
-const OPENFHE_MULT_DEPTH: u32 = 2;
+const OPENFHE_MULT_DEPTH: u32 = 6;
 
 fn run_openfhe_encrypt(values: Vec<i64>) -> Result<usize, String> {
     use he_benchmark::{OpenFHEContext, OpenFHEKeyPair, OpenFHEPlaintext, OpenFHECiphertext};

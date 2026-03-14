@@ -345,14 +345,17 @@ impl EncryptedInferenceEngine {
         );
 
         // Create BFV context
-        let mult_depth = 3;
+        // Multiplicative depth needed for true FHE CNN:
+        //   Conv1 (ct×pt) + x² (ct×ct) + Conv2 (ct×pt) + x² (ct×ct) + FC (ct×pt)
+        //   = 5 multiplicative depths, plus margin for accumulation
+        let mult_depth = 6;
         println!(
             "  Creating BFV context (p={}, depth={})...",
             plaintext_modulus, mult_depth
         );
         let ctx = OpenFHEContext::new_bfv(plaintext_modulus, mult_depth)?;
         let kp = OpenFHEKeyPair::generate(&ctx)?;
-        println!("  Keypair generated (128-bit security)");
+        println!("  Keypair generated (128-bit security, with rotation keys)");
 
         // Encode weights as OpenFHE plaintexts/ciphertexts
         let weights = mnist_weights.encode(&ctx, &kp)?;

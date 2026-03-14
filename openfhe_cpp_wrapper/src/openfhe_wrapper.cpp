@@ -98,13 +98,21 @@ extern "C" OpenFHEKeyPair* openfhe_generate_keypair(OpenFHEContext* ctx) {
         // Generate key pair
         KeyPair<DCRTPoly> keyPair = ctx->cryptoContext->KeyGen();
         
-        // Generate evaluation keys for multiplication
+        // Generate evaluation keys for multiplication (relinearization)
         ctx->cryptoContext->EvalMultKeyGen(keyPair.secretKey);
         
-        // Note: Rotation keys not generated due to memory constraints
-        // For production use, generate specific rotation indices as needed:
-        // std::vector<int32_t> indexList = {1, -1, 2, -2, ...};
-        // ctx->cryptoContext->EvalRotateKeyGen(keyPair.secretKey, indexList);
+        // Generate rotation keys for slot manipulation (needed for conv/pool/matmul)
+        // We need rotation indices for:
+        //   - Conv2d: shifts by multiples of input_width and small offsets
+        //   - AvgPool: shifts within pooling windows
+        //   - Matmul: accumulating dot products
+        // Generate a broad range to cover all CNN layer needs
+        std::vector<int32_t> indexList;
+        for (int32_t i = 1; i <= 784; i++) {  // up to 28*28 for full image
+            indexList.push_back(i);
+            indexList.push_back(-i);
+        }
+        ctx->cryptoContext->EvalRotateKeyGen(keyPair.secretKey, indexList);
         
         // Allocate and return
         OpenFHEKeyPair* kp = new OpenFHEKeyPair();
@@ -348,6 +356,74 @@ extern "C" OpenFHECiphertext* openfhe_eval_sub(
         
     } catch (const std::exception& e) {
         set_error(std::string("EvalSub failed: ") + e.what());
+        return nullptr;
+    }
+}
+
+// ── Ciphertext-Plaintext operations (for true FHE CNN) ──
+
+extern "C" OpenFHECiphertext* openfhe_eval_add_plain(
+    OpenFHECiphertext* ct,
+    OpenFHEPlaintext* pt
+) {
+    if (!ct || !pt || !ct->ctx) {
+        set_error("Invalid parameters for EvalAdd(ct, pt)");
+        return nullptr;
+    }
+    try {
+        auto result = ct->ctx->cryptoContext->EvalAdd(ct->ciphertext, pt->plaintext);
+        if (!result) { set_error("EvalAdd(ct,pt) returned null"); return nullptr; }
+        auto* out = new OpenFHECiphertext();
+        out->ciphertext = result;
+        out->ctx = ct->ctx;
+        set_error("");
+        return out;
+    } catch (const std::exception& e) {
+        set_error(std::string("EvalAdd(ct,pt) failed: ") + e.what());
+        return nullptr;
+    }
+}
+
+extern "C" OpenFHECiphertext* openfhe_eval_mult_plain(
+    OpenFHECiphertext* ct,
+    OpenFHEPlaintext* pt
+) {
+    if (!ct || !pt || !ct->ctx) {
+        set_error("Invalid parameters for EvalMult(ct, pt)");
+        return nullptr;
+    }
+    try {
+        auto result = ct->ctx->cryptoContext->EvalMult(ct->ciphertext, pt->plaintext);
+        if (!result) { set_error("EvalMult(ct,pt) returned null"); return nullptr; }
+        auto* out = new OpenFHECiphertext();
+        out->ciphertext = result;
+        out->ctx = ct->ctx;
+        set_error("");
+        return out;
+    } catch (const std::exception& e) {
+        set_error(std::string("EvalMult(ct,pt) failed: ") + e.what());
+        return nullptr;
+    }
+}
+
+extern "C" OpenFHECiphertext* openfhe_eval_rotate(
+    OpenFHECiphertext* ct,
+    int32_t index
+) {
+    if (!ct || !ct->ctx) {
+        set_error("Invalid parameters for EvalRotate");
+        return nullptr;
+    }
+    try {
+        auto result = ct->ctx->cryptoContext->EvalRotate(ct->ciphertext, index);
+        if (!result) { set_error("EvalRotate returned null"); return nullptr; }
+        auto* out = new OpenFHECiphertext();
+        out->ciphertext = result;
+        out->ctx = ct->ctx;
+        set_error("");
+        return out;
+    } catch (const std::exception& e) {
+        set_error(std::string("EvalRotate failed: ") + e.what());
         return nullptr;
     }
 }

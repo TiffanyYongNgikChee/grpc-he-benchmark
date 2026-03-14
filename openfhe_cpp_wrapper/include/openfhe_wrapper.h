@@ -127,6 +127,27 @@ OpenFHECiphertext* openfhe_subtract(
     OpenFHECiphertext* b
 );
 
+// ── Ciphertext-Plaintext operations (for true FHE CNN) ──
+
+/// Add a plaintext to a ciphertext: result = ct + pt
+OpenFHECiphertext* openfhe_eval_add_plain(
+    OpenFHECiphertext* ct,
+    OpenFHEPlaintext* pt
+);
+
+/// Multiply ciphertext by plaintext: result = ct * pt
+OpenFHECiphertext* openfhe_eval_mult_plain(
+    OpenFHECiphertext* ct,
+    OpenFHEPlaintext* pt
+);
+
+/// Rotate ciphertext slots by index positions
+/// Positive index = left rotate, negative = right rotate
+OpenFHECiphertext* openfhe_eval_rotate(
+    OpenFHECiphertext* ct,
+    int32_t index
+);
+
 // Error Handling
 /// Get last error message
 /// @return Error message string (valid until next call)

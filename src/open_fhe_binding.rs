@@ -167,4 +167,24 @@ unsafe extern "C" {
     
     /// Get last error from CNN operations
     pub fn openfhe_cnn_get_last_error() -> *const c_char;
+    
+    // ── Ciphertext-Plaintext operations (for true FHE CNN) ──
+    
+    /// Add plaintext to ciphertext: result = ct + pt
+    pub fn openfhe_eval_add_plain(
+        ct: *mut OpenFHECiphertext,
+        pt: *mut OpenFHEPlaintext,
+    ) -> *mut OpenFHECiphertext;
+    
+    /// Multiply ciphertext by plaintext: result = ct * pt
+    pub fn openfhe_eval_mult_plain(
+        ct: *mut OpenFHECiphertext,
+        pt: *mut OpenFHEPlaintext,
+    ) -> *mut OpenFHECiphertext;
+    
+    /// Rotate ciphertext slots by index positions
+    pub fn openfhe_eval_rotate(
+        ct: *mut OpenFHECiphertext,
+        index: i32,
+    ) -> *mut OpenFHECiphertext;
 }
