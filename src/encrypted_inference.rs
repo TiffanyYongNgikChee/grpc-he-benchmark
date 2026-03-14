@@ -140,7 +140,7 @@ impl From<OpenFHEError> for InferenceError {
 /// and pre-encoded weights, so there's no repeated setup cost.
 ///
 /// # Arguments
-/// * `ctx` - OpenFHE BFV context (plaintext_modulus=7340033, depth=3)
+/// * `ctx` - OpenFHE BFV context (plaintext_modulus from config, depth=6)
 /// * `kp` - Key pair for encrypt/decrypt/re-encrypt
 /// * `w` - Pre-encoded weights (from `MnistWeights::encode()`)
 /// * `scaled_pixels` - 784 pre-scaled pixel values

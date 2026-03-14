@@ -213,130 +213,18 @@ extern "C" OpenFHECiphertext* openfhe_conv2d(
         std::vector<int64_t> kernel_vec = kernel->plaintext->GetPackedValue();
         for (auto& v : kernel_vec) { if (v > half_p) v -= p; }
         
-        // For convolution, we use the "shift-multiply-accumulate" approach:
-        // For each kernel position (kh, kw), shift the input so that the
-        // relevant pixels align with the output positions, then multiply
-        // by the kernel weight, and accumulate.
-        //
-        // Shift amount for kernel position (kh, kw) = kh * input_width + kw
-        // After shifting, output pixel (oh, ow) sees input pixel (oh+kh, ow+kw)
-        // at position oh * input_width + ow (which is the output's "natural" slot).
-        //
-        // But our output has different dimensions, so we need a gather step.
-        // Simpler approach: for each (kh, kw), create a weight mask at the
-        // output positions and use EvalMultPlain + EvalAdd to accumulate.
+        // Rotate-multiply-accumulate approach (CryptoNets / Gazelle style):
+        // For each kernel position (kh, kw):
+        //   1. Rotate input by (kh * input_width + kw) — aligns input pixels
+        //      so that slot (oh*iw + ow) now contains input[(oh+kh)*iw + (ow+kw)]
+        //   2. Multiply all slots by scalar kernel[kh][kw]
+        //   3. Add to accumulator
+        // After all 25 kernel positions: slot (oh*iw + ow) contains the
+        // convolution output for position (oh, ow) — but in input-width layout.
+        // One decrypt to rearrange to output-width layout + apply divisor.
         
-        // Initialize accumulator ciphertext to zero
         std::vector<int64_t> zero_vec(slot_count, 0);
         auto zero_pt = make_plain(ctx, zero_vec);
-        auto accumulator = cc->Encrypt(keypair->keyPair.publicKey, zero_pt);
-        
-        for (size_t kh = 0; kh < kernel_height; kh++) {
-            for (size_t kw = 0; kw < kernel_width; kw++) {
-                int64_t kval = kernel_vec[kh * kernel_width + kw];
-                if (kval == 0) continue;  // Skip zero weights
-                
-                // Create a mask: for each output position (oh, ow),
-                // put the kernel weight at the INPUT position (oh+kh)*(input_width)+(ow+kw)
-                std::vector<int64_t> mask(slot_count, 0);
-                for (size_t oh = 0; oh < out_height; oh++) {
-                    for (size_t ow = 0; ow < out_width; ow++) {
-                        size_t input_idx = (oh + kh) * input_width + (ow + kw);
-                        if (input_idx < slot_count) {
-                            mask[input_idx] = kval;
-                        }
-                    }
-                }
-                auto mask_pt = make_plain(ctx, mask);
-                
-                // Multiply: each slot gets input[idx] * kernel_weight (or 0)
-                auto partial = cc->EvalMult(input->ciphertext, mask_pt);
-                
-                // Now we need to gather: move input_idx → output_idx
-                // For each output (oh, ow):
-                //   input_idx = (oh+kh)*input_width + (ow+kw)
-                //   output_idx = oh*out_width + ow
-                //   shift = input_idx - output_idx
-                // The shift varies per output position, so we can't do a single rotate.
-                // Instead, we accumulate into the output using per-position extraction.
-                // 
-                // Optimization: since the shift pattern repeats, we can group by shift.
-                // But for simplicity and correctness, we use a different approach:
-                // encode kval at OUTPUT positions directly with the right input offset.
-                
-                // Actually, let's restructure: for kernel pos (kh, kw), the rotation
-                // needed to align input positions with output positions is:
-                //   input slot for output (oh,ow) = (oh+kh)*iw + (ow+kw)
-                //   output slot = oh*ow_dim + ow
-                // Since iw != ow_dim in general (input_width != out_width),
-                // a single rotation doesn't work.
-                //
-                // Better approach: iterate output positions, building the result
-                // through selective accumulation.
-                // 
-                // Most practical for BFV packed: extract, rotate, accumulate per-row.
-                
-                // Simplest correct approach: one mask per kernel position
-                // where mask[i] = kval if slot i corresponds to a valid input position
-                // that maps to an output position, then we rearrange via output encoding.
-                
-                // Let's use the most straightforward FHE approach:
-                // For each kernel position, rotate input to align and multiply by scalar
-                accumulator = cc->EvalAdd(accumulator, partial);
-            }
-        }
-        
-        // The accumulator now has the convolution values, but at the INPUT slot positions.
-        // We need to "remap" from input layout to output layout.
-        // Since both are flattened row-major but with different widths, we decrypt
-        // to rearrange (this is the one decrypt we can't avoid without complex masking).
-        
-        // Decrypt, rearrange to output layout, re-encrypt
-        Plaintext acc_plain;
-        cc->Decrypt(keypair->keyPair.secretKey, accumulator, &acc_plain);
-        std::vector<int64_t> acc_vec = acc_plain->GetPackedValue();
-        for (auto& v : acc_vec) { if (v > half_p) v -= p; }
-        
-        std::vector<int64_t> output_vec(slot_count, 0);
-        for (size_t oh = 0; oh < out_height; oh++) {
-            for (size_t ow = 0; ow < out_width; ow++) {
-                // Sum contributions from all kernel positions at this output
-                int64_t sum = 0;
-                for (size_t kh = 0; kh < kernel_height; kh++) {
-                    for (size_t kw = 0; kw < kernel_width; kw++) {
-                        size_t input_idx = (oh + kh) * input_width + (ow + kw);
-                        int64_t kval = kernel_vec[kh * kernel_width + kw];
-                        if (input_idx < acc_vec.size()) {
-                            // The accumulated value at input_idx contains
-                            // input[input_idx] * sum_of_all_kernel_weights_mapped_here
-                            // This approach doesn't correctly isolate per-kernel-position
-                            // contributions at overlapping positions.
-                        }
-                    }
-                }
-                // We need a different strategy entirely for rearranging...
-            }
-        }
-        
-        // REVISED APPROACH: Given the slot layout mismatch between input and output,
-        // the most practical true-FHE convolution for BFV packed integers uses
-        // per-kernel-position "rotate-multiply-accumulate" with the diagonal method.
-        //
-        // However, for a single-channel CNN with small feature maps, the overhead
-        // of managing slot layouts exceeds the benefit. The standard approach in
-        // the FHE literature (CryptoNets, LoLa, Gazelle) is:
-        //
-        // 1. Encode input image as a single ciphertext (slots = pixels)
-        // 2. For each kernel weight at offset (kh, kw):
-        //    a. Rotate input by (kh * input_width + kw) slots
-        //    b. Multiply rotated ct by scalar kernel[kh][kw]
-        //    c. Add to accumulator
-        // 3. Apply output masking to zero out invalid edge positions
-        //
-        // This works when output layout matches input layout (same width stride).
-        // Let's implement this properly.
-        
-        // RESET: Start fresh with the correct rotate-multiply-accumulate approach
         auto acc2 = cc->Encrypt(keypair->keyPair.publicKey, zero_pt);
         
         for (size_t kh = 0; kh < kernel_height; kh++) {

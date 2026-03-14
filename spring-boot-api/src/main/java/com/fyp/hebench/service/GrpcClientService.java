@@ -1,15 +1,14 @@
 package com.fyp.hebench.service;
 
-import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;      // Generated from .proto message
 
-import com.fyp.hebench.grpc.BenchmarkRequest;      // Generated from .proto message
-import com.fyp.hebench.grpc.BenchmarkResponse;     // Generated from .proto message
-import com.fyp.hebench.grpc.ComparisonBenchmarkResponse;  // Generated from .proto message
-import com.fyp.hebench.grpc.PredictRequest;         // Generated from .proto PredictRequest message
-import com.fyp.hebench.grpc.PredictResponse;        // Generated from .proto PredictResponse message
-import com.fyp.hebench.grpc.HEServiceGrpc;         // Generated gRPC client stub
-
-import org.springframework.beans.factory.annotation.Value; // Injects config values
+import com.fyp.hebench.grpc.BenchmarkRequest;     // Generated from .proto message
+import com.fyp.hebench.grpc.BenchmarkResponse;  // Generated from .proto message
+import com.fyp.hebench.grpc.ComparisonBenchmarkResponse;         // Generated from .proto PredictRequest message
+import com.fyp.hebench.grpc.HEServiceGrpc;        // Generated from .proto PredictResponse message
+import com.fyp.hebench.grpc.PredictRequest;         // Generated gRPC client stub
+import com.fyp.hebench.grpc.PredictResponse; // Injects config values
 
 import io.grpc.ManagedChannel;           // gRPC network connection handler
 import io.grpc.ManagedChannelBuilder;    // Builder to create the channel

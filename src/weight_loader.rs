@@ -448,7 +448,7 @@ impl MnistWeights {
     ///
     /// # Arguments
     /// * `context` - OpenFHE BFV context (must match training config:
-    ///               plaintext_modulus=7340033, mult_depth=3)
+    ///               plaintext_modulus from model_config.json, mult_depth=6)
     /// * `keypair` - Key pair (needed to encrypt bias vectors)
     pub fn encode(&self, context: &OpenFHEContext, keypair: &OpenFHEKeyPair)
         -> Result<EncodedWeights, OpenFHEError>
@@ -715,7 +715,7 @@ mod tests {
 
         // Config sanity checks
         assert_eq!(weights.config.scale_factor, 1000);
-        assert_eq!(weights.config.plaintext_modulus, 7340033);
+        assert_eq!(weights.config.plaintext_modulus, 100073473);
         assert_eq!(weights.config.total_parameters, 222);
         assert_eq!(weights.config.input_shape, [1, 1, 28, 28]);
         assert_eq!(weights.config.output_shape, [1, 10]);

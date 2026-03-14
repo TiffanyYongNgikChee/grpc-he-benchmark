@@ -882,7 +882,7 @@ def quantize_weights(model, scale_factor=1000):
     Quantize float32 model weights to integers for BFV encryption.
     
     BFV (Brakerski-Fan-Vercauteren) operates on integers modulo a plaintext
-    modulus. Our OpenFHE setup uses plaintext_modulus = 7340033, so integer
+    modulus. Our OpenFHE setup uses plaintext_modulus = 100073473, so integer
     weights must fit within that range.
     
     Quantization process:
@@ -919,8 +919,8 @@ def quantize_weights(model, scale_factor=1000):
                          'scale_factor'
     """
     print(f"\n  Scale factor: {scale_factor}")
-    print(f"  Plaintext modulus: 7340033 (max integer in BFV)")
-    print(f"  Max representable value: ±{7340033 // 2}\n")
+    print(f"  Plaintext modulus: 100073473 (max integer in BFV)")
+    print(f"  Max representable value: ±{100073473 // 2}\n")
     
     quantized = {"scale_factor": scale_factor}
     
@@ -959,7 +959,7 @@ def quantize_weights(model, scale_factor=1000):
         print(f"  {display_name:<15s} {shape_str:>15s} {float_range:>25s} {int_range:>20s} {max_abs:>10d}")
     
     # Check if any values exceed plaintext modulus
-    max_half = 7340033 // 2
+    max_half = 100073473 // 2
     overflow = False
     for param_name, display_name, key in layers:
         max_val = max(abs(quantized[key].min()), abs(quantized[key].max()))
@@ -1099,7 +1099,7 @@ def export_weights_csv(quantized, model, test_loader):
         "quantization": {
             "scale_factor": scale_factor,
             "method": "round(weight * scale_factor)",
-            "plaintext_modulus": 7340033,
+            "plaintext_modulus": 100073473,
             "scheme": "BFV"
         },
         "accuracy": {

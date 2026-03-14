@@ -63,7 +63,7 @@
   "quantization": {
     "scale_factor": 1000,
     "method": "round(weight * scale_factor)",
-    "plaintext_modulus": 7340033,
+    "plaintext_modulus": 100073473,
     "scheme": "BFV"
   },
   "accuracy": {
