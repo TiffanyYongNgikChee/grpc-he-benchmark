@@ -29,8 +29,10 @@ services:
       - he-grpc-server
     restart: unless-stopped
 
-  # Development/Benchmark service
+  # Development/Benchmark service (only runs with: docker compose --profile dev up)
   he-benchmark:
+    profiles:
+      - dev
     build:
       context: .
       target: builder
