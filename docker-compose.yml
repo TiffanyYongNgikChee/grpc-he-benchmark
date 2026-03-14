@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # gRPC Server for Homomorphic Encryption
+  # gRPC Server for Homomorphic Encryption (Rust)
   he-grpc-server:
     build: .
     ports:
@@ -16,6 +16,18 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # Spring Boot REST API (Java) — bridges React frontend ↔ Rust gRPC server
+  spring-boot-api:
+    build: ./spring-boot-api
+    ports:
+      - "8080:8080"
+    environment:
+      - GRPC_SERVER_HOST=he-grpc-server
+      - GRPC_SERVER_PORT=50051
+    depends_on:
+      - he-grpc-server
+    restart: unless-stopped
 
   # Development/Benchmark service
   he-benchmark:

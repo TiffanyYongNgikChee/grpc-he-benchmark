@@ -9,6 +9,8 @@ import com.fyp.hebench.grpc.PredictRequest;         // Generated from .proto Pre
 import com.fyp.hebench.grpc.PredictResponse;        // Generated from .proto PredictResponse message
 import com.fyp.hebench.grpc.HEServiceGrpc;         // Generated gRPC client stub
 
+import org.springframework.beans.factory.annotation.Value; // Injects config values
+
 import io.grpc.ManagedChannel;           // gRPC network connection handler
 import io.grpc.ManagedChannelBuilder;    // Builder to create the channel
 import jakarta.annotation.PostConstruct; // Runs method after bean is created
@@ -30,6 +32,15 @@ import jakarta.annotation.PreDestroy;    // Runs method before bean is destroyed
 @Service
 public class GrpcClientService {
 
+    // Read gRPC server host from application.properties (default: localhost)
+    // In Docker, this will be overridden to "he-grpc-server" (the container name)
+    @Value("${grpc.server.host:localhost}")
+    private String grpcHost;
+
+    // Read gRPC server port from application.properties (default: 50051)
+    @Value("${grpc.server.port:50051}")
+    private int grpcPort;
+
     // ManagedChannel = the network connection to the Rust gRPC server
     // Think of it like a phone line that stays open
     private ManagedChannel channel;
@@ -46,10 +57,10 @@ public class GrpcClientService {
     @PostConstruct
     public void init() {
         // Create a channel (connection) to the Rust gRPC server
-        // "localhost" = same machine (Docker exposes port to host)
-        // 50051 = the port where Rust gRPC server listens
-        // .usePlaintext() = no TLS encryption (ok for local development)
-        channel = ManagedChannelBuilder.forAddress("localhost", 50051)
+        // grpcHost = "localhost" locally, "he-grpc-server" in Docker
+        // grpcPort = the port where Rust gRPC server listens
+        // .usePlaintext() = no TLS encryption (ok for local/internal Docker network)
+        channel = ManagedChannelBuilder.forAddress(grpcHost, grpcPort)
                 .usePlaintext()
                 .build();
         
