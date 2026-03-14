@@ -29,6 +29,7 @@ export async function predictDigit(pixels, scaleFactor = 1000) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ pixels, scaleFactor }),
+    signal: AbortSignal.timeout(300_000), // 5 min — FHE inference can take ~27s+ per image
   });
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: "Unknown error" }));

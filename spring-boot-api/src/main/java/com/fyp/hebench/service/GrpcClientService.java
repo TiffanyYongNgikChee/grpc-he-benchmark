@@ -10,6 +10,8 @@ import com.fyp.hebench.grpc.HEServiceGrpc;        // Generated from .proto Predi
 import com.fyp.hebench.grpc.PredictRequest;         // Generated gRPC client stub
 import com.fyp.hebench.grpc.PredictResponse; // Injects config values
 
+import java.util.concurrent.TimeUnit;
+
 import io.grpc.ManagedChannel;           // gRPC network connection handler
 import io.grpc.ManagedChannelBuilder;    // Builder to create the channel
 import jakarta.annotation.PostConstruct; // Runs method after bean is created
@@ -271,8 +273,11 @@ public class GrpcClientService {
         // Step 2: Call the Rust gRPC server's PredictDigit RPC
         // This is where the magic happens — the Rust server runs the full
         // encrypted CNN inference pipeline inside Docker
-        // Takes ~50ms for one image
-        PredictResponse result = stub.predictDigit(request);
+        // Takes ~27s on t3.large (swap-heavy), ~5-8s on t3.xlarge (16GB RAM)
+        // Set a 5-minute deadline so we don't hang forever if something goes wrong
+        PredictResponse result = stub
+                .withDeadlineAfter(5, TimeUnit.MINUTES)
+                .predictDigit(request);
 
         // Step 3: Convert Protobuf response → Java POJO for JSON
         com.fyp.hebench.model.PredictResponse response = new com.fyp.hebench.model.PredictResponse();
