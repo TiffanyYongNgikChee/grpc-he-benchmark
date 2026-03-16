@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package he_service;
 
-option java_multiple_files = true; //  Generate separate .java files for each message - like request, response, grpc service
-option java_package = "com.fyp.hebench.grpc"; // Generated file starts with:
-option java_outer_classname = "HeServiceProto"; // Name of the "wrapper" class that holds protobuf metadata
+option java_multiple_files = true;
+option java_package = "com.fyp.hebench.grpc";
+option java_outer_classname = "HeServiceProto";
 
 // Main service for Homomorphic Encryption operations
 service HEService {
@@ -31,42 +31,45 @@ service HEService {
 
   // Run encrypted MNIST digit inference (full HE-CNN pipeline)
   rpc PredictDigit(PredictRequest) returns (PredictResponse);
+
+  // Run encrypted MNIST digit inference with real-time layer progress streaming
+  rpc PredictDigitStream(PredictRequest) returns (stream PredictProgressEvent);
 }
 
 // Request to generate keys
 message GenerateKeysRequest {
-  string library = 1;
-  int32 poly_modulus_degree = 2;
+  string library = 1;  // "SEAL", "HELib", or "OpenFHE"
+  int32 poly_modulus_degree = 2;  // Security parameter (e.g., 8192)
 }
 
 // Response with session ID and public key
 message GenerateKeysResponse {
-  string session_id = 1;
-  bytes public_key = 2;
-  string status = 3;
+  string session_id = 1;  // Unique session identifier
+  bytes public_key = 2;   // Serialized public key
+  string status = 3;      // "success" or error message
 }
 
 // Request to encrypt data
 message EncryptRequest {
-  string session_id = 1;
-  repeated int64 values = 2;
+  string session_id = 1;      // Session from GenerateKeys
+  repeated int64 values = 2;  // Values to encrypt
 }
 
 // Response with encrypted data
 message EncryptResponse {
-  bytes ciphertext = 1;
+  bytes ciphertext = 1;  // Serialized ciphertext
   string status = 2;
 }
 
 // Request to decrypt data
 message DecryptRequest {
-  string session_id = 1;
-  bytes ciphertext = 2;
+  string session_id = 1;  // Session ID
+  bytes ciphertext = 2;   // Ciphertext to decrypt
 }
 
 // Response with decrypted data
 message DecryptResponse {
-  repeated int64 values = 1;
+  repeated int64 values = 1;  // Decrypted values
   string status = 2;
 }
 
@@ -98,8 +101,8 @@ message BenchmarkResponse {
   double multiplication_time_ms = 4;
   double decryption_time_ms = 5;
   string status = 6;
-  double total_time_ms = 7;
-  double encoding_time_ms = 8;
+  double total_time_ms = 7;           // Total benchmark time
+  double encoding_time_ms = 8;        // Time spent encoding data
 }
 
 // Comparison benchmark results (all libraries)
@@ -107,8 +110,8 @@ message ComparisonBenchmarkResponse {
   BenchmarkResponse seal = 1;
   BenchmarkResponse helib = 2;
   BenchmarkResponse openfhe = 3;
-  string fastest_library = 4;
-  string recommendation = 5;
+  string fastest_library = 4;         // Which library was fastest overall
+  string recommendation = 5;          // Usage recommendation based on results
 }
 
 // Request for encrypted MNIST digit prediction
@@ -125,20 +128,39 @@ message PredictResponse {
   string status = 4;                  // "success" or error message
 
   // Per-layer timing breakdown (milliseconds)
-  double encryption_ms = 5;
-  double conv1_ms = 6;
-  double bias1_ms = 7;
-  double act1_ms = 8;
-  double pool1_ms = 9;
-  double conv2_ms = 10;
-  double bias2_ms = 11;
-  double act2_ms = 12;
-  double pool2_ms = 13;
-  double fc_ms = 14;
-  double bias_fc_ms = 15;
-  double decryption_ms = 16;
-  double total_ms = 17;
+  double encryption_ms = 5;           // Encrypt input pixels → ciphertext
+  double conv1_ms = 6;               // Conv1: 28×28 → 24×24 (5×5 kernel, ÷scale)
+  double bias1_ms = 7;               // Add Conv1 bias
+  double act1_ms = 8;                // Square activation x²/scale after Conv1
+  double pool1_ms = 9;               // AvgPool 2×2 (24×24 → 12×12)
+  double conv2_ms = 10;              // Conv2: 12×12 → 8×8 (5×5 kernel, ÷scale)
+  double bias2_ms = 11;              // Add Conv2 bias
+  double act2_ms = 12;               // Square activation x²/scale after Conv2
+  double pool2_ms = 13;              // AvgPool 2×2 (8×8 → 4×4)
+  double fc_ms = 14;                 // FC matmul: 16 → 10 (÷scale)
+  double bias_fc_ms = 15;            // Add FC bias
+  double decryption_ms = 16;         // Decrypt output → plaintext logits
+  double total_ms = 17;              // Total wall-clock time (encrypt → decrypt)
 
   // Model metadata
-  double float_model_accuracy = 18;
+  double float_model_accuracy = 18;  // Float model accuracy from training (e.g., 97.5)
+}
+
+// Real-time progress event streamed during PredictDigitStream
+message PredictProgressEvent {
+  // Event type: "layer_start", "layer_done", or "complete"
+  string event_type = 1;
+
+  // Layer identifier (e.g. "encrypt", "conv1", "bias1", "relu1", "pool1",
+  // "conv2", "bias2", "relu2", "pool2", "fc", "biasfc", "decrypt")
+  string layer = 2;
+
+  // Time in ms this layer took (only set for "layer_done" events)
+  double layer_ms = 3;
+
+  // Cumulative elapsed time since inference started (ms)
+  double elapsed_ms = 4;
+
+  // For "complete" event — the full prediction result
+  PredictResponse result = 5;
 }
