@@ -413,4 +413,162 @@ impl EncryptedInferenceEngine {
     pub fn scale_factor(&self) -> i64 {
         self.scale_factor
     }
+
+    /// Run encrypted inference with a progress callback after each layer.
+    ///
+    /// The callback receives `(layer_name, layer_ms, elapsed_ms)` after
+    /// each layer completes. This enables real-time streaming to clients.
+    pub fn predict_with_progress<F>(
+        &self,
+        pixels_0_255: &[i64],
+        mut on_layer_done: F,
+    ) -> Result<InferenceResult, InferenceError>
+    where
+        F: FnMut(&str, f64, f64),
+    {
+        if pixels_0_255.len() != 784 {
+            return Err(InferenceError::InvalidInput(format!(
+                "Expected 784 pixels (28×28), got {}",
+                pixels_0_255.len()
+            )));
+        }
+
+        let scaled = scale_pixels(pixels_0_255, self.scale_factor);
+        run_encrypted_inference_streaming(
+            &self.ctx,
+            &self.kp,
+            &self.weights,
+            &scaled,
+            self.scale_factor,
+            &mut on_layer_done,
+        )
+    }
+}
+
+/// Run the full encrypted CNN inference pipeline with progress callbacks.
+///
+/// Calls `on_layer_done(layer_name, layer_ms, elapsed_ms)` after each layer.
+pub fn run_encrypted_inference_streaming<F>(
+    ctx: &OpenFHEContext,
+    kp: &OpenFHEKeyPair,
+    w: &EncodedWeights,
+    scaled_pixels: &[i64],
+    scale_factor: i64,
+    on_layer_done: &mut F,
+) -> Result<InferenceResult, InferenceError>
+where
+    F: FnMut(&str, f64, f64),
+{
+    if scaled_pixels.len() != 784 {
+        return Err(InferenceError::InvalidInput(format!(
+            "Expected 784 scaled pixels, got {}",
+            scaled_pixels.len()
+        )));
+    }
+
+    let t_total = Instant::now();
+
+    // ---- Encrypt input ----
+    let t = Instant::now();
+    let input_pt = OpenFHEPlaintext::from_vec(ctx, scaled_pixels)?;
+    let encrypted_input = OpenFHECiphertext::encrypt(ctx, kp, &input_pt)?;
+    let encryption_ms = t.elapsed().as_secs_f64() * 1000.0;
+    on_layer_done("encrypt", encryption_ms, t_total.elapsed().as_secs_f64() * 1000.0);
+
+    // ---- Conv1 ----
+    let t = Instant::now();
+    let x = encrypted_input.conv2d(ctx, kp, &w.conv1_kernel, 28, 28, 5, 5, scale_factor)?;
+    let conv1_ms = t.elapsed().as_secs_f64() * 1000.0;
+    on_layer_done("conv1", conv1_ms, t_total.elapsed().as_secs_f64() * 1000.0);
+
+    // + Conv1 bias
+    let t = Instant::now();
+    let x = x.add(ctx, &w.conv1_bias)?;
+    let bias1_ms = t.elapsed().as_secs_f64() * 1000.0;
+    on_layer_done("bias1", bias1_ms, t_total.elapsed().as_secs_f64() * 1000.0);
+
+    // Square activation x²/S
+    let t = Instant::now();
+    let x = x.square_activate(ctx, kp, scale_factor)?;
+    let act1_ms = t.elapsed().as_secs_f64() * 1000.0;
+    on_layer_done("relu1", act1_ms, t_total.elapsed().as_secs_f64() * 1000.0);
+
+    // AvgPool 2×2 (24×24 → 12×12)
+    let t = Instant::now();
+    let x = x.avgpool(ctx, kp, 24, 24, 2, 2)?;
+    let pool1_ms = t.elapsed().as_secs_f64() * 1000.0;
+    on_layer_done("pool1", pool1_ms, t_total.elapsed().as_secs_f64() * 1000.0);
+
+    // ---- Conv2 ----
+    let t = Instant::now();
+    let x = x.conv2d(ctx, kp, &w.conv2_kernel, 12, 12, 5, 5, scale_factor)?;
+    let conv2_ms = t.elapsed().as_secs_f64() * 1000.0;
+    on_layer_done("conv2", conv2_ms, t_total.elapsed().as_secs_f64() * 1000.0);
+
+    // + Conv2 bias
+    let t = Instant::now();
+    let x = x.add(ctx, &w.conv2_bias)?;
+    let bias2_ms = t.elapsed().as_secs_f64() * 1000.0;
+    on_layer_done("bias2", bias2_ms, t_total.elapsed().as_secs_f64() * 1000.0);
+
+    // Square activation x²/S
+    let t = Instant::now();
+    let x = x.square_activate(ctx, kp, scale_factor)?;
+    let act2_ms = t.elapsed().as_secs_f64() * 1000.0;
+    on_layer_done("relu2", act2_ms, t_total.elapsed().as_secs_f64() * 1000.0);
+
+    // AvgPool 2×2 (8×8 → 4×4)
+    let t = Instant::now();
+    let x = x.avgpool(ctx, kp, 8, 8, 2, 2)?;
+    let pool2_ms = t.elapsed().as_secs_f64() * 1000.0;
+    on_layer_done("pool2", pool2_ms, t_total.elapsed().as_secs_f64() * 1000.0);
+
+    // ---- FC layer ----
+    let t = Instant::now();
+    let x = OpenFHECiphertext::matmul(ctx, kp, &w.fc_weights, &x, 10, 16, scale_factor)?;
+    let fc_ms = t.elapsed().as_secs_f64() * 1000.0;
+    on_layer_done("fc", fc_ms, t_total.elapsed().as_secs_f64() * 1000.0);
+
+    // + FC bias
+    let t = Instant::now();
+    let x = x.add(ctx, &w.fc_bias)?;
+    let bias_fc_ms = t.elapsed().as_secs_f64() * 1000.0;
+    on_layer_done("biasfc", bias_fc_ms, t_total.elapsed().as_secs_f64() * 1000.0);
+
+    // ---- Decrypt & classify ----
+    let t = Instant::now();
+    let output_pt = x.decrypt(ctx, kp)?;
+    let all_values = output_pt.to_vec()?;
+    let decryption_ms = t.elapsed().as_secs_f64() * 1000.0;
+    on_layer_done("decrypt", decryption_ms, t_total.elapsed().as_secs_f64() * 1000.0);
+
+    let total_ms = t_total.elapsed().as_secs_f64() * 1000.0;
+
+    let logits: Vec<i64> = all_values[..10].to_vec();
+    let predicted_digit = logits
+        .iter()
+        .enumerate()
+        .max_by_key(|&(_, v)| v)
+        .map(|(i, _)| i)
+        .unwrap_or(0);
+
+    Ok(InferenceResult {
+        predicted_digit,
+        logits,
+        timing: InferenceTiming {
+            encryption_ms,
+            conv1_ms,
+            bias1_ms,
+            act1_ms,
+            pool1_ms,
+            conv2_ms,
+            bias2_ms,
+            act2_ms,
+            pool2_ms,
+            fc_ms,
+            bias_fc_ms,
+            decryption_ms,
+            total_ms,
+        },
+    })
 }
