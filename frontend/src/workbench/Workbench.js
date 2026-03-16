@@ -55,16 +55,13 @@ export default function Workbench() {
     setResult(null);
     setActiveStep(0);
 
-    /* Start simulated layer-by-layer progress animation immediately */
-    progress.startSimulated();
-
     try {
-      const response = await predictDigit(pixels, 1000);
+      /* Try real SSE streaming first — returns the prediction result via the stream */
+      const requestBody = { pixels: pixels, scaleFactor: 1000 };
+      const response = await progress.startSSE(requestBody);
+
       setResult(response);
       setRunCount((c) => c + 1);
-
-      /* Mark all layers done and show real timings */
-      progress.markAllDone();
 
       /* Post-result animation: replay layers with real timing ratios */
       let elapsed = 0;
@@ -79,10 +76,35 @@ export default function Workbench() {
         const t = setTimeout(() => setActiveStep(step), elapsed);
         animTimers.current.push(t);
       }
-    } catch (err) {
-      setError(err.message);
-      setActiveStep(-1);
+    } catch (sseErr) {
+      /* SSE failed — fall back to simulated animation + regular predict */
+      console.warn("SSE streaming unavailable, falling back to simulated:", sseErr.message);
       progress.reset();
+      progress.startSimulated();
+
+      try {
+        const response = await predictDigit(pixels, 1000);
+        setResult(response);
+        setRunCount((c) => c + 1);
+        progress.markAllDone();
+
+        let elapsed = 0;
+        const timingKeys = LAYERS.map((l) => l.key);
+        animTimers.current.forEach(clearTimeout);
+        animTimers.current = [];
+
+        for (let step = 1; step <= LAYERS.length; step++) {
+          const key = timingKeys[step - 1];
+          const ms = key && response[key] ? response[key] : 60;
+          elapsed += Math.min(ms * 1.5, 500);
+          const t = setTimeout(() => setActiveStep(step), elapsed);
+          animTimers.current.push(t);
+        }
+      } catch (err) {
+        setError(err.message);
+        setActiveStep(-1);
+        progress.reset();
+      }
     } finally {
       setLoading(false);
     }

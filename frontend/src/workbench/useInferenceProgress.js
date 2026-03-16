@@ -187,8 +187,23 @@ export default function useInferenceProgress() {
               for (const line of lines) {
                 if (line.startsWith("data:")) {
                   try {
-                    const event = JSON.parse(line.slice(5).trim());
-                    handleSSEEvent(event, resolve);
+                    const data = JSON.parse(line.slice(5).trim());
+                    const eventType = data.eventType || data.type;
+
+                    if (eventType === "layer_done") {
+                      const idx = PIPELINE_LAYER_IDS.indexOf(data.layer);
+                      if (idx >= 0) {
+                        setLayerStatus((prev) => ({ ...prev, [data.layer]: "done" }));
+                        if (idx + 1 < PIPELINE_LAYER_IDS.length) {
+                          advanceToLayer(idx + 1);
+                        }
+                      }
+                    } else if (eventType === "complete") {
+                      markAllDone();
+                      resolve(data.result);
+                    } else if (eventType === "error") {
+                      reject(new Error(data.error || "Streaming inference failed"));
+                    }
                   } catch {
                     // Skip malformed events
                   }
@@ -204,21 +219,6 @@ export default function useInferenceProgress() {
           reject(err);
         });
     });
-
-    function handleSSEEvent(event, resolve) {
-      if (event.type === "layer_start") {
-        const idx = PIPELINE_LAYER_IDS.indexOf(event.layer);
-        if (idx >= 0) advanceToLayer(idx);
-      } else if (event.type === "layer_done") {
-        const idx = PIPELINE_LAYER_IDS.indexOf(event.layer);
-        if (idx >= 0) {
-          setLayerStatus((prev) => ({ ...prev, [event.layer]: "done" }));
-        }
-      } else if (event.type === "complete") {
-        markAllDone();
-        resolve(event.result);
-      }
-    }
   }, [cleanup, startClock, advanceToLayer, markAllDone]);
 
   return {
