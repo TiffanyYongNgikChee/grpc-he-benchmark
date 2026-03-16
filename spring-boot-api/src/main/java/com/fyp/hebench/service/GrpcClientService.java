@@ -9,8 +9,10 @@ import com.fyp.hebench.grpc.ComparisonBenchmarkResponse;         // Generated fr
 import com.fyp.hebench.grpc.HEServiceGrpc;        // Generated from .proto PredictResponse message
 import com.fyp.hebench.grpc.PredictRequest;         // Generated gRPC client stub
 import com.fyp.hebench.grpc.PredictResponse; // Injects config values
+import com.fyp.hebench.grpc.PredictProgressEvent; // Streaming progress event
 
 import java.util.concurrent.TimeUnit;
+import java.util.Iterator;
 
 import io.grpc.ManagedChannel;           // gRPC network connection handler
 import io.grpc.ManagedChannelBuilder;    // Builder to create the channel
@@ -305,5 +307,28 @@ public class GrpcClientService {
         response.setFloatModelAccuracy(result.getFloatModelAccuracy());
 
         return response;
+    }
+
+    /**
+     * Stream encrypted MNIST digit prediction with real-time layer progress
+     * 
+     * Uses server-streaming gRPC: Rust sends a PredictProgressEvent after each
+     * CNN layer completes. Spring Boot forwards these as SSE events to the frontend.
+     * 
+     * @param pixels - 784 pixel values (28×28 image, values 0-255)
+     * @param scaleFactor - Quantisation scale factor (default: 1000)
+     * @return Iterator of PredictProgressEvent from the Rust streaming RPC
+     */
+    public Iterator<PredictProgressEvent> predictDigitStream(java.util.List<Long> pixels, long scaleFactor) {
+        PredictRequest request = PredictRequest.newBuilder()
+                .addAllPixels(pixels)
+                .setScaleFactor(scaleFactor)
+                .build();
+
+        // Use blocking stub with server-streaming — returns an Iterator
+        // The blocking stub handles server-streaming RPCs by returning Iterator<T>
+        return stub
+                .withDeadlineAfter(5, TimeUnit.MINUTES)
+                .predictDigitStream(request);
     }
 }
