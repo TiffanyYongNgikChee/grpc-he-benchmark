@@ -18,6 +18,12 @@ openfhe_cpp_wrapper/build/
 # Java / Spring Boot
 spring-boot-api/target/
 
+# Frontend / React
+frontend/node_modules/
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+
 # Python
 .venv/
 __pycache__/
