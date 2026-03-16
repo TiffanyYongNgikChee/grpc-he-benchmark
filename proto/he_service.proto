@@ -27,6 +27,9 @@ service HEService {
 
   // Run encrypted MNIST digit inference (full HE-CNN pipeline)
   rpc PredictDigit(PredictRequest) returns (PredictResponse);
+
+  // Run encrypted MNIST digit inference with real-time layer progress streaming
+  rpc PredictDigitStream(PredictRequest) returns (stream PredictProgressEvent);
 }
 
 // Request to generate keys
@@ -137,4 +140,23 @@ message PredictResponse {
 
   // Model metadata
   double float_model_accuracy = 18;  // Float model accuracy from training (e.g., 97.5)
+}
+
+// Real-time progress event streamed during PredictDigitStream
+message PredictProgressEvent {
+  // Event type: "layer_start", "layer_done", or "complete"
+  string event_type = 1;
+
+  // Layer identifier (e.g. "encrypt", "conv1", "bias1", "relu1", "pool1",
+  // "conv2", "bias2", "relu2", "pool2", "fc", "biasfc", "decrypt")
+  string layer = 2;
+
+  // Time in ms this layer took (only set for "layer_done" events)
+  double layer_ms = 3;
+
+  // Cumulative elapsed time since inference started (ms)
+  double elapsed_ms = 4;
+
+  // For "complete" event — the full prediction result
+  PredictResponse result = 5;
 }
