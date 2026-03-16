@@ -1,9 +1,13 @@
 /**
  * API client for communicating with the Spring Boot backend.
- * All fetch calls to localhost:8080 go through here.
+ * All fetch calls go through here.
+ *
+ * To switch between local and EC2:
+ *   - Local dev:  REACT_APP_API_BASE is unset → defaults to localhost:8080
+ *   - EC2 deploy: REACT_APP_API_BASE=http://54.205.254.22:8080/api
  */
 
-const API_BASE = "http://localhost:8080/api";
+const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:8080/api";
 
 /**
  * Check if the backend server is running.
