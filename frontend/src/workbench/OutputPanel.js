@@ -14,7 +14,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip);
  * OutputPanel — Right column showing prediction results.
  * Light theme with clean, minimal style.
  */
-export default function OutputPanel({ result, error, loading, pixels }) {
+export default function OutputPanel({ result, error, loading, pixels, layerStatus, elapsedMs }) {
   /* Empty state */
   if (!result && !error && !loading) {
     return (
@@ -30,15 +30,51 @@ export default function OutputPanel({ result, error, loading, pixels }) {
     );
   }
 
-  /* Loading */
+  /* Loading — show progress */
   if (loading) {
+    const pipelineLayers = [
+      "encrypt", "conv1", "bias1", "relu1", "pool1",
+      "conv2", "bias2", "relu2", "pool2",
+      "fc", "biasfc", "decrypt",
+    ];
+    const doneCount = layerStatus
+      ? pipelineLayers.filter((id) => layerStatus[id] === "done").length
+      : 0;
+    const currentLayer = layerStatus
+      ? pipelineLayers.find((id) => layerStatus[id] === "processing")
+      : null;
+    const pct = Math.round((doneCount / pipelineLayers.length) * 100);
+    const elapsed = elapsedMs ? (elapsedMs / 1000).toFixed(1) : "0.0";
+
     return (
       <div className="flex flex-col items-center justify-center h-full">
+        {/* Spinner */}
         <svg className="animate-spin h-8 w-8 mb-3" style={{ color: "#f4743a" }} viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
-        <p className="text-xs" style={{ color: "#f4743a" }}>Encrypting & inferring…</p>
+
+        {/* Current layer label */}
+        <p className="text-xs font-medium mb-1" style={{ color: "#f4743a" }}>
+          {currentLayer ? `Processing: ${currentLayer.toUpperCase()}` : "Encrypting & inferring…"}
+        </p>
+
+        {/* Progress bar */}
+        <div className="w-full max-w-[180px] h-2 rounded-full overflow-hidden mb-2" style={{ background: "#e5e5e5" }}>
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${pct}%`,
+              background: "linear-gradient(90deg, #f4743a, #e03e52)",
+              transition: "width 0.5s ease",
+            }}
+          />
+        </div>
+
+        {/* Stats */}
+        <p className="text-[10px] font-mono" style={{ color: "#999" }}>
+          {doneCount}/{pipelineLayers.length} layers • {elapsed}s
+        </p>
       </div>
     );
   }

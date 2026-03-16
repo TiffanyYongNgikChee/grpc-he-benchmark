@@ -5,6 +5,7 @@ import MiniCanvas from "./MiniCanvas";
 import OutputPanel from "./OutputPanel";
 import MetricsStrip from "./MetricsStrip";
 import LibraryComparison from "./LibraryComparison";
+import useInferenceProgress from "./useInferenceProgress";
 import { checkHealth, predictDigit, runComparisonBenchmark } from "../api/client";
 
 /**
@@ -26,7 +27,8 @@ export default function Workbench() {
   const [error, setError] = useState(null);
   const [healthy, setHealthy] = useState(null);
 
-  /* Animation */
+  /* Animation — layer-by-layer progress */
+  const progress = useInferenceProgress();
   const [activeStep, setActiveStep] = useState(-1);
   const [hoveredLayer, setHoveredLayer] = useState(null);
   const [runCount, setRunCount] = useState(0);
@@ -53,12 +55,18 @@ export default function Workbench() {
     setResult(null);
     setActiveStep(0);
 
+    /* Start simulated layer-by-layer progress animation immediately */
+    progress.startSimulated();
+
     try {
       const response = await predictDigit(pixels, 1000);
       setResult(response);
       setRunCount((c) => c + 1);
 
-      /* Animate layers sequentially */
+      /* Mark all layers done and show real timings */
+      progress.markAllDone();
+
+      /* Post-result animation: replay layers with real timing ratios */
       let elapsed = 0;
       const timingKeys = LAYERS.map((l) => l.key);
       animTimers.current.forEach(clearTimeout);
@@ -74,15 +82,17 @@ export default function Workbench() {
     } catch (err) {
       setError(err.message);
       setActiveStep(-1);
+      progress.reset();
     } finally {
       setLoading(false);
     }
-  }, [pixels, loading]);
+  }, [pixels, loading, progress]);
 
   const handleReset = () => {
     setResult(null);
     setError(null);
     setActiveStep(-1);
+    progress.reset();
   };
 
   /* ─── Run library comparison ─── */
@@ -292,6 +302,7 @@ export default function Workbench() {
                 activeStep={activeStep}
                 hovered={hoveredLayer}
                 onHover={setHoveredLayer}
+                layerStatus={progress.running || result ? progress.layerStatus : null}
               />
             </div>
 
@@ -326,7 +337,14 @@ export default function Workbench() {
           {/* ── OUTPUT COLUMN ── */}
           <div className="flex-shrink-0" style={{ width: 240 }}>
             <SectionTitle>OUTPUT</SectionTitle>
-            <OutputPanel result={result} error={error} loading={loading} pixels={pixels} />
+            <OutputPanel
+              result={result}
+              error={error}
+              loading={loading}
+              pixels={pixels}
+              layerStatus={progress.layerStatus}
+              elapsedMs={progress.elapsedMs}
+            />
           </div>
         </div>
       </div>
