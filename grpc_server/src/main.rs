@@ -10,6 +10,8 @@ use tonic::{transport::Server, Request, Response, Status};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 
 use he_benchmark::encrypted_inference::EncryptedInferenceEngine;
 
@@ -1152,6 +1154,112 @@ impl HeService for HEServiceImpl {
             total_ms: result.timing.total_ms,
             float_model_accuracy: float_accuracy,
         }))
+    }
+
+    // ============================================
+    // PredictDigitStream — Streaming Encrypted MNIST Inference
+    // ============================================
+
+    type PredictDigitStreamStream =
+        ReceiverStream<Result<PredictProgressEvent, Status>>;
+
+    async fn predict_digit_stream(
+        &self,
+        request: Request<PredictRequest>,
+    ) -> Result<Response<Self::PredictDigitStreamStream>, Status> {
+        let req = request.into_inner();
+
+        println!("📥 Received PredictDigitStream request ({} pixels)", req.pixels.len());
+
+        if req.pixels.len() != 784 {
+            return Err(Status::invalid_argument(format!(
+                "Expected 784 pixels (28×28 image), got {}",
+                req.pixels.len()
+            )));
+        }
+
+        let engine = Arc::clone(&self.inference_engine);
+        let pixels = req.pixels;
+
+        // Create a channel for streaming progress events back to the client
+        let (tx, rx) = mpsc::channel(32);
+
+        tokio::task::spawn_blocking(move || {
+            let float_accuracy = engine.0.float_accuracy;
+
+            // Progress callback: sends an event for each completed layer
+            let tx_clone = tx.clone();
+            let mut progress_sender = move |layer: &str, layer_ms: f64, elapsed_ms: f64| {
+                let event = PredictProgressEvent {
+                    event_type: "layer_done".to_string(),
+                    layer: layer.to_string(),
+                    layer_ms,
+                    elapsed_ms,
+                    result: None,
+                };
+                // Use blocking_send since we're inside spawn_blocking
+                let _ = tx_clone.blocking_send(Ok(event));
+            };
+
+            let result = engine.0.predict_with_progress(&pixels, &mut progress_sender);
+
+            match result {
+                Ok(result) => {
+                    // Compute confidence
+                    let max_logit = *result.logits.iter().max().unwrap_or(&0) as f64;
+                    let sum_positive: f64 =
+                        result.logits.iter().filter(|&&v| v > 0).map(|&v| v as f64).sum();
+                    let confidence =
+                        if sum_positive > 0.0 { max_logit / sum_positive } else { 0.0 };
+
+                    println!(
+                        "   ✓ Stream: Predicted digit: {} (confidence: {:.2}%, time: {:.1}ms)",
+                        result.predicted_digit,
+                        confidence * 100.0,
+                        result.timing.total_ms
+                    );
+
+                    // Send final "complete" event with full result
+                    let final_response = PredictResponse {
+                        predicted_digit: result.predicted_digit as i32,
+                        logits: result.logits,
+                        confidence,
+                        status: "success".to_string(),
+                        encryption_ms: result.timing.encryption_ms,
+                        conv1_ms: result.timing.conv1_ms,
+                        bias1_ms: result.timing.bias1_ms,
+                        act1_ms: result.timing.act1_ms,
+                        pool1_ms: result.timing.pool1_ms,
+                        conv2_ms: result.timing.conv2_ms,
+                        bias2_ms: result.timing.bias2_ms,
+                        act2_ms: result.timing.act2_ms,
+                        pool2_ms: result.timing.pool2_ms,
+                        fc_ms: result.timing.fc_ms,
+                        bias_fc_ms: result.timing.bias_fc_ms,
+                        decryption_ms: result.timing.decryption_ms,
+                        total_ms: result.timing.total_ms,
+                        float_model_accuracy: float_accuracy,
+                    };
+
+                    let complete_event = PredictProgressEvent {
+                        event_type: "complete".to_string(),
+                        layer: String::new(),
+                        layer_ms: 0.0,
+                        elapsed_ms: result.timing.total_ms,
+                        result: Some(final_response),
+                    };
+                    let _ = tx.blocking_send(Ok(complete_event));
+                }
+                Err(e) => {
+                    let _ = tx.blocking_send(Err(Status::internal(format!(
+                        "Inference failed: {}",
+                        e
+                    ))));
+                }
+            }
+        });
+
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 }
 
