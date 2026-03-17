@@ -27,13 +27,20 @@ export async function checkHealth() {
  * POST /api/predict
  * @param {number[]} pixels - 784 pixel values (28×28 image)
  * @param {number} scaleFactor - BFV quantisation scale (default: 1000)
+ * @param {AbortSignal} [signal] - Optional AbortSignal to cancel the request
  */
-export async function predictDigit(pixels, scaleFactor = 1000) {
+export async function predictDigit(pixels, scaleFactor = 1000, signal) {
+  const timeoutSignal = AbortSignal.timeout(300_000); // 5 min — FHE inference can take ~27s+ per image
+  // Combine external signal (if provided) with timeout signal
+  const combinedSignal = signal
+    ? AbortSignal.any([signal, timeoutSignal])
+    : timeoutSignal;
+
   const res = await fetch(`${API_BASE}/predict`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ pixels, scaleFactor }),
-    signal: AbortSignal.timeout(300_000), // 5 min — FHE inference can take ~27s+ per image
+    signal: combinedSignal,
   });
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: "Unknown error" }));
@@ -67,15 +74,21 @@ export async function runBenchmark(library, numOperations = 10) {
  * @param {number} numOperations - How many times to repeat each operation
  * @param {number[]|null} testValues - Custom integers to encrypt (null = use defaults)
  */
-export async function runComparisonBenchmark(numOperations = 10, testValues = null) {
+export async function runComparisonBenchmark(numOperations = 10, testValues = null, signal) {
   const body = { library: "ALL", numOperations };
   if (testValues && testValues.length > 0) {
     body.testValues = testValues;
   }
+  const timeoutSignal = AbortSignal.timeout(180_000); // 3 min timeout
+  const combinedSignal = signal
+    ? AbortSignal.any([signal, timeoutSignal])
+    : timeoutSignal;
+
   const res = await fetch(`${API_BASE}/benchmark/compare`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal: combinedSignal,
   });
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: "Unknown error" }));

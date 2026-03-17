@@ -5,6 +5,7 @@ import MiniCanvas from "./MiniCanvas";
 import OutputPanel from "./OutputPanel";
 import MetricsStrip from "./MetricsStrip";
 import LibraryComparison from "./LibraryComparison";
+import MnistBatchBenchmark from "./MnistBatchBenchmark";
 import useInferenceProgress from "./useInferenceProgress";
 import { checkHealth, predictDigit, runComparisonBenchmark } from "../api/client";
 
@@ -38,6 +39,7 @@ export default function Workbench() {
   const [compData, setCompData] = useState(null);
   const [compLoading, setCompLoading] = useState(false);
   const [compError, setCompError] = useState(null);
+  const compAbortRef = useRef(null);
 
   /* Health check */
   useEffect(() => {
@@ -122,15 +124,28 @@ export default function Workbench() {
     if (compLoading) return;
     setCompLoading(true);
     setCompError(null);
+    const ac = new AbortController();
+    compAbortRef.current = ac;
     try {
-      const data = await runComparisonBenchmark(10, testValues);
+      const data = await runComparisonBenchmark(10, testValues, ac.signal);
       setCompData(data);
     } catch (err) {
-      setCompError(err.message);
+      if (err.name === "AbortError") {
+        setCompError("Benchmark cancelled.");
+      } else if (err.name === "TimeoutError") {
+        setCompError("Benchmark timed out after 3 minutes. The server may be overloaded — try again or reduce operations.");
+      } else {
+        setCompError(err.message);
+      }
     } finally {
+      compAbortRef.current = null;
       setCompLoading(false);
     }
   }, [compLoading]);
+
+  const handleCompCancel = useCallback(() => {
+    if (compAbortRef.current) compAbortRef.current.abort();
+  }, []);
 
   useEffect(() => () => animTimers.current.forEach(clearTimeout), []);
 
@@ -401,7 +416,31 @@ export default function Workbench() {
               loading={compLoading}
               error={compError}
               onRun={handleComparison}
+              onCancel={handleCompCancel}
             />
+          </div>
+        </div>
+      </div>
+
+      {/* ═══════════ MNIST BATCH BENCHMARK ═══════════ */}
+      <div className="px-4 md:px-8 py-8" style={{ background: "#ebeaea", borderTop: "1px solid #d9d9d9" }}>
+        <div className="max-w-[1100px] mx-auto">
+          <div className="flex items-center gap-3 mb-4">
+            <h3
+              className="text-xs font-medium uppercase tracking-widest"
+              style={{ color: "#888", letterSpacing: "0.12em" }}
+            >
+              MNIST BATCH BENCHMARK
+            </h3>
+            <span className="text-[10px]" style={{ color: "#bbb" }}>
+              10 test images • Encrypted CNN Inference
+            </span>
+          </div>
+          <div
+            className="rounded-lg p-5"
+            style={{ background: "#fafafa", border: "1px solid #e5e5e5" }}
+          >
+            <MnistBatchBenchmark />
           </div>
         </div>
       </div>

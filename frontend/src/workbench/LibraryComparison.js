@@ -69,7 +69,7 @@ const OPERATIONS = [
   { key: "decryptionTimeMs",     label: "Decrypt" },    // time to decrypt ciphertext → plaintext
 ];
 
-export default function LibraryComparison({ data, loading, error, onRun }) {
+export default function LibraryComparison({ data, loading, error, onRun, onCancel }) {
   // The user can type custom numbers to encrypt/benchmark (e.g. "42, 7, 100")
   // If left empty, the backend uses default sequential test data.
   const [inputValues, setInputValues] = useState("");
