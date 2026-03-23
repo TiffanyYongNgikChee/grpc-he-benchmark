@@ -263,13 +263,15 @@ public class GrpcClientService {
      * @param scaleFactor - Quantisation scale factor (default: 1000)
      * @return PredictResponse with predicted digit, confidence, timing breakdown
      */
-    public com.fyp.hebench.model.PredictResponse predictDigit(java.util.List<Long> pixels, long scaleFactor) {
+    public com.fyp.hebench.model.PredictResponse predictDigit(java.util.List<Long> pixels, long scaleFactor, int securityLevel) {
         // Step 1: Build Protobuf PredictRequest
         // .addAllPixels() converts Java List<Long> to protobuf repeated int64
         // .setScaleFactor() sets the quantisation scale (1000 = multiply weights by 1000)
+        // .setSecurityLevel() sets the HE security level (0=128, 1=192, 2=256)
         PredictRequest request = PredictRequest.newBuilder()
                 .addAllPixels(pixels)
                 .setScaleFactor(scaleFactor)
+                .setSecurityLevel(securityLevel)
                 .build();
 
         // Step 2: Call the Rust gRPC server's PredictDigit RPC
@@ -305,6 +307,7 @@ public class GrpcClientService {
 
         // Model metadata
         response.setFloatModelAccuracy(result.getFloatModelAccuracy());
+        response.setSecurityLevelLabel(result.getSecurityLevelLabel());
 
         return response;
     }
@@ -319,10 +322,11 @@ public class GrpcClientService {
      * @param scaleFactor - Quantisation scale factor (default: 1000)
      * @return Iterator of PredictProgressEvent from the Rust streaming RPC
      */
-    public Iterator<PredictProgressEvent> predictDigitStream(java.util.List<Long> pixels, long scaleFactor) {
+    public Iterator<PredictProgressEvent> predictDigitStream(java.util.List<Long> pixels, long scaleFactor, int securityLevel) {
         PredictRequest request = PredictRequest.newBuilder()
                 .addAllPixels(pixels)
                 .setScaleFactor(scaleFactor)
+                .setSecurityLevel(securityLevel)
                 .build();
 
         // Use blocking stub with server-streaming — returns an Iterator

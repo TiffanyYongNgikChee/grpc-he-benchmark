@@ -91,7 +91,8 @@ public class BenchmarkController {
             // Call the gRPC service which forwards to Rust server in Docker
             PredictResponse response = grpcClientService.predictDigit(
                 request.getPixels(), 
-                scaleFactor
+                scaleFactor,
+                request.getSecurityLevel()
             );
             return ResponseEntity.ok(response);
         } catch (io.grpc.StatusRuntimeException e) {
@@ -148,7 +149,7 @@ public class BenchmarkController {
         new Thread(() -> {
             try {
                 java.util.Iterator<com.fyp.hebench.grpc.PredictProgressEvent> stream = 
-                    grpcClientService.predictDigitStream(request.getPixels(), scaleFactor);
+                    grpcClientService.predictDigitStream(request.getPixels(), scaleFactor, request.getSecurityLevel());
 
                 while (stream.hasNext()) {
                     com.fyp.hebench.grpc.PredictProgressEvent event = stream.next();
@@ -222,6 +223,7 @@ public class BenchmarkController {
             sb.append(",\"decryptionMs\":").append(r.getDecryptionMs());
             sb.append(",\"totalMs\":").append(r.getTotalMs());
             sb.append(",\"floatModelAccuracy\":").append(r.getFloatModelAccuracy());
+            sb.append(",\"securityLevelLabel\":\"").append(r.getSecurityLevelLabel()).append("\"");
             sb.append("}");
         }
 
