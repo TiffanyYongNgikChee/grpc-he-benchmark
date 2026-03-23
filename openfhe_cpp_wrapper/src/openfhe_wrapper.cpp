@@ -52,13 +52,27 @@ static void set_error(const std::string& error) {
 // Context Management Implementation
 extern "C" OpenFHEContext* openfhe_create_bfv_context(
     uint64_t plaintext_modulus,
-    uint32_t multiplicative_depth
+    uint32_t multiplicative_depth,
+    uint32_t security_level
 ) {
     try {
         // Create encryption parameters for BFV
         CCParams<CryptoContextBFVRNS> parameters;
         parameters.SetPlaintextModulus(plaintext_modulus);
         parameters.SetMultiplicativeDepth(multiplicative_depth);
+
+        // Set security level: 0=128-bit (default), 1=192-bit, 2=256-bit
+        switch (security_level) {
+            case 1:
+                parameters.SetSecurityLevel(HEStd_192_classic);
+                break;
+            case 2:
+                parameters.SetSecurityLevel(HEStd_256_classic);
+                break;
+            default:
+                parameters.SetSecurityLevel(HEStd_128_classic);
+                break;
+        }
         
         // Generate crypto context
         CryptoContext<DCRTPoly> cryptoContext = GenCryptoContext(parameters);

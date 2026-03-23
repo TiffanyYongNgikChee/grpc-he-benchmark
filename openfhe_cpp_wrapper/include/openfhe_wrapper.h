@@ -19,10 +19,12 @@ typedef struct OpenFHECiphertext OpenFHECiphertext;
 /// Create a new OpenFHE BFV context
 /// @param plaintext_modulus: Plaintext modulus (e.g., 65537)
 /// @param multiplicative_depth: Multiplicative depth (e.g., 2)
+/// @param security_level: Security standard (0=128-bit, 1=192-bit, 2=256-bit)
 /// @return Pointer to context or NULL on failure
 OpenFHEContext* openfhe_create_bfv_context(
     uint64_t plaintext_modulus,
-    uint32_t multiplicative_depth
+    uint32_t multiplicative_depth,
+    uint32_t security_level
 );
 
 /// Destroy context and free memory
