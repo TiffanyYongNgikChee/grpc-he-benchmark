@@ -316,6 +316,8 @@ pub struct EncryptedInferenceEngine {
     kp: OpenFHEKeyPair,
     weights: EncodedWeights,
     scale_factor: i64,
+    /// Security level used (0=128-bit, 1=192-bit, 2=256-bit)
+    pub security_level: u32,
     /// Float model accuracy from training (for reference in responses)
     pub float_accuracy: f64,
 }
@@ -323,13 +325,27 @@ pub struct EncryptedInferenceEngine {
 impl EncryptedInferenceEngine {
     /// Initialize the engine: load weights, create BFV context, encode weights.
     ///
-    /// This takes ~2-5 seconds (keygen + weight encoding). Do it once at startup.
+    /// Uses 128-bit security (default). Do it once at startup (~2-5 seconds).
     ///
     /// # Arguments
     /// * `weights_dir` - Path to directory with CSV weight files + model_config.json
     ///                   (e.g., "mnist_training/weights")
     pub fn new(weights_dir: &str) -> Result<Self, InferenceError> {
-        println!("EncryptedInferenceEngine: Initializing...");
+        Self::new_with_security(weights_dir, 0)
+    }
+
+    /// Initialize the engine with a configurable security level.
+    ///
+    /// # Arguments
+    /// * `weights_dir` - Path to directory with CSV weight files + model_config.json
+    /// * `security_level` - 0=128-bit, 1=192-bit, 2=256-bit
+    pub fn new_with_security(weights_dir: &str, security_level: u32) -> Result<Self, InferenceError> {
+        let sec_label = match security_level {
+            1 => "192-bit",
+            2 => "256-bit",
+            _ => "128-bit",
+        };
+        println!("EncryptedInferenceEngine: Initializing ({} security)...", sec_label);
 
         // Load quantized weights from CSV
         let mnist_weights = MnistWeights::load(weights_dir)?;
@@ -353,9 +369,9 @@ impl EncryptedInferenceEngine {
             "  Creating BFV context (p={}, depth={})...",
             plaintext_modulus, mult_depth
         );
-        let ctx = OpenFHEContext::new_bfv(plaintext_modulus, mult_depth)?;
+        let ctx = OpenFHEContext::new_bfv_with_security(plaintext_modulus, mult_depth, security_level)?;
         let kp = OpenFHEKeyPair::generate(&ctx)?;
-        println!("  Keypair generated (128-bit security, with rotation keys)");
+        println!("  Keypair generated ({} security, with rotation keys)", sec_label);
 
         // Encode weights as OpenFHE plaintexts/ciphertexts
         let weights = mnist_weights.encode(&ctx, &kp)?;
@@ -367,6 +383,7 @@ impl EncryptedInferenceEngine {
             kp,
             weights,
             scale_factor,
+            security_level,
             float_accuracy,
         })
     }

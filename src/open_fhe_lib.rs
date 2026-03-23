@@ -52,14 +52,24 @@ pub struct OpenFHEContext {
 }
 
 impl OpenFHEContext {
-    /// Create a new OpenFHE BFV context
+    /// Create a new OpenFHE BFV context with 128-bit security (default)
     /// 
     /// # Parameters
     /// - plaintext_modulus: Plaintext modulus (e.g., 65537)
     /// - multiplicative_depth: Multiplicative depth (e.g., 2)
     pub fn new_bfv(plaintext_modulus: u64, multiplicative_depth: u32) -> Result<Self> {
+        Self::new_bfv_with_security(plaintext_modulus, multiplicative_depth, 0)
+    }
+
+    /// Create a new OpenFHE BFV context with configurable security level
+    ///
+    /// # Parameters
+    /// - plaintext_modulus: Plaintext modulus (e.g., 65537)
+    /// - multiplicative_depth: Multiplicative depth (e.g., 2)
+    /// - security_level: 0=128-bit, 1=192-bit, 2=256-bit
+    pub fn new_bfv_with_security(plaintext_modulus: u64, multiplicative_depth: u32, security_level: u32) -> Result<Self> {
         let ptr = unsafe {
-            open_fhe_binding::openfhe_create_bfv_context(plaintext_modulus, multiplicative_depth)
+            open_fhe_binding::openfhe_create_bfv_context(plaintext_modulus, multiplicative_depth, security_level)
         };
         
         NonNull::new(ptr)

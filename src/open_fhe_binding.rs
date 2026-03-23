@@ -32,6 +32,7 @@ unsafe extern "C" {
     pub fn openfhe_create_bfv_context(
         plaintext_modulus: c_ulonglong,
         multiplicative_depth: c_uint,
+        security_level: c_uint,
     ) -> *mut OpenFHEContext;
     
     pub fn openfhe_destroy_context(ctx: *mut OpenFHEContext);
