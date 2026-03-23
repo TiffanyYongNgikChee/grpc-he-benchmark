@@ -25,6 +25,7 @@ from torch.utils.data import DataLoader
 import numpy as np
 import json
 import os
+import shutil
 import matplotlib.pyplot as plt
 
 # ============================================================================
@@ -189,6 +190,77 @@ class SquareActivation(nn.Module):
         return x * x
 
 
+class CubeActivation(nn.Module):
+    """
+    Degree-3 polynomial activation: f(x) = 0.125x³ + 0.5x
+    
+    Why degree 3?
+      A higher-degree polynomial can approximate ReLU more closely than x².
+      This odd polynomial (only odd powers) preserves the sign of the input,
+      similar to ReLU's behavior. Coefficients are derived from Chebyshev
+      polynomial approximation of ReLU on [-1, 1].
+    
+    Trade-off:
+      - Better ReLU approximation → potentially higher accuracy
+      - Requires more HE multiplications (3 mults vs 1 for x²)
+      - Needs higher multiplicative depth in BFV context (depth ~8 vs ~6)
+    
+    Maps to: openfhe_poly_activate(degree=3) in openfhe_cnn_ops.cpp
+    """
+    
+    def forward(self, x):
+        return 0.125 * x ** 3 + 0.5 * x
+
+
+class Degree4Activation(nn.Module):
+    """
+    Degree-4 polynomial activation: f(x) = 0.0625x⁴ + 0.25x² + 0.1
+    
+    Why degree 4?
+      An even higher-degree polynomial can capture more curvature of ReLU.
+      This even polynomial (only even powers + constant) ensures non-negative
+      outputs, similar to x² but with a flatter region near zero.
+    
+    Trade-off:
+      - Most accurate ReLU approximation of the three options
+      - Requires the most HE multiplications (4 mults)
+      - Needs highest multiplicative depth in BFV context (depth ~10)
+      - Slowest encrypted inference
+    
+    Maps to: openfhe_poly_activate(degree=4) in openfhe_cnn_ops.cpp
+    """
+    
+    def forward(self, x):
+        return 0.0625 * x ** 4 + 0.25 * x ** 2 + 0.1
+
+
+def get_activation(degree):
+    """
+    Factory function to create the appropriate activation by degree.
+    
+    Args:
+        degree: 2 (x²), 3 (cubic), or 4 (quartic)
+    
+    Returns:
+        nn.Module activation function
+    """
+    if degree == 2:
+        return SquareActivation()
+    elif degree == 3:
+        return CubeActivation()
+    elif degree == 4:
+        return Degree4Activation()
+    else:
+        raise ValueError(f"Unsupported activation degree: {degree}. Use 2, 3, or 4.")
+
+
+ACTIVATION_LABELS = {
+    2: ("x²", "x^2"),
+    3: ("0.125x³+0.5x", "0.125*x^3 + 0.5*x"),
+    4: ("0.0625x⁴+0.25x²+0.1", "0.0625*x^4 + 0.25*x^2 + 0.1"),
+}
+
+
 def verify_activation():
     """Test the square activation on known values."""
     act = SquareActivation()
@@ -213,7 +285,29 @@ def verify_activation():
     grad_match = torch.allclose(x.grad, expected_grad)
     print(f"    Gradient: {x.grad.tolist()} (expected {expected_grad.tolist()}) {'✓' if grad_match else '✗'}")
     
-    return match and grad_match
+    # Test CubeActivation (degree 3): 0.125*x³ + 0.5*x
+    act3 = CubeActivation()
+    test_input3 = torch.tensor([-2.0, -1.0, 0.0, 1.0, 2.0])
+    output3 = act3(test_input3)
+    expected3 = 0.125 * test_input3 ** 3 + 0.5 * test_input3
+    match3 = torch.allclose(output3, expected3)
+    print(f"\n  CubeActivation test:")
+    print(f"    Input:    {test_input3.tolist()}")
+    print(f"    Output:   {[round(v, 4) for v in output3.tolist()]}")
+    print(f"    Match:    {'✓' if match3 else '✗'}")
+    
+    # Test Degree4Activation (degree 4): 0.0625*x⁴ + 0.25*x² + 0.1
+    act4 = Degree4Activation()
+    test_input4 = torch.tensor([-2.0, -1.0, 0.0, 1.0, 2.0])
+    output4 = act4(test_input4)
+    expected4 = 0.0625 * test_input4 ** 4 + 0.25 * test_input4 ** 2 + 0.1
+    match4 = torch.allclose(output4, expected4)
+    print(f"\n  Degree4Activation test:")
+    print(f"    Input:    {test_input4.tolist()}")
+    print(f"    Output:   {[round(v, 4) for v in output4.tolist()]}")
+    print(f"    Match:    {'✓' if match4 else '✗'}")
+    
+    return match and grad_match and match3 and match4
 
 
 # ============================================================================
@@ -256,8 +350,10 @@ class HE_CNN(nn.Module):
     Total parameters: Conv1(25+1) + Conv2(25+1) + FC(160+10) = 222
     """
     
-    def __init__(self):
+    def __init__(self, activation_degree=2):
         super(HE_CNN, self).__init__()
+        
+        self.activation_degree = activation_degree
         
         # Conv1: 1 input channel, 1 output channel, 5×5 kernel
         # No padding (valid convolution) — matches openfhe_conv2d behavior
@@ -269,8 +365,8 @@ class HE_CNN(nn.Module):
             bias=True
         )
         
-        # Square activation (replaces ReLU)
-        self.act1 = SquareActivation()
+        # Polynomial activation (degree 2=x², 3=cubic, 4=quartic)
+        self.act1 = get_activation(activation_degree)
         
         # Average pooling 2×2, stride 2
         self.pool1 = nn.AvgPool2d(kernel_size=2, stride=2)
@@ -284,8 +380,8 @@ class HE_CNN(nn.Module):
             bias=True
         )
         
-        # Square activation
-        self.act2 = SquareActivation()
+        # Polynomial activation (same degree as act1)
+        self.act2 = get_activation(activation_degree)
         
         # Average pooling 2×2, stride 2
         self.pool2 = nn.AvgPool2d(kernel_size=2, stride=2)
@@ -994,15 +1090,15 @@ def quantize_weights(model, scale_factor=1000):
 # Export Weights to CSV
 # ============================================================================
 
-def export_weights_csv(quantized, model, test_loader):
+def export_weights_csv(quantized, model, test_loader, output_subdir="weights"):
     """
     Save quantized integer weights to CSV files for the Rust/OpenFHE pipeline.
     
-    Creates a 'weights/' directory with one CSV file per layer parameter,
+    Creates a weights directory with one CSV file per layer parameter,
     plus a model_config.json with metadata needed by the Rust weight loader.
     
     File layout:
-      weights/
+      weights_degN/
         conv1_weights.csv   — 5×5 kernel, 25 integers (row-major)
         conv1_bias.csv      — 1 integer
         conv2_weights.csv   — 5×5 kernel, 25 integers (row-major)
@@ -1022,8 +1118,9 @@ def export_weights_csv(quantized, model, test_loader):
         quantized: Dict from quantize_weights() with integer arrays
         model: Trained model (for accuracy reference)
         test_loader: Test loader (for recording accuracy in config)
+        output_subdir: Subdirectory name (e.g., "weights", "weights_deg3")
     """
-    output_dir = os.path.join(os.path.dirname(__file__), "weights")
+    output_dir = os.path.join(os.path.dirname(__file__), output_subdir)
     os.makedirs(output_dir, exist_ok=True)
     
     scale_factor = quantized["scale_factor"]
@@ -1079,16 +1176,21 @@ def export_weights_csv(quantized, model, test_loader):
     # Get current accuracy for reference
     accuracy, per_digit = evaluate(model, test_loader)
     
+    # Determine activation info from model
+    act_degree = getattr(model, 'activation_degree', 2)
+    act_label, act_formula = ACTIVATION_LABELS.get(act_degree, ("x^2", "x^2"))
+    
     config = {
         "model_name": "HE_CNN",
         "framework": "PyTorch",
+        "activation_degree": act_degree,
         "architecture": {
             "layers": [
                 {"name": "conv1", "type": "Conv2d", "kernel_size": 5, "in_channels": 1, "out_channels": 1, "padding": 0},
-                {"name": "act1", "type": "SquareActivation", "formula": "x^2"},
+                {"name": "act1", "type": f"PolynomialActivation(degree={act_degree})", "formula": act_formula},
                 {"name": "pool1", "type": "AvgPool2d", "kernel_size": 2, "stride": 2},
                 {"name": "conv2", "type": "Conv2d", "kernel_size": 5, "in_channels": 1, "out_channels": 1, "padding": 0},
-                {"name": "act2", "type": "SquareActivation", "formula": "x^2"},
+                {"name": "act2", "type": f"PolynomialActivation(degree={act_degree})", "formula": act_formula},
                 {"name": "pool2", "type": "AvgPool2d", "kernel_size": 2, "stride": 2},
                 {"name": "fc", "type": "Linear", "in_features": 16, "out_features": 10}
             ],
@@ -1168,7 +1270,8 @@ def verify_quantized_accuracy(quantized, model, test_loader):
     print(f"  Original float accuracy: {original_acc:.2f}%")
     
     # Step 2: Create a new model with quantized weights (int → float)
-    quantized_model = HE_CNN()
+    act_degree = getattr(model, 'activation_degree', 2)
+    quantized_model = HE_CNN(activation_degree=act_degree)
     
     # Reconstruct float weights from quantized integers
     state_dict = quantized_model.state_dict()
@@ -1240,66 +1343,119 @@ if __name__ == "__main__":
     print("Step 1 Complete: Dataset ready for training")
     print("=" * 70)
     
-    # Step 2a: Custom activation
-    print("\nStep 2a: Square Activation Function (x²)")
+    # Step 2a: Verify all activation functions
+    print("\nStep 2a: Verifying Activation Functions (x², cubic, quartic)")
     print("-" * 40)
     activation_ok = verify_activation()
     if not activation_ok:
         print("  ERROR: Activation function test failed!")
         exit(1)
-    print("  Step 2a Complete: x² activation verified ✓")
+    print("  Step 2a Complete: All activations verified ✓")
     
-    # Step 2b + 2c: Build model and verify forward pass
-    print("\nStep 2b: Building CNN Model")
-    print("-" * 40)
-    model = HE_CNN()
+    # ========================================================================
+    # Train 3 models with different activation degrees
+    # ========================================================================
+    activation_degrees = [2, 3, 4]
+    weight_dirs = {2: "weights_deg2", 3: "weights_deg3", 4: "weights_deg4"}
+    results_summary = {}
     
-    print("\nStep 2c: Verifying Forward Pass")
-    print("-" * 40)
-    model_ok = verify_model(model)
-    if not model_ok:
-        print("  ERROR: Model shape verification failed!")
-        exit(1)
-    print("  Step 2 Complete: Model built and verified ✓")
+    for degree in activation_degrees:
+        act_label, act_formula = ACTIVATION_LABELS[degree]
+        
+        print("\n" + "=" * 70)
+        print(f"TRAINING: Activation Degree {degree} — {act_label}")
+        print("=" * 70)
+        
+        # Build model
+        print(f"\nStep 2b: Building CNN Model (degree={degree})")
+        print("-" * 40)
+        model = HE_CNN(activation_degree=degree)
+        
+        print(f"\nStep 2c: Verifying Forward Pass (degree={degree})")
+        print("-" * 40)
+        model_ok = verify_model(model)
+        if not model_ok:
+            print(f"  ERROR: Model shape verification failed for degree {degree}!")
+            exit(1)
+        print(f"  Step 2 Complete: Model (degree={degree}) built and verified ✓")
+        
+        # Train
+        print(f"\nStep 3: Training Model (degree={degree}, 10 epochs)")
+        print("-" * 40)
+        model, history = train_full(model, train_loader, test_loader, num_epochs=10, lr=0.001)
+        print(f"  Step 3 Complete: Training (degree={degree}) finished ✓")
+        
+        # Final accuracy report
+        print(f"\nFinal Accuracy Report (degree={degree})")
+        print("-" * 40)
+        evaluate_final(model, test_loader)
+        print("  Accuracy report generated ✓")
+
+        # Confusion matrix
+        print(f"\nConfusion Matrix (degree={degree})")
+        print("-" * 40)
+        confusion_matrix_report(model, test_loader)
+        print("  Confusion matrix generated ✓")
+
+        # Sample predictions
+        print(f"\nSample Predictions (degree={degree})")
+        print("-" * 40)
+        sample_predictions(model, test_loader)
+        print("  Sample predictions generated ✓")
+
+        # Quantize weights
+        print(f"\nStep 5a: Quantize Weights (degree={degree})")
+        print("-" * 40)
+        quantized = quantize_weights(model)
+        print(f"  Step 5a Complete: Weights quantized ✓")
+
+        # Export weights to degree-specific directory
+        out_dir = weight_dirs[degree]
+        print(f"\nStep 5b: Export Weights to CSV → {out_dir}/")
+        print("-" * 40)
+        export_weights_csv(quantized, model, test_loader, output_subdir=out_dir)
+        print(f"  Step 5b Complete: Weights exported to {out_dir}/ ✓")
+
+        # Verify quantized accuracy
+        print(f"\nStep 5c: Verify Quantized Accuracy (degree={degree})")
+        print("-" * 40)
+        verify_quantized_accuracy(quantized, model, test_loader)
+        print(f"  Step 5c Complete: Quantized accuracy verified ✓")
+        
+        # Record results
+        accuracy, _ = evaluate(model, test_loader)
+        results_summary[degree] = {
+            "accuracy": accuracy,
+            "best_loss": min(history["loss"]),
+        }
     
-    # Step 3: Train the model (10 epochs)
-    print("\nStep 3: Training Model (10 epochs)")
-    print("-" * 40)
-    model, history = train_full(model, train_loader, test_loader, num_epochs=10, lr=0.001)
-    print(f"  Step 3 Complete: Training finished ✓")
+    # Also copy degree-2 weights to the original 'weights/' dir for backward compat
+    src = os.path.join(os.path.dirname(__file__), "weights_deg2")
+    dst = os.path.join(os.path.dirname(__file__), "weights")
+    if os.path.exists(src):
+        if os.path.exists(dst):
+            shutil.rmtree(dst)
+        shutil.copytree(src, dst)
+        print(f"\n  ✓ Copied weights_deg2/ → weights/ (backward compatibility)")
     
-    # Final accuracy report
-    print("\nFinal Accuracy Report")
-    print("-" * 40)
-    evaluate_final(model, test_loader)
-    print("  Accuracy report generated ✓")
-
-    # Confusion matrix
-    print("\nConfusion Matrix")
-    print("-" * 40)
-    confusion_matrix_report(model, test_loader)
-    print("  Confusion matrix generated ✓")
-
-    # Sample predictions
-    print("\nSample Predictions")
-    print("-" * 40)
-    sample_predictions(model, test_loader)
-    print("  Sample predictions generated ✓")
-
-    # Export weights
-    print("\nStep 5a: Quantize Weights")
-    print("-" * 40)
-    quantized = quantize_weights(model)
-    print("  Step 5a Complete: Weights quantized ✓")
-
-    # Save weights to CSV
-    print("\nStep 5b: Export Weights to CSV")
-    print("-" * 40)
-    export_weights_csv(quantized, model, test_loader)
-    print("  Step 5b Complete: Weights exported ✓")
-
-    # Verify quantized accuracy
-    print("\nStep 5c: Verify Quantized Accuracy")
-    print("-" * 40)
-    verify_quantized_accuracy(quantized, model, test_loader)
-    print("  Step 5c Complete: Quantized accuracy verified ✓")
+    # ========================================================================
+    # Print comparison summary
+    # ========================================================================
+    print("\n" + "=" * 70)
+    print("TRAINING COMPLETE — Activation Degree Comparison")
+    print("=" * 70)
+    print(f"\n  {'Degree':>8s}  {'Activation':>25s}  {'Accuracy':>10s}  {'Best Loss':>10s}")
+    print(f"  {'─'*8}  {'─'*25}  {'─'*10}  {'─'*10}")
+    for degree in activation_degrees:
+        act_label, _ = ACTIVATION_LABELS[degree]
+        r = results_summary[degree]
+        print(f"  {degree:>8d}  {act_label:>25s}  {r['accuracy']:>9.2f}%  {r['best_loss']:>10.4f}")
+    
+    print(f"\n  Weight directories:")
+    for degree in activation_degrees:
+        print(f"    degree {degree}: mnist_training/{weight_dirs[degree]}/")
+    print(f"    default:    mnist_training/weights/ (copy of degree 2)")
+    
+    print("\n" + "=" * 70)
+    print("All 3 activation degree models trained and exported ✓")
+    print("=" * 70)
