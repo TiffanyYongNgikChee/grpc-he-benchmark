@@ -1104,6 +1104,12 @@ impl HeService for HEServiceImpl {
         // Clone the Arc so we can move it into the blocking task
         let engine = Arc::clone(&self.inference_engine);
         let pixels = req.pixels;
+        let sec_level = engine.0.security_level;
+        let sec_label = match sec_level {
+            1 => "192-bit".to_string(),
+            2 => "256-bit".to_string(),
+            _ => "128-bit".to_string(),
+        };
 
         // Run inference on a blocking thread (FFI calls are not async-safe)
         let (result, float_accuracy) = tokio::task::spawn_blocking(move || {
@@ -1153,6 +1159,7 @@ impl HeService for HEServiceImpl {
             decryption_ms: result.timing.decryption_ms,
             total_ms: result.timing.total_ms,
             float_model_accuracy: float_accuracy,
+            security_level_label: sec_label,
         }))
     }
 
@@ -1180,6 +1187,12 @@ impl HeService for HEServiceImpl {
 
         let engine = Arc::clone(&self.inference_engine);
         let pixels = req.pixels;
+        let sec_level = engine.0.security_level;
+        let sec_label = match sec_level {
+            1 => "192-bit".to_string(),
+            2 => "256-bit".to_string(),
+            _ => "128-bit".to_string(),
+        };
 
         // Create a channel for streaming progress events back to the client
         let (tx, rx) = mpsc::channel(32);
@@ -1239,6 +1252,7 @@ impl HeService for HEServiceImpl {
                         decryption_ms: result.timing.decryption_ms,
                         total_ms: result.timing.total_ms,
                         float_model_accuracy: float_accuracy,
+                        security_level_label: sec_label,
                     };
 
                     let complete_event = PredictProgressEvent {
@@ -1273,10 +1287,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // This takes ~2-5 seconds — done once at startup
     let weights_dir = std::env::var("MNIST_WEIGHTS_DIR")
         .unwrap_or_else(|_| "mnist_training/weights".to_string());
-    println!("Initializing encrypted inference engine (weights: {})...", weights_dir);
-    let engine = EncryptedInferenceEngine::new(&weights_dir)
+    let security_level: u32 = std::env::var("HE_SECURITY_LEVEL")
+        .unwrap_or_else(|_| "0".to_string())
+        .parse()
+        .unwrap_or(0);
+    let sec_label = match security_level {
+        1 => "192-bit",
+        2 => "256-bit",
+        _ => "128-bit",
+    };
+    println!("Initializing encrypted inference engine (weights: {}, security: {})...", weights_dir, sec_label);
+    let engine = EncryptedInferenceEngine::new_with_security(&weights_dir, security_level)
         .expect("Failed to initialize EncryptedInferenceEngine");
-    println!("Encrypted inference engine ready (float accuracy: {:.2}%)\n", engine.float_accuracy);
+    println!("Encrypted inference engine ready (float accuracy: {:.2}%, security: {})\n", engine.float_accuracy, sec_label);
 
     let service = HEServiceImpl::new(engine);
 
