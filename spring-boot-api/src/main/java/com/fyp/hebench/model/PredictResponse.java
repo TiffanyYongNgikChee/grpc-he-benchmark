@@ -44,6 +44,7 @@ public class PredictResponse {
     // === Model metadata ===
     private double floatModelAccuracy; // Plaintext model accuracy (e.g., 87.68)
     private String securityLevelLabel; // Security level used (e.g., "128-bit", "192-bit", "256-bit")
+    private int activationDegree;      // Polynomial activation degree used (2, 3, or 4)
 
     // Default constructor required by Spring for JSON serialisation
     public PredictResponse() {}
@@ -106,4 +107,7 @@ public class PredictResponse {
 
     public String getSecurityLevelLabel() { return securityLevelLabel; }
     public void setSecurityLevelLabel(String securityLevelLabel) { this.securityLevelLabel = securityLevelLabel; }
+
+    public int getActivationDegree() { return activationDegree; }
+    public void setActivationDegree(int activationDegree) { this.activationDegree = activationDegree; }
 }

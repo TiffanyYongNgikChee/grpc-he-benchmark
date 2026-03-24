@@ -115,6 +115,7 @@ message PredictRequest {
   repeated int64 pixels = 1;          // 784 pixel values (28×28 image, row-major, 0-255 range)
   int64 scale_factor = 2;             // Quantization scale factor (default: 1000)
   int32 security_level = 3;           // Security level: 0=128-bit (default), 1=192-bit, 2=256-bit
+  int32 activation_degree = 4;        // Polynomial activation degree: 2=x² (default), 3=cubic, 4=quartic
 }
 
 // Response from encrypted MNIST digit prediction
@@ -142,6 +143,7 @@ message PredictResponse {
   // Model metadata
   double float_model_accuracy = 18;  // Float model accuracy from training (e.g., 97.5)
   string security_level_label = 19;  // Security level used (e.g., "128-bit", "192-bit", "256-bit")
+  int32 activation_degree = 20;      // Polynomial activation degree used (2, 3, or 4)
 }
 
 // Real-time progress event streamed during PredictDigitStream

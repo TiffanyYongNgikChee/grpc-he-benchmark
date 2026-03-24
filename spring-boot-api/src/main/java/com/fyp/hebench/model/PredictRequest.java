@@ -18,6 +18,7 @@ public class PredictRequest {
     private List<Long> pixels;
     private long scaleFactor;
     private int securityLevel;  // 0=128-bit (default), 1=192-bit, 2=256-bit
+    private int activationDegree;  // 2=x² (default), 3=cubic, 4=quartic
 
     // Default constructor required by Spring for JSON deserialisation
     public PredictRequest() {}
@@ -33,10 +34,19 @@ public class PredictRequest {
         this.securityLevel = securityLevel;
     }
 
+    public PredictRequest(List<Long> pixels, long scaleFactor, int securityLevel, int activationDegree) {
+        this.pixels = pixels;
+        this.scaleFactor = scaleFactor;
+        this.securityLevel = securityLevel;
+        this.activationDegree = activationDegree;
+    }
+
     public List<Long> getPixels() { return pixels; }
     public void setPixels(List<Long> pixels) { this.pixels = pixels; }
     public long getScaleFactor() { return scaleFactor; }
     public void setScaleFactor(long scaleFactor) { this.scaleFactor = scaleFactor; }
     public int getSecurityLevel() { return securityLevel; }
     public void setSecurityLevel(int securityLevel) { this.securityLevel = securityLevel; }
+    public int getActivationDegree() { return activationDegree; }
+    public void setActivationDegree(int activationDegree) { this.activationDegree = activationDegree; }
 }

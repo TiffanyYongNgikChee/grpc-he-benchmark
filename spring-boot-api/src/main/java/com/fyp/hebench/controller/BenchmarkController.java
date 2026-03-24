@@ -224,6 +224,7 @@ public class BenchmarkController {
             sb.append(",\"totalMs\":").append(r.getTotalMs());
             sb.append(",\"floatModelAccuracy\":").append(r.getFloatModelAccuracy());
             sb.append(",\"securityLevelLabel\":\"").append(r.getSecurityLevelLabel()).append("\"");
+            sb.append(",\"activationDegree\":").append(r.getActivationDegree());
             sb.append("}");
         }
 

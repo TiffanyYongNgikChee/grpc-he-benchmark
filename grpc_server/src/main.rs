@@ -1110,6 +1110,7 @@ impl HeService for HEServiceImpl {
             2 => "256-bit".to_string(),
             _ => "128-bit".to_string(),
         };
+        let act_degree = engine.0.activation_degree;
 
         // Run inference on a blocking thread (FFI calls are not async-safe)
         let (result, float_accuracy) = tokio::task::spawn_blocking(move || {
@@ -1160,6 +1161,7 @@ impl HeService for HEServiceImpl {
             total_ms: result.timing.total_ms,
             float_model_accuracy: float_accuracy,
             security_level_label: sec_label,
+            activation_degree: act_degree as i32,
         }))
     }
 
@@ -1193,6 +1195,7 @@ impl HeService for HEServiceImpl {
             2 => "256-bit".to_string(),
             _ => "128-bit".to_string(),
         };
+        let act_degree = engine.0.activation_degree;
 
         // Create a channel for streaming progress events back to the client
         let (tx, rx) = mpsc::channel(32);
@@ -1253,6 +1256,7 @@ impl HeService for HEServiceImpl {
                         total_ms: result.timing.total_ms,
                         float_model_accuracy: float_accuracy,
                         security_level_label: sec_label,
+                        activation_degree: act_degree as i32,
                     };
 
                     let complete_event = PredictProgressEvent {
@@ -1299,7 +1303,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Initializing encrypted inference engine (weights: {}, security: {})...", weights_dir, sec_label);
     let engine = EncryptedInferenceEngine::new_with_security(&weights_dir, security_level)
         .expect("Failed to initialize EncryptedInferenceEngine");
-    println!("Encrypted inference engine ready (float accuracy: {:.2}%, security: {})\n", engine.float_accuracy, sec_label);
+    let act_label = match engine.activation_degree {
+        3 => "degree-3 (0.125x³+0.5x)",
+        4 => "degree-4 (0.0625x⁴+0.25x²+0.1)",
+        _ => "degree-2 (x²)",
+    };
+    println!(
+        "Encrypted inference engine ready (float accuracy: {:.2}%, security: {}, activation: {})\n",
+        engine.float_accuracy, sec_label, act_label
+    );
 
     let service = HEServiceImpl::new(engine);
 

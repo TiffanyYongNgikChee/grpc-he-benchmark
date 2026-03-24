@@ -308,6 +308,7 @@ public class GrpcClientService {
         // Model metadata
         response.setFloatModelAccuracy(result.getFloatModelAccuracy());
         response.setSecurityLevelLabel(result.getSecurityLevelLabel());
+        response.setActivationDegree(result.getActivationDegree());
 
         return response;
     }
