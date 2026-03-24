@@ -118,6 +118,9 @@ pub struct ModelConfig {
     pub input_shape: [usize; 4],
     /// Output dimensions [batch, classes]
     pub output_shape: [usize; 2],
+    /// Polynomial activation degree (2 = x², 3 = cubic, 4 = quartic)
+    /// Defaults to 2 if not present in model_config.json
+    pub activation_degree: u32,
 }
 
 // ============================================================================
@@ -323,6 +326,9 @@ impl MnistWeights {
         let float_accuracy = get_num("float_model")?;
         let total_parameters = get_num("total_parameters")? as usize;
 
+        // Parse activation_degree (optional, default to 2 for backward compatibility)
+        let activation_degree = get_num("activation_degree").unwrap_or(2.0) as u32;
+
         // Parse input_shape array [1, 1, 28, 28]
         let input_shape = Self::parse_shape_array(&content, "input_shape", 4)?;
         let output_shape = Self::parse_shape_array(&content, "output_shape", 2)?;
@@ -335,6 +341,7 @@ impl MnistWeights {
             total_parameters,
             input_shape: [input_shape[0], input_shape[1], input_shape[2], input_shape[3]],
             output_shape: [output_shape[0], output_shape[1]],
+            activation_degree,
         })
     }
 

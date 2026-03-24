@@ -461,6 +461,63 @@ pub fn square_activate(
         })
 }
 
+/// General polynomial activation using decrypt→compute→re-encrypt approach
+///
+/// Evaluates a polynomial with integer-scaled coefficients using Horner's
+/// method in 64-bit integer space, then divides by (coeff_scale * divisor).
+///
+/// # Supported polynomials
+/// - **Degree 2** (x²): `coeffs = [1000, 0, 0]`, `coeff_scale = 1000`
+/// - **Degree 3** (0.125x³+0.5x): `coeffs = [125, 0, 500, 0]`, `coeff_scale = 1000`
+/// - **Degree 4** (0.0625x⁴+0.25x²+0.1): `coeffs = [625, 0, 2500, 0, 1000]`, `coeff_scale = 10000`
+///
+/// # Parameters
+/// - context: OpenFHE context
+/// - keypair: Key pair for decrypt/re-encrypt
+/// - degree: Polynomial degree (2, 3, or 4)
+/// - coeffs: Integer-scaled coefficients, highest degree first
+/// - coeff_scale: Scale factor applied to coefficients
+/// - divisor: Additional BFV scale divisor (e.g., scale_factor)
+///
+/// # Returns
+/// Encrypted polynomial-activated values
+pub fn poly_activate(
+    &self,
+    context: &OpenFHEContext,
+    keypair: &OpenFHEKeyPair,
+    degree: i32,
+    coeffs: &[i64],
+    coeff_scale: i64,
+    divisor: i64,
+) -> Result<OpenFHECiphertext> {
+    let ptr = unsafe {
+        open_fhe_binding::openfhe_poly_activate(
+            context.as_ptr(),
+            keypair.as_ptr(),
+            self.ptr.as_ptr(),
+            degree,
+            coeffs.as_ptr(),
+            coeffs.len(),
+            coeff_scale,
+            divisor,
+        )
+    };
+
+    NonNull::new(ptr)
+        .map(|ptr| OpenFHECiphertext { ptr })
+        .ok_or_else(|| {
+            let err = unsafe {
+                let err_ptr = open_fhe_binding::openfhe_cnn_get_last_error();
+                if !err_ptr.is_null() {
+                    CStr::from_ptr(err_ptr).to_string_lossy().into_owned()
+                } else {
+                    String::from("Polynomial activation failed")
+                }
+            };
+            OpenFHEError::Unknown(err)
+        })
+}
+
 /// Average pooling for downsampling feature maps
 /// 
 /// # Parameters

@@ -141,6 +141,22 @@ unsafe extern "C" {
         input: *mut OpenFHECiphertext,
         divisor: i64,
     ) -> *mut OpenFHECiphertext;
+
+    /// General polynomial activation with configurable degree and coefficients
+    /// Computes polynomial using Horner's method in plaintext space (decrypt→compute→re-encrypt)
+    /// coeffs: integer-scaled coefficients, highest degree first [c_n, ..., c_1, c_0]
+    /// coeff_scale: scale factor applied to coefficients (e.g. 1000)
+    /// divisor: additional BFV scale divisor
+    pub fn openfhe_poly_activate(
+        ctx: *mut OpenFHEContext,
+        keypair: *mut OpenFHEKeyPair,
+        input: *mut OpenFHECiphertext,
+        degree: i32,
+        coeffs: *const i64,
+        num_coeffs: usize,
+        coeff_scale: i64,
+        divisor: i64,
+    ) -> *mut OpenFHECiphertext;
     
     /// Average pooling for downsampling
     /// input: encrypted feature map (flattened input_height × input_width)

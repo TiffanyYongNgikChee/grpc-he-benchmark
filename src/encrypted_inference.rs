@@ -131,6 +131,53 @@ impl From<OpenFHEError> for InferenceError {
 }
 
 // ============================================================================
+// Activation routing helper
+// ============================================================================
+
+/// Polynomial coefficients for each supported activation degree.
+///
+/// The coefficients are in highest-degree-first order (Horner's format)
+/// and are integer-scaled by `coeff_scale`.
+///
+/// | Degree | Polynomial              | Coefficients (×scale) | coeff_scale |
+/// |--------|-------------------------|-----------------------|-------------|
+/// | 2      | x²                      | [1, 0, 0]             | 1           |
+/// | 3      | 0.125x³ + 0.5x          | [125, 0, 500, 0]      | 1000        |
+/// | 4      | 0.0625x⁴ + 0.25x² + 0.1 | [625, 0, 2500, 0, 1000] | 10000   |
+///
+/// Note: Since our CNN uses decrypt→compute→re-encrypt for activation,
+/// the polynomial is evaluated in plaintext 64-bit integer space.
+/// This means mult_depth stays at 6 regardless of polynomial degree.
+fn apply_activation(
+    x: OpenFHECiphertext,
+    ctx: &OpenFHEContext,
+    kp: &OpenFHEKeyPair,
+    scale_factor: i64,
+    activation_degree: u32,
+) -> Result<OpenFHECiphertext, InferenceError> {
+    match activation_degree {
+        2 => {
+            // x²/S — the original square activation (fastest path)
+            Ok(x.square_activate(ctx, kp, scale_factor)?)
+        }
+        3 => {
+            // 0.125x³ + 0.5x  →  coeffs=[125, 0, 500, 0], coeff_scale=1000
+            let coeffs: &[i64] = &[125, 0, 500, 0];
+            Ok(x.poly_activate(ctx, kp, 3, coeffs, 1000, scale_factor)?)
+        }
+        4 => {
+            // 0.0625x⁴ + 0.25x² + 0.1  →  coeffs=[625, 0, 2500, 0, 1000], coeff_scale=10000
+            let coeffs: &[i64] = &[625, 0, 2500, 0, 1000];
+            Ok(x.poly_activate(ctx, kp, 4, coeffs, 10000, scale_factor)?)
+        }
+        _ => Err(InferenceError::InvalidInput(format!(
+            "Unsupported activation_degree {}. Supported: 2, 3, 4",
+            activation_degree
+        ))),
+    }
+}
+
+// ============================================================================
 // Core inference function (stateless)
 // ============================================================================
 
@@ -146,14 +193,15 @@ impl From<OpenFHEError> for InferenceError {
 /// * `scaled_pixels` - 784 pre-scaled pixel values
 ///     (computed as `round(pixel_0_255 / 255.0 * scale_factor)`)
 /// * `scale_factor` - The quantization scale factor (e.g., 1000)
+/// * `activation_degree` - Polynomial degree for activation function (2, 3, or 4)
 ///
 /// # Returns
 /// `InferenceResult` with predicted digit, raw logits, and timing
 ///
 /// # Pipeline
 /// ```text
-/// encrypt → Conv1(÷S) → +bias → x²/S → Pool(24→12)
-///         → Conv2(÷S) → +bias → x²/S → Pool(8→4)
+/// encrypt → Conv1(÷S) → +bias → poly_act → Pool(24→12)
+///         → Conv2(÷S) → +bias → poly_act → Pool(8→4)
 ///         → FC(÷S)    → +bias → decrypt → argmax
 /// ```
 pub fn run_encrypted_inference(
@@ -162,6 +210,7 @@ pub fn run_encrypted_inference(
     w: &EncodedWeights,
     scaled_pixels: &[i64],
     scale_factor: i64,
+    activation_degree: u32,
 ) -> Result<InferenceResult, InferenceError> {
     if scaled_pixels.len() != 784 {
         return Err(InferenceError::InvalidInput(format!(
@@ -189,9 +238,9 @@ pub fn run_encrypted_inference(
     let x = x.add(ctx, &w.conv1_bias)?;
     let bias1_ms = t.elapsed().as_secs_f64() * 1000.0;
 
-    // Square activation x²/S
+    // Polynomial activation (degree-aware)
     let t = Instant::now();
-    let x = x.square_activate(ctx, kp, scale_factor)?;
+    let x = apply_activation(x, ctx, kp, scale_factor, activation_degree)?;
     let act1_ms = t.elapsed().as_secs_f64() * 1000.0;
 
     // AvgPool 2×2 (24×24 → 12×12)
@@ -210,9 +259,9 @@ pub fn run_encrypted_inference(
     let x = x.add(ctx, &w.conv2_bias)?;
     let bias2_ms = t.elapsed().as_secs_f64() * 1000.0;
 
-    // Square activation x²/S
+    // Polynomial activation (degree-aware)
     let t = Instant::now();
-    let x = x.square_activate(ctx, kp, scale_factor)?;
+    let x = apply_activation(x, ctx, kp, scale_factor, activation_degree)?;
     let act2_ms = t.elapsed().as_secs_f64() * 1000.0;
 
     // AvgPool 2×2 (8×8 → 4×4 = 16 features)
@@ -320,6 +369,8 @@ pub struct EncryptedInferenceEngine {
     pub security_level: u32,
     /// Float model accuracy from training (for reference in responses)
     pub float_accuracy: f64,
+    /// Polynomial activation degree (2=x², 3=cubic, 4=quartic)
+    pub activation_degree: u32,
 }
 
 impl EncryptedInferenceEngine {
@@ -352,12 +403,19 @@ impl EncryptedInferenceEngine {
         let scale_factor = mnist_weights.config.scale_factor;
         let float_accuracy = mnist_weights.config.float_accuracy;
         let plaintext_modulus = mnist_weights.config.plaintext_modulus;
+        let activation_degree = mnist_weights.config.activation_degree;
 
+        let act_label = match activation_degree {
+            3 => "degree-3 (0.125x³+0.5x)",
+            4 => "degree-4 (0.0625x⁴+0.25x²+0.1)",
+            _ => "degree-2 (x²)",
+        };
         println!(
-            "  Weights loaded: {} params, scale_factor={}, accuracy={:.2}%",
+            "  Weights loaded: {} params, scale_factor={}, accuracy={:.2}%, activation={}",
             mnist_weights.total_params(),
             scale_factor,
-            float_accuracy
+            float_accuracy,
+            act_label
         );
 
         // Create BFV context
@@ -385,6 +443,7 @@ impl EncryptedInferenceEngine {
             scale_factor,
             security_level,
             float_accuracy,
+            activation_degree,
         })
     }
 
@@ -407,7 +466,7 @@ impl EncryptedInferenceEngine {
         let scaled = scale_pixels(pixels_0_255, self.scale_factor);
 
         // Run the pipeline
-        run_encrypted_inference(&self.ctx, &self.kp, &self.weights, &scaled, self.scale_factor)
+        run_encrypted_inference(&self.ctx, &self.kp, &self.weights, &scaled, self.scale_factor, self.activation_degree)
     }
 
     /// Run encrypted inference on pre-scaled pixel values.
@@ -423,6 +482,7 @@ impl EncryptedInferenceEngine {
             &self.weights,
             scaled_pixels,
             self.scale_factor,
+            self.activation_degree,
         )
     }
 
@@ -457,6 +517,7 @@ impl EncryptedInferenceEngine {
             &self.weights,
             &scaled,
             self.scale_factor,
+            self.activation_degree,
             &mut on_layer_done,
         )
     }
@@ -471,6 +532,7 @@ pub fn run_encrypted_inference_streaming<F>(
     w: &EncodedWeights,
     scaled_pixels: &[i64],
     scale_factor: i64,
+    activation_degree: u32,
     on_layer_done: &mut F,
 ) -> Result<InferenceResult, InferenceError>
 where
@@ -504,9 +566,9 @@ where
     let bias1_ms = t.elapsed().as_secs_f64() * 1000.0;
     on_layer_done("bias1", bias1_ms, t_total.elapsed().as_secs_f64() * 1000.0);
 
-    // Square activation x²/S
+    // Polynomial activation (degree-aware)
     let t = Instant::now();
-    let x = x.square_activate(ctx, kp, scale_factor)?;
+    let x = apply_activation(x, ctx, kp, scale_factor, activation_degree)?;
     let act1_ms = t.elapsed().as_secs_f64() * 1000.0;
     on_layer_done("relu1", act1_ms, t_total.elapsed().as_secs_f64() * 1000.0);
 
@@ -528,9 +590,9 @@ where
     let bias2_ms = t.elapsed().as_secs_f64() * 1000.0;
     on_layer_done("bias2", bias2_ms, t_total.elapsed().as_secs_f64() * 1000.0);
 
-    // Square activation x²/S
+    // Polynomial activation (degree-aware)
     let t = Instant::now();
-    let x = x.square_activate(ctx, kp, scale_factor)?;
+    let x = apply_activation(x, ctx, kp, scale_factor, activation_degree)?;
     let act2_ms = t.elapsed().as_secs_f64() * 1000.0;
     on_layer_done("relu2", act2_ms, t_total.elapsed().as_secs_f64() * 1000.0);
 
