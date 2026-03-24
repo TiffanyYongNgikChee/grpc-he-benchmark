@@ -584,7 +584,14 @@ extern "C" OpenFHECiphertext* openfhe_poly_activate(
 
             // Divide by coeff_scale (to undo the coefficient scaling)
             // then by divisor (to manage the BFV scale factor)
-            output_vec[i] = result / coeff_scale / divisor;
+            int64_t val = result / coeff_scale / divisor;
+
+            // Clamp to plaintext modulus range [-p/2, p/2] to prevent
+            // OpenFHE encoding overflow for high-degree polynomials
+            if (val > half_p) val = half_p;
+            if (val < -half_p) val = -half_p;
+
+            output_vec[i] = val;
         }
 
         auto output_pt = make_plain(ctx, output_vec);
