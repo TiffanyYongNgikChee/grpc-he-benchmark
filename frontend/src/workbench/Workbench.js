@@ -7,6 +7,7 @@ import MetricsStrip from "./MetricsStrip";
 import LibraryComparison from "./LibraryComparison";
 import MnistBatchBenchmark from "./MnistBatchBenchmark";
 import ParameterComparison from "./ParameterComparison";
+import ArchitectureDiagram from "./ArchitectureDiagram";
 import useInferenceProgress from "./useInferenceProgress";
 import { checkHealth, predictDigit, runComparisonBenchmark } from "../api/client";
 
@@ -608,6 +609,11 @@ export default function Workbench() {
               polynomials using the controls above. The x² function gives the best accuracy
               as it matches the training configuration.
             </p>
+
+            {/* Visual pipeline walkthrough */}
+            <div className="mt-6">
+              <ArchitectureDiagram />
+            </div>
           </div>
 
           {/* ── CNN Layer Glossary ── */}
