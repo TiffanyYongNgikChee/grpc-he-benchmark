@@ -10,7 +10,7 @@ services:
       - RUST_BACKTRACE=1
       - LD_LIBRARY_PATH=/app/lib:/usr/local/lib:/usr/local/helib_pack/helib_pack/lib
       - GRPC_BIND_ADDR=[::]:50051
-      - HE_SECURITY_LEVEL=${HE_SECURITY_LEVEL:-128}
+      - HE_SECURITY_LEVEL=${HE_SECURITY_LEVEL:-0}
       - MNIST_WEIGHTS_DIR=${MNIST_WEIGHTS_DIR:-mnist_training/weights}
     restart: unless-stopped
     healthcheck:
@@ -66,7 +66,7 @@ services:
       - RUST_BACKTRACE=1
       - LD_LIBRARY_PATH=/app/lib:/usr/local/lib:/usr/local/helib_pack/helib_pack/lib
       - PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-      - HE_SECURITY_LEVEL=${HE_SECURITY_LEVEL:-128}
+      - HE_SECURITY_LEVEL=${HE_SECURITY_LEVEL:-0}
 
 volumes:
   cargo-cache:

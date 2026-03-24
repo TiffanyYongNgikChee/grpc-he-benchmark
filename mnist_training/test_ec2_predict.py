@@ -71,6 +71,10 @@ def main():
     images, labels = load_test_data(weights_dir)
     print(f"\n  Loaded {len(images)} test images (digits {labels})")
     
+    # Track server-reported parameters (from first successful response)
+    server_activation_degree = None
+    server_security_label = None
+    
     # Test each image
     correct = 0
     total = 0
@@ -89,6 +93,13 @@ def main():
             total_ms = result.get("totalMs", 0)
             status = result.get("status", "unknown")
             logits = result.get("logits", [])
+            
+            # Capture server-reported parameters on first success
+            if server_activation_degree is None:
+                server_activation_degree = result.get("activationDegree", "?")
+                server_security_label = result.get("securityLevelLabel", "?")
+                print(f"\n  Server config: security={server_security_label}, activation_degree={server_activation_degree}")
+                print()
             
             is_correct = predicted == true_label
             if is_correct:
@@ -119,7 +130,9 @@ def main():
                 "fc_ms": result.get("fcMs", 0),
                 "decryption_ms": result.get("decryptionMs", 0),
                 "logits": logits,
-                "status": status
+                "status": status,
+                "activation_degree": result.get("activationDegree", ""),
+                "security_level_label": result.get("securityLevelLabel", "")
             })
             
         except Exception as e:
@@ -137,6 +150,8 @@ def main():
     # Summary
     print("\n" + "=" * 70)
     print(f"  RESULTS: {correct}/{total} correct ({correct/total*100:.1f}% accuracy)")
+    if server_security_label:
+        print(f"  Security: {server_security_label}  |  Activation degree: {server_activation_degree}")
     print("=" * 70)
     
     # Timing summary
@@ -156,14 +171,20 @@ def main():
             label = key.replace("_ms", "").replace("_", " ").title()
             print(f"    {label:20s}: {sum(vals)/len(vals):8.1f} ms")
     
-    # Save results to CSV
-    csv_path = os.path.join(script_dir, "fhe_test_results.csv")
+    # Save results to CSV (include experiment parameters in filename)
+    suffix = ""
+    if server_activation_degree is not None:
+        suffix += f"_deg{server_activation_degree}"
+    if server_security_label and server_security_label != "?":
+        safe_label = str(server_security_label).replace("-", "").replace(" ", "")
+        suffix += f"_{safe_label}"
+    csv_path = os.path.join(script_dir, f"fhe_test_results{suffix}.csv")
     with open(csv_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=[
             "image_index", "true_label", "predicted", "correct",
             "confidence", "total_ms", "encryption_ms", "conv1_ms",
             "act1_ms", "pool1_ms", "conv2_ms", "act2_ms", "pool2_ms",
-            "fc_ms", "decryption_ms", "status"
+            "fc_ms", "decryption_ms", "activation_degree", "security_level_label", "status"
         ])
         writer.writeheader()
         for r in results:
