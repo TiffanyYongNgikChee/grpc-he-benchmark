@@ -41,9 +41,7 @@ Every arrow after "Encrypt" operates on ciphertext. The server holds only encryp
 
 ## Architecture
 
-```
-
-```
+![System Architecture](SystemArchitecture_FYP.png)
 
 **Design decisions:**
 
