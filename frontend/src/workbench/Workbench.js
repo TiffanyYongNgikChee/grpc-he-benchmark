@@ -6,6 +6,7 @@ import OutputPanel from "./OutputPanel";
 import MetricsStrip from "./MetricsStrip";
 import LibraryComparison from "./LibraryComparison";
 import MnistBatchBenchmark from "./MnistBatchBenchmark";
+import ParameterComparison from "./ParameterComparison";
 import useInferenceProgress from "./useInferenceProgress";
 import { checkHealth, predictDigit, runComparisonBenchmark } from "../api/client";
 
@@ -27,6 +28,10 @@ export default function Workbench() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [healthy, setHealthy] = useState(null);
+
+  /* Parameter panel state */
+  const [securityLevel, setSecurityLevel] = useState(0);       // 0=128-bit, 1=192-bit, 2=256-bit
+  const [activationDegree, setActivationDegree] = useState(2); // 2=x², 3=cubic, 4=quartic
 
   /* Animation — layer-by-layer progress */
   const progress = useInferenceProgress();
@@ -59,7 +64,7 @@ export default function Workbench() {
 
     try {
       /* Try real SSE streaming first — returns the prediction result via the stream */
-      const requestBody = { pixels: pixels, scaleFactor: 1000 };
+      const requestBody = { pixels: pixels, scaleFactor: 1000, securityLevel, activationDegree };
       const response = await progress.startSSE(requestBody);
 
       setResult(response);
@@ -85,7 +90,7 @@ export default function Workbench() {
       progress.startSimulated();
 
       try {
-        const response = await predictDigit(pixels, 1000);
+        const response = await predictDigit(pixels, 1000, { securityLevel, activationDegree });
         setResult(response);
         setRunCount((c) => c + 1);
         progress.markAllDone();
@@ -110,7 +115,7 @@ export default function Workbench() {
     } finally {
       setLoading(false);
     }
-  }, [pixels, loading, progress]);
+  }, [pixels, loading, progress, securityLevel, activationDegree]);
 
   const handleReset = () => {
     setResult(null);
@@ -232,7 +237,28 @@ export default function Workbench() {
         {/* Dropdowns */}
         <ControlDropdown label="Library" options={["OpenFHE", "SEAL", "HElib"]} />
         <ControlDropdown label="Encryption" options={["BFV"]} />
-        <ControlDropdown label="Activation" options={["x² (Square)"]} />
+        <ControlDropdownStateful
+          label="Security"
+          options={[
+            { label: "128-bit", value: 0 },
+            { label: "192-bit", value: 1 },
+            { label: "256-bit", value: 2 },
+          ]}
+          value={securityLevel}
+          onChange={setSecurityLevel}
+          disabled={loading}
+        />
+        <ControlDropdownStateful
+          label="Activation"
+          options={[
+            { label: "x² (degree 2)", value: 2 },
+            { label: "degree 3", value: 3 },
+            { label: "degree 4", value: 4 },
+          ]}
+          value={activationDegree}
+          onChange={setActivationDegree}
+          disabled={loading}
+        />
         <ControlDropdown label="Scale factor" options={["1000"]} />
         <ControlDropdown label="Model" options={["CNN (LeNet-5)"]} />
 
@@ -445,6 +471,29 @@ export default function Workbench() {
         </div>
       </div>
 
+      {/* ═══════════ PARAMETER COMPARISON ═══════════ */}
+      <div className="px-4 md:px-8 py-8" style={{ background: "#fff", borderTop: "1px solid #e5e5e5" }}>
+        <div className="max-w-[1100px] mx-auto">
+          <div className="flex items-center gap-3 mb-4">
+            <h3
+              className="text-xs font-medium uppercase tracking-widest"
+              style={{ color: "#888", letterSpacing: "0.12em" }}
+            >
+              PARAMETER EXPERIMENTS
+            </h3>
+            <span className="text-[10px]" style={{ color: "#bbb" }}>
+              Security Level & Activation Degree Comparison
+            </span>
+          </div>
+          <div
+            className="rounded-lg p-5"
+            style={{ background: "#fafafa", border: "1px solid #e5e5e5" }}
+          >
+            <ParameterComparison />
+          </div>
+        </div>
+      </div>
+
       {/* ═══════════ EXPAND ARROW ═══════════ */}
       <div className="flex justify-center py-3" style={{ background: "#ebeaea" }}>
         <a href="#info" className="w-9 h-9 rounded-full border border-gray-300 bg-white flex items-center justify-center hover:bg-gray-100 transition">
@@ -552,11 +601,12 @@ export default function Workbench() {
               <li>The server <b>decrypts</b> only the 10 final output values (logits) and returns the predicted digit.</li>
             </ol>
             <p>
-              The model was trained in PyTorch on the MNIST dataset with an{" "}
-              <b>x² (square) activation function</b> instead of the usual ReLU. This is because
+              The model was trained in PyTorch on the MNIST dataset with a{" "}
+              <b>polynomial activation function</b> instead of the usual ReLU. This is because
               HE can only do addition and multiplication — it cannot do comparisons like
-              max(0, x). The x² function is fully polynomial and works natively in encrypted
-              arithmetic.
+              max(0, x). You can choose between x² (degree 2), degree 3, and degree 4
+              polynomials using the controls above. The x² function gives the best accuracy
+              as it matches the training configuration.
             </p>
           </div>
 
@@ -706,6 +756,25 @@ function ControlDropdown({ label, options }) {
   );
 }
 
+function ControlDropdownStateful({ label, options, value, onChange, disabled }) {
+  return (
+    <div className="px-2 md:px-3">
+      <div className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: "#999" }}>{label}</div>
+      <select
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        disabled={disabled}
+        className="text-sm font-medium bg-white border rounded px-2 py-0.5 cursor-pointer appearance-none pr-6 disabled:opacity-50"
+        style={{ color: "#333", borderColor: "#ccc", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function Divider() {
   return <div className="w-px h-8 mx-1" style={{ background: "#ccc" }} />;
 }
@@ -717,11 +786,11 @@ function getLayerDescription(id) {
     encrypt: "Encode & encrypt using BFV scheme (OpenFHE)",
     conv1:   "Encrypted 5×5 convolution, single channel",
     bias1:   "Add encrypted bias vector to conv1 output",
-    relu1:   "Square activation (x² approximation of ReLU)",
+    relu1:   "Polynomial activation (configurable degree)",
     pool1:   "2×2 average pooling on encrypted data",
     conv2:   "Encrypted 5×5 convolution, single channel",
     bias2:   "Add encrypted bias vector to conv2 output",
-    relu2:   "Square activation (x² approximation of ReLU)",
+    relu2:   "Polynomial activation (configurable degree)",
     pool2:   "2×2 average pooling on encrypted data",
     fc:      "Encrypted fully-connected layer → 10 logits",
     biasfc:  "Add encrypted bias vector to FC output",

@@ -27,9 +27,16 @@ export async function checkHealth() {
  * POST /api/predict
  * @param {number[]} pixels - 784 pixel values (28×28 image)
  * @param {number} scaleFactor - BFV quantisation scale (default: 1000)
- * @param {AbortSignal} [signal] - Optional AbortSignal to cancel the request
+ * @param {object} [options] - Optional parameters
+ * @param {number} [options.securityLevel] - 0=128-bit, 1=192-bit, 2=256-bit
+ * @param {number} [options.activationDegree] - 2=x², 3=cubic, 4=quartic
+ * @param {AbortSignal} [options.signal] - Optional AbortSignal to cancel the request
  */
-export async function predictDigit(pixels, scaleFactor = 1000, signal) {
+export async function predictDigit(pixels, scaleFactor = 1000, options = {}) {
+  const { securityLevel = 0, activationDegree = 2, signal } = typeof options === 'object' && options !== null && !('aborted' in options)
+    ? options
+    : { signal: options }; // backward compat: if options is an AbortSignal
+
   const timeoutSignal = AbortSignal.timeout(300_000); // 5 min — FHE inference can take ~27s+ per image
   // Combine external signal (if provided) with timeout signal
   const combinedSignal = signal
@@ -39,7 +46,7 @@ export async function predictDigit(pixels, scaleFactor = 1000, signal) {
   const res = await fetch(`${API_BASE}/predict`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pixels, scaleFactor }),
+    body: JSON.stringify({ pixels, scaleFactor, securityLevel, activationDegree }),
     signal: combinedSignal,
   });
   if (!res.ok) {
