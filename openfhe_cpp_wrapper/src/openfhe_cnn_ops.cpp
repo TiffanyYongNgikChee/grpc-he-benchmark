@@ -520,3 +520,86 @@ extern "C" OpenFHECiphertext* openfhe_rescale(
     }
 }
 
+// ============================================================================
+// General Polynomial Activation (degree 2, 3, or 4)
+// ============================================================================
+// Uses decrypt→compute→re-encrypt approach (same as square_activate).
+// Evaluates a polynomial with integer-scaled coefficients in 64-bit space,
+// then divides by (coeff_scale * divisor) to manage scale.
+//
+// Degree 2: f(x) = c2*x² + c1*x + c0           → /coeff_scale/divisor
+// Degree 3: f(x) = c3*x³ + c2*x² + c1*x + c0   → /coeff_scale/divisor
+// Degree 4: f(x) = c4*x⁴ + c3*x³ + c2*x² + c1*x + c0 → /coeff_scale/divisor
+//
+// The coefficients are provided as integers (pre-scaled by coeff_scale).
+// For example, 0.125x³ + 0.5x with coeff_scale=1000 → coeffs=[125, 0, 500, 0]
+//
+// Horner's method is used for evaluation: f(x) = ((c4*x + c3)*x + c2)*x + c1)*x + c0
+// This minimises the number of multiplications and keeps intermediate values smaller.
+extern "C" OpenFHECiphertext* openfhe_poly_activate(
+    OpenFHEContext* ctx,
+    OpenFHEKeyPair* keypair,
+    OpenFHECiphertext* input,
+    int degree,
+    const int64_t* coeffs,
+    size_t num_coeffs,
+    int64_t coeff_scale,
+    int64_t divisor
+) {
+    if (!ctx || !keypair || !input || !coeffs || divisor == 0 || coeff_scale == 0) {
+        set_cnn_error("Invalid parameters for poly_activate");
+        return nullptr;
+    }
+    if (num_coeffs != (size_t)(degree + 1)) {
+        set_cnn_error("num_coeffs must equal degree + 1");
+        return nullptr;
+    }
+    if (degree < 2 || degree > 4) {
+        set_cnn_error("poly_activate only supports degree 2, 3, or 4");
+        return nullptr;
+    }
+
+    try {
+        auto cc = ctx->cryptoContext;
+        int64_t p = cc->GetCryptoParameters()->GetPlaintextModulus();
+        int64_t half_p = p / 2;
+        size_t slot_count = cc->GetEncodingParams()->GetBatchSize();
+
+        // Decrypt input to evaluate polynomial in 64-bit integer space
+        Plaintext input_plain;
+        cc->Decrypt(keypair->keyPair.secretKey, input->ciphertext, &input_plain);
+        std::vector<int64_t> input_vec = input_plain->GetPackedValue();
+
+        std::vector<int64_t> output_vec(slot_count, 0);
+        for (size_t i = 0; i < input_vec.size() && i < slot_count; i++) {
+            int64_t x = input_vec[i];
+            if (x > half_p) x -= p;
+
+            // Evaluate polynomial using Horner's method
+            // coeffs are ordered highest degree first: [c_n, c_{n-1}, ..., c_1, c_0]
+            int64_t result = coeffs[0];
+            for (int d = 1; d <= degree; d++) {
+                result = result * x + coeffs[d];
+            }
+
+            // Divide by coeff_scale (to undo the coefficient scaling)
+            // then by divisor (to manage the BFV scale factor)
+            output_vec[i] = result / coeff_scale / divisor;
+        }
+
+        auto output_pt = make_plain(ctx, output_vec);
+        auto output_ct = cc->Encrypt(keypair->keyPair.publicKey, output_pt);
+
+        OpenFHECiphertext* result = new OpenFHECiphertext();
+        result->ciphertext = output_ct;
+        result->ctx = ctx;
+
+        set_cnn_error("");
+        return result;
+
+    } catch (const std::exception& e) {
+        set_cnn_error(std::string("Polynomial activation (degree=") + std::to_string(degree) + ") failed: " + e.what());
+        return nullptr;
+    }
+}
+

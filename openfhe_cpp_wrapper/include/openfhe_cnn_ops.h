@@ -117,6 +117,40 @@ OpenFHECiphertext* openfhe_avgpool(
     size_t stride
 );
 
+/// General polynomial activation with configurable degree and coefficients.
+/// Computes f(x) = c[n]*x^n + c[n-1]*x^(n-1) + ... + c[1]*x + c[0] then
+/// divides by `divisor` to manage scale. Uses decrypt→compute→re-encrypt.
+///
+/// Coefficient format (integer-scaled, highest degree first):
+///   Degree 2 (x²):            coeffs = [1000, 0, 0]        → x²/divisor
+///   Degree 3 (cubic):         coeffs = [125, 0, 500, 0]    → (0.125x³+0.5x)/divisor
+///   Degree 4 (quartic):       coeffs = [625, 0, 2500, 0, 1000] → (0.0625x⁴+0.25x²+0.1)/divisor
+///
+/// The coefficients are pre-scaled by 1000 (or 10000 for deg4). The caller
+/// must pass `coeff_scale` so the function can divide correctly:
+///   result[i] = poly(x[i]) / coeff_scale / divisor
+///
+/// @param ctx: OpenFHE context
+/// @param keypair: Key pair for decrypt/re-encrypt
+/// @param input: Encrypted input values
+/// @param degree: Polynomial degree (2, 3, or 4)
+/// @param coeffs: Integer-scaled polynomial coefficients, length = degree+1,
+///                ordered highest degree first: [c_n, c_{n-1}, ..., c_1, c_0]
+/// @param num_coeffs: Number of coefficients (must equal degree + 1)
+/// @param coeff_scale: Scale factor applied to coefficients (e.g. 1000)
+/// @param divisor: Additional divisor for rescaling (e.g. scale_factor)
+/// @return Encrypted activated values or NULL on failure
+OpenFHECiphertext* openfhe_poly_activate(
+    OpenFHEContext* ctx,
+    OpenFHEKeyPair* keypair,
+    OpenFHECiphertext* input,
+    int degree,
+    const int64_t* coeffs,
+    size_t num_coeffs,
+    int64_t coeff_scale,
+    int64_t divisor
+);
+
 /// Rescale encrypted values by dividing by a divisor
 /// Used after polynomial activation (x²) to prevent scale accumulation.
 /// After x² with scale_factor S, values grow as S². Dividing by S
