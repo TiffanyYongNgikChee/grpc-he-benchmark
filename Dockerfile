@@ -149,8 +149,11 @@ COPY build.rs ./
 # gRPC server files
 COPY proto ./proto
 COPY grpc_server ./grpc_server
-# MNIST weights (needed for encrypted inference)
+# MNIST weights (needed for encrypted inference — all activation degrees)
 COPY mnist_training/weights ./mnist_training/weights
+COPY mnist_training/weights_deg2 ./mnist_training/weights_deg2
+COPY mnist_training/weights_deg3 ./mnist_training/weights_deg3
+COPY mnist_training/weights_deg4 ./mnist_training/weights_deg4
 
 # Build the wrappers
 RUN echo "=== Building HElib wrapper ===" && \
@@ -264,8 +267,11 @@ COPY --from=builder /app/target/release/examples/benchmark /app/benchmark
 COPY --from=builder /app/target/release/examples/medical_data /app/medical_data
 COPY --from=builder /app/grpc_server/target/release/he-grpc-server /app/he-grpc-server
 
-# Copy MNIST weights for encrypted inference
+# Copy MNIST weights for encrypted inference (all activation degrees)
 COPY --from=builder /app/mnist_training/weights /app/mnist_training/weights
+COPY --from=builder /app/mnist_training/weights_deg2 /app/mnist_training/weights_deg2
+COPY --from=builder /app/mnist_training/weights_deg3 /app/mnist_training/weights_deg3
+COPY --from=builder /app/mnist_training/weights_deg4 /app/mnist_training/weights_deg4
 
 # Update library cache so the system can find all .so files
 RUN ldconfig

@@ -11,6 +11,7 @@ services:
       - LD_LIBRARY_PATH=/app/lib:/usr/local/lib:/usr/local/helib_pack/helib_pack/lib
       - GRPC_BIND_ADDR=[::]:50051
       - HE_SECURITY_LEVEL=${HE_SECURITY_LEVEL:-128}
+      - MNIST_WEIGHTS_DIR=${MNIST_WEIGHTS_DIR:-mnist_training/weights}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "echo", "ok"]
