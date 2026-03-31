@@ -1,0 +1,27 @@
+# docker-compose.compute.yml
+# ─── EC2 #2: Rust gRPC Server (Compute) ───
+# This runs on the compute-optimised EC2 instance (c5.xlarge).
+# Only the Rust server — no frontend, no Spring Boot.
+#
+# Usage:
+#   docker compose -f docker-compose.compute.yml up -d
+
+version: '3.8'
+
+services:
+  he-grpc-server:
+    build: .
+    ports:
+      - "50051:50051"
+    environment:
+      - RUST_BACKTRACE=1
+      - LD_LIBRARY_PATH=/app/lib:/usr/local/lib:/usr/local/helib_pack/helib_pack/lib
+      - GRPC_BIND_ADDR=[::]:50051
+      - HE_SECURITY_LEVEL=${HE_SECURITY_LEVEL:-0}
+      - MNIST_WEIGHTS_DIR=${MNIST_WEIGHTS_DIR:-mnist_training/weights}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "echo", "ok"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
