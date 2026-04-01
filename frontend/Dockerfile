@@ -1,11 +1,11 @@
 # ── Stage 1: Build React app ──
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
 # Copy package files first for dependency caching
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm install
 
 # Copy source and build
 COPY . .
