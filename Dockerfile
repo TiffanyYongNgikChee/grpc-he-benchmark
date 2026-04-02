@@ -154,6 +154,7 @@ COPY mnist_training/weights ./mnist_training/weights
 COPY mnist_training/weights_deg2 ./mnist_training/weights_deg2
 COPY mnist_training/weights_deg3 ./mnist_training/weights_deg3
 COPY mnist_training/weights_deg4 ./mnist_training/weights_deg4
+COPY scripts ./scripts
 
 # Build the wrappers
 RUN echo "=== Building HElib wrapper ===" && \
