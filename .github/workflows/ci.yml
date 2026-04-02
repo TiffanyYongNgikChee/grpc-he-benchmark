@@ -39,6 +39,11 @@ jobs:
       - name: Lint check
         run: npx eslint src/ --max-warnings=0 || true
 
+      - name: Run tests
+        run: npx react-scripts test --watchAll=false --ci
+        env:
+          CI: true
+
       - name: Build production bundle
         run: npm run build
         env:
