@@ -36,7 +36,7 @@ RUN echo "=== Building NTL ===" && \
     tar -xzf ntl-11.5.1.tar.gz && \
     cd ntl-11.5.1/src && \
     ./configure PREFIX=/usr/local NTL_GMP_LIP=on NTL_THREADS=on CXXFLAGS="-O2 -fPIC" SHARED=on > /dev/null && \
-    make -j4 > /dev/null 2>&1 && \
+    make -j2 > /dev/null 2>&1 && \
     make install > /dev/null && \
     ldconfig && \
     echo "NTL installed successfully" && \
@@ -61,7 +61,7 @@ RUN echo "=== Configuring HElib ===" && \
 
 RUN echo "=== Building HElib (this takes 5-10 minutes) ===" && \
     cd /root/HElib/build && \
-    make -j4 && \
+    make -j2 && \
     echo "HElib built successfully"
 
 RUN echo "=== Installing HElib ===" && \
@@ -198,13 +198,15 @@ RUN mkdir -p /app/lib && \
 ENV LD_LIBRARY_PATH=/app/lib:/usr/local/lib:/usr/local/helib_pack/helib_pack/lib:${LD_LIBRARY_PATH}
 
 
-# Build the Rust project (both examples)
+# Build the Rust project (examples)
 RUN echo "=== Building Rust examples ===" && \
     cargo build --release --features all_he --example benchmark && \
     cargo build --release --features all_he --example medical_data && \
+    cargo build --release --example mnist_benchmark && \
     echo "Rust examples built successfully" && \
     ls -lh /app/target/release/examples/benchmark && \
-    ls -lh /app/target/release/examples/medical_data
+    ls -lh /app/target/release/examples/medical_data && \
+    ls -lh /app/target/release/examples/mnist_benchmark
 
 # Build the gRPC server
 RUN echo "=== Building gRPC server ===" && \
@@ -265,6 +267,7 @@ COPY --from=builder /app/lib/libopenfhe_wrapper.so* /app/lib/
 # Copy the compiled Rust binaries
 COPY --from=builder /app/target/release/examples/benchmark /app/benchmark
 COPY --from=builder /app/target/release/examples/medical_data /app/medical_data
+COPY --from=builder /app/target/release/examples/mnist_benchmark /app/mnist_benchmark
 COPY --from=builder /app/grpc_server/target/release/he-grpc-server /app/he-grpc-server
 
 # Copy MNIST weights for encrypted inference (all activation degrees)
@@ -272,6 +275,9 @@ COPY --from=builder /app/mnist_training/weights /app/mnist_training/weights
 COPY --from=builder /app/mnist_training/weights_deg2 /app/mnist_training/weights_deg2
 COPY --from=builder /app/mnist_training/weights_deg3 /app/mnist_training/weights_deg3
 COPY --from=builder /app/mnist_training/weights_deg4 /app/mnist_training/weights_deg4
+
+# Copy benchmark script
+COPY --from=builder /app/scripts/run_all_benchmarks.sh /app/scripts/run_all_benchmarks.sh
 
 # Update library cache so the system can find all .so files
 RUN ldconfig
@@ -289,11 +295,13 @@ EXPOSE 50051
 # - ./he-grpc-server  (gRPC server for HE operations)
 # - ./benchmark       (3-way HE library comparison)
 # - ./medical_data    (SEAL medical record demo)
+# - ./mnist_benchmark (100-image encrypted CNN benchmark)
 # 
 # Usage:
 #   docker run -p 50051:50051 <image>                    # Run gRPC server
 #   docker run --rm <image> ./benchmark                  # Run benchmark
 #   docker run --rm <image> ./medical_data               # Run medical demo
+#   docker run --rm <image> ./mnist_benchmark             # Run MNIST benchmark
 #   docker run -it --rm <image> /bin/bash                # Interactive shell
 
 # Default command: run the gRPC server
