@@ -7,6 +7,7 @@ import MetricsStrip from "./MetricsStrip";
 import LibraryComparison from "./LibraryComparison";
 import MnistBatchBenchmark from "./MnistBatchBenchmark";
 import ParameterComparison from "./ParameterComparison";
+import BenchmarkResultsDashboard from "./BenchmarkResultsDashboard";
 import ArchitectureDiagram from "./ArchitectureDiagram";
 import useInferenceProgress from "./useInferenceProgress";
 import { checkHealth, predictDigit, runComparisonBenchmark } from "../api/client";
@@ -491,6 +492,29 @@ export default function Workbench() {
             style={{ background: "#fafafa", border: "1px solid #e5e5e5" }}
           >
             <ParameterComparison />
+          </div>
+        </div>
+      </div>
+
+      {/* ═══════════ BENCHMARK RESULTS DASHBOARD ═══════════ */}
+      <div className="px-4 md:px-8 py-8" style={{ background: "#f7f7f7", borderTop: "1px solid #e5e5e5" }}>
+        <div className="max-w-[1100px] mx-auto">
+          <div className="flex items-center gap-3 mb-4">
+            <h3
+              className="text-xs font-medium uppercase tracking-widest"
+              style={{ color: "#888", letterSpacing: "0.12em" }}
+            >
+              BENCHMARK RESULTS
+            </h3>
+            <span className="text-[10px]" style={{ color: "#bbb" }}>
+              FHE CNN Performance across Activation Degrees
+            </span>
+          </div>
+          <div
+            className="rounded-lg p-5"
+            style={{ background: "#fafafa", border: "1px solid #e5e5e5" }}
+          >
+            <BenchmarkResultsDashboard />
           </div>
         </div>
       </div>
