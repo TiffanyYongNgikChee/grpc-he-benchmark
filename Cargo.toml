@@ -46,3 +46,7 @@ path = "examples/mnist_inference.rs"
 name = "mnist_verify"
 path = "examples/mnist_verify.rs"
 
+[[example]]
+name = "mnist_benchmark"
+path = "examples/mnist_benchmark.rs"
+
