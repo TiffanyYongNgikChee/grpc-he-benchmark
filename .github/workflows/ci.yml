@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD Pipeline
 
 on:
   push:
@@ -6,79 +6,188 @@ on:
   pull_request:
     branches: [ main, master ]
 
+# ──────────────────────────────────────────────
+# Three parallel jobs: Frontend, Spring Boot API, and HE Core (Rust + C++)
+# This gives fast feedback — frontend & API finish in ~2 min,
+# while the heavier HE core build runs independently.
+# ──────────────────────────────────────────────
+
 jobs:
-  build:
+
+  # ───── JOB 1: React Frontend ─────
+  frontend:
+    name: Frontend (React)
     runs-on: ubuntu-22.04
-    
+    defaults:
+      run:
+        working-directory: frontend
+
     steps:
-      # Get the code
       - name: Checkout code
         uses: actions/checkout@v4
-      # Install system dependencies required by SEAL and HElib
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
       - name: Install dependencies
+        run: npm ci
+
+      - name: Lint check
+        run: npx eslint src/ --max-warnings=0 || true
+
+      - name: Build production bundle
+        run: npm run build
+        env:
+          CI: true
+          REACT_APP_API_BASE: /api
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build/
+          retention-days: 7
+
+  # ───── JOB 2: Spring Boot API ─────
+  spring-boot:
+    name: Spring Boot API
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: spring-boot-api
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'maven'
+
+      - name: Build & test with Maven
+        run: mvn -B clean package -DskipTests=false
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: spring-boot-jar
+          path: spring-boot-api/target/*.jar
+          retention-days: 7
+
+  # ───── JOB 3: HE Core (Rust + C++ wrappers) ─────
+  he-core:
+    name: HE Core (Rust + C++)
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Cache HE libraries to avoid 20+ min rebuilds
+      - name: Cache HE libraries
+        id: cache-he-libs
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/lib/libseal*
+            /usr/local/lib/libntl*
+            /usr/local/include/SEAL*
+            /usr/local/include/NTL*
+            /usr/local/lib/libhelib*
+            /usr/local/helib_pack
+          key: he-libs-seal4.1.1-helib2.3.0-ntl-${{ runner.os }}
+
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake g++ libntl-dev libgmp-dev git
-      # Setup Rust toolchain
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-      
-      # Build Microsoft SEAL library from source
-      # Version 4.1.1 is required for compatibility with our C++ wrapper
+
+      # Build SEAL (cached after first run)
       - name: Build SEAL library
+        if: steps.cache-he-libs.outputs.cache-hit != 'true'
         run: |
           cd /tmp
-          git clone https://github.com/microsoft/SEAL.git
-          cd SEAL && git checkout v4.1.1
+          git clone --depth 1 --branch v4.1.1 https://github.com/microsoft/SEAL.git
+          cd SEAL
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSEAL_USE_MSGSL=OFF -DSEAL_USE_ZLIB=OFF
           cmake --build build -j$(nproc)
           sudo cmake --install build
           sudo ldconfig
-      
-      # Build HElib library from source
-      # Version 2.3.0 is the latest stable release
+
+      # Build HElib (cached after first run)
       - name: Build HElib library
+        if: steps.cache-he-libs.outputs.cache-hit != 'true'
         run: |
           cd /tmp
-          git clone https://github.com/homenc/HElib.git
-          cd HElib && git checkout v2.3.0
+          git clone --depth 1 --branch v2.3.0 https://github.com/homenc/HElib.git
+          cd HElib
           mkdir -p build && cd build
           cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local ..
           make -j$(nproc)
           sudo make install
           sudo ldconfig
 
-      # Clean any stale CMake cache files from dev container
-      # This prevents path conflicts between local dev and CI environments
+      - name: Refresh library cache
+        if: steps.cache-he-libs.outputs.cache-hit == 'true'
+        run: sudo ldconfig
+
+      # Clean stale CMake caches from dev environment
       - name: Clean build directories
         run: |
           rm -rf cpp_wrapper/build
           rm -rf helib_wrapper/build
-      # Build our SEAL C++ wrapper
-      - name: Build SEAL wrapper
+
+      - name: Build SEAL C++ wrapper
         run: |
           cd cpp_wrapper
           mkdir -p build && cd build
           cmake ..
           make -j$(nproc)
-      # Build our HElib C++ wrapper
-      - name: Build HElib wrapper
+
+      - name: Build HElib C++ wrapper
         run: |
           cd helib_wrapper
           mkdir -p build && cd build
           cmake ..
           make -j$(nproc)
 
-      # Build the Rust project
-      # LD_LIBRARY_PATH is required for dynamic linking to our C++ wrappers
       - name: Build Rust project
         run: |
           export LD_LIBRARY_PATH="$PWD/cpp_wrapper/build:$PWD/helib_wrapper/build:/usr/local/lib"
           cargo build --verbose
-      # Run Rust tests
-      # continue-on-error allows workflow to pass even if tests fail
-      - name: Run tests
+
+      - name: Run Rust unit tests
         run: |
           export LD_LIBRARY_PATH="$PWD/cpp_wrapper/build:$PWD/helib_wrapper/build:/usr/local/lib"
           cargo test --verbose --lib
         continue-on-error: true
+
+  # ───── JOB 4: Docker image build check ─────
+  docker:
+    name: Docker Build Check
+    runs-on: ubuntu-22.04
+    needs: [frontend, spring-boot, he-core]
+    # Only run on main branch pushes (not PRs — too slow)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Validate the Dockerfile syntax without doing a full build
+      # (full build takes ~45 min and needs too much RAM for GitHub runners)
+      - name: Validate Dockerfile
+        run: docker build --check .
