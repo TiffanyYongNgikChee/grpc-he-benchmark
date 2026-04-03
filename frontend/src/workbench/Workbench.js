@@ -9,6 +9,7 @@ import MnistBatchBenchmark from "./MnistBatchBenchmark";
 import ParameterComparison from "./ParameterComparison";
 import BenchmarkResultsDashboard from "./BenchmarkResultsDashboard";
 import ArchitectureDiagram from "./ArchitectureDiagram";
+import NeuralHero from "./NeuralHero";
 import useInferenceProgress from "./useInferenceProgress";
 import { checkHealth, predictDigit, runComparisonBenchmark } from "../api/client";
 
@@ -163,20 +164,42 @@ export default function Workbench() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "#f7f7f7" }}>
 
-      {/* ═══════════ HEADER ═══════════ */}
-      <header
-        className="text-center py-8 px-4"
-        style={{ background: "#1a1a2e" }}
+      {/* ═══════════ HERO — NEURAL NETWORK ANIMATION ═══════════ */}
+      <NeuralHero />
+
+      {/* ═══════════ STICKY NAV BAR (appears after hero) ═══════════ */}
+      <div
+        className="sticky top-0 z-30 border-b backdrop-blur-xl"
+        style={{
+          background: "rgba(3,7,18,0.88)",
+          borderColor: "rgba(99,102,241,0.08)",
+        }}
       >
-        <h1 className="text-white text-xl md:text-2xl font-light tracking-wide leading-snug">
-          Tinker With{" "}
-          <span className="font-bold">Encrypted Neural Networks</span>{" "}
-          Right Here in Your Browser.
-        </h1>
-        <p className="text-sm mt-1 font-light" style={{ color: "rgba(255,255,255,0.65)" }}>
-          Don't Worry, Your Data Stays <b className="text-white">Encrypted</b>. We Promise.
-        </p>
-      </header>
+        <div className="max-w-[1440px] mx-auto px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#6366f1", boxShadow: "0 0 8px #6366f1" }} />
+            <span className="text-[10px] font-semibold tracking-[0.2em] text-white/50 uppercase">
+              HE Benchmark
+            </span>
+          </div>
+          <div className="flex items-center gap-4 text-[10px] text-white/30">
+            <a href="#workbench" className="hover:text-white/80 transition-colors">Workbench</a>
+            <a href="#benchmarks" className="hover:text-white/80 transition-colors">Benchmarks</a>
+            <a href="#results" className="hover:text-white/80 transition-colors">Results</a>
+            <a href="#info" className="hover:text-white/80 transition-colors">About</a>
+            <div className="flex items-center gap-1.5 ml-2">
+              <div
+                className="w-1.5 h-1.5 rounded-full"
+                style={{
+                  background: healthy === null ? "#555" : healthy ? "#06d6a0" : "#e03e52",
+                  boxShadow: healthy ? "0 0 6px rgba(6,214,160,0.5)" : "none",
+                }}
+              />
+              <span className="text-[9px]">{healthy === null ? "…" : healthy ? "Online" : "Offline"}</span>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* ═══════════ CONTROLS BAR ═══════════ */}
       <div
@@ -287,7 +310,7 @@ export default function Workbench() {
       </div>
 
       {/* ═══════════ MAIN AREA ═══════════ */}
-      <div className="flex-1 px-4 md:px-8 py-6">
+      <div id="workbench" className="flex-1 px-4 md:px-8 py-6">
         <div className="max-w-[1440px] mx-auto flex gap-6" style={{ minHeight: 420 }}>
 
           {/* ── INPUT COLUMN ── */}
@@ -451,7 +474,7 @@ export default function Workbench() {
       </div>
 
       {/* ═══════════ MNIST BATCH BENCHMARK ═══════════ */}
-      <div className="px-4 md:px-8 py-8" style={{ background: "#ebeaea", borderTop: "1px solid #d9d9d9" }}>
+      <div id="benchmarks" className="px-4 md:px-8 py-8" style={{ background: "#ebeaea", borderTop: "1px solid #d9d9d9" }}>
         <div className="max-w-[1100px] mx-auto">
           <div className="flex items-center gap-3 mb-4">
             <h3
@@ -497,7 +520,7 @@ export default function Workbench() {
       </div>
 
       {/* ═══════════ BENCHMARK RESULTS DASHBOARD ═══════════ */}
-      <div className="px-4 md:px-8 py-8" style={{ background: "#f7f7f7", borderTop: "1px solid #e5e5e5" }}>
+      <div id="results" className="px-4 md:px-8 py-8" style={{ background: "#f7f7f7", borderTop: "1px solid #e5e5e5" }}>
         <div className="max-w-[1100px] mx-auto">
           <div className="flex items-center gap-3 mb-4">
             <h3
