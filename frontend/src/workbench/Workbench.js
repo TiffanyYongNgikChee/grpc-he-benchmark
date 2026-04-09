@@ -507,7 +507,7 @@ export default function Workbench() {
               PARAMETER EXPERIMENTS
             </h3>
             <span className="text-[10px]" style={{ color: "#bbb" }}>
-              Security Level & Activation Degree Comparison
+              Security Level, Activation Degree, Scale Factor & Plaintext Modulus
             </span>
           </div>
           <div

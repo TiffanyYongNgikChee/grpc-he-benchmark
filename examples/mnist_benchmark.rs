@@ -43,6 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse arguments
     let mut weights_dir = String::from("mnist_training/weights");
     let mut output_path = String::new(); // auto-generated if empty
+    let mut limit: Option<usize> = None; // limit number of images
 
     let mut i = 1;
     while i < args.len() {
@@ -59,12 +60,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     output_path = args[i].clone();
                 }
             }
+            "--limit" | "-n" => {
+                i += 1;
+                if i < args.len() {
+                    limit = Some(args[i].parse().expect("--limit must be a positive integer"));
+                }
+            }
             "--help" | "-h" => {
                 println!("Usage: mnist_benchmark [OPTIONS]");
                 println!();
                 println!("Options:");
                 println!("  --weights, -w <DIR>   Weight directory (default: mnist_training/weights)");
                 println!("  --output,  -o <FILE>  Output CSV path (default: auto-generated)");
+                println!("  --limit,   -n <NUM>   Only run first N images (default: all)");
                 println!("  --help,    -h         Show this help");
                 return Ok(());
             }
@@ -93,7 +101,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("  Loading test images from: {}", images_path.display());
-    let (images, labels) = load_test_data(&images_path, &labels_path)?;
+    let (mut images, mut labels) = load_test_data(&images_path, &labels_path)?;
+
+    // Apply --limit if specified
+    if let Some(n) = limit {
+        if n < images.len() {
+            println!("  Limiting to first {} of {} images", n, images.len());
+            images.truncate(n);
+            labels.truncate(n);
+        }
+    }
+
     let num_images = images.len();
     println!("  Loaded {} images with {} labels\n", num_images, labels.len());
 

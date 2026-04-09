@@ -3,7 +3,7 @@
 # Run Scale Factor & Plaintext Modulus benchmark experiments.
 #
 # This script runs directly on EC2 #2 (compute server).
-# It benchmarks 10 images × 5 configs (3 scale factors + 2 extra moduli).
+# It benchmarks N images × 5 configs (3 scale factors + 2 extra moduli).
 #
 # Prerequisites:
 #   1. Docker container is running:  docker-compose up -d --build
@@ -11,7 +11,8 @@
 #
 # Usage:
 #   chmod +x scripts/run_new_experiments.sh
-#   ./scripts/run_new_experiments.sh
+#   ./scripts/run_new_experiments.sh          # default: 10 images
+#   ./scripts/run_new_experiments.sh 20       # custom: 20 images
 #
 # Expected runtime: ~10 images × ~14s/image × 5 configs ≈ 12 minutes total
 #   (though plaintext_modulus changes may affect context creation time)
@@ -19,9 +20,13 @@
 
 set -euo pipefail
 
+# Number of images to benchmark (default: 10, pass as first arg to override)
+IMAGE_LIMIT="${1:-10}"
+
 echo "================================================================"
 echo "  New Experiments Benchmark Suite"
 echo "  Scale Factor (3 configs) + Plaintext Modulus (3 configs)"
+echo "  Images per config: $IMAGE_LIMIT"
 echo "================================================================"
 echo ""
 
@@ -74,7 +79,8 @@ for i in "${!SCALE_DIRS[@]}"; do
 
     cargo run --release --example mnist_benchmark -- \
         --weights "$WDIR" \
-        --output "mnist_training/fhe_benchmark_${LABEL}_128bit.csv"
+        --output "mnist_training/fhe_benchmark_${LABEL}_128bit.csv" \
+        --limit "$IMAGE_LIMIT"
 
     END=$(date +%s)
     ELAPSED=$((END - START))
@@ -139,7 +145,8 @@ for i in "${!MODULUS_DIRS[@]}"; do
 
     cargo run --release --example mnist_benchmark -- \
         --weights "$WDIR" \
-        --output "mnist_training/fhe_benchmark_${LABEL}_128bit.csv"
+        --output "mnist_training/fhe_benchmark_${LABEL}_128bit.csv" \
+        --limit "$IMAGE_LIMIT"
 
     END=$(date +%s)
     ELAPSED=$((END - START))

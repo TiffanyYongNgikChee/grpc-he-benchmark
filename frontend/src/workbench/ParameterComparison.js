@@ -109,40 +109,100 @@ const formatMs = (ms) => {
   return `${ms.toFixed(0)}ms`;
 };
 
+/* ── Convert a scale/modulus JSON config → row ── */
+function configToExperimentRow(cfg, parameter) {
+  const la = cfg.layer_averages || {};
+  return {
+    parameter,
+    value: cfg.label,
+    accuracy: cfg.accuracy,
+    accuracyPct: cfg.accuracy_pct,
+    avgInferenceMs: cfg.avg_total_ms,
+    encMs: la.encryption_ms ?? 0,
+    conv1Ms: la.conv1_ms ?? 0,
+    act1Ms: la.act1_ms ?? 0,
+    pool1Ms: la.pool1_ms ?? 0,
+    conv2Ms: la.conv2_ms ?? 0,
+    act2Ms: la.act2_ms ?? 0,
+    pool2Ms: la.pool2_ms ?? 0,
+    fcMs: la.fc_ms ?? 0,
+    decMs: la.decryption_ms ?? 0,
+    security: cfg.security || "128-bit",
+    numImages: cfg.num_images,
+    notes: "",
+  };
+}
+
 /* ── Main Component ── */
 export default function ParameterComparison() {
-  const [activeTab, setActiveTab] = useState("activation"); // "activation" | "security"
+  const [activeTab, setActiveTab] = useState("activation"); // "activation" | "security" | "scale" | "modulus"
   const [activationRows, setActivationRows] = useState([]);
+  const [scaleRows, setScaleRows] = useState([]);
+  const [modulusRows, setModulusRows] = useState([]);
   const [numImages, setNumImages] = useState(0);
+  const [scaleNumImages, setScaleNumImages] = useState(0);
+  const [modulusNumImages, setModulusNumImages] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  /* Load benchmark_data.json once on mount */
+  /* Load all JSON data on mount */
   useEffect(() => {
-    fetch("/benchmark_data.json")
-      .then((res) => {
-        if (!res.ok) throw new Error("benchmark_data.json not found");
-        return res.json();
-      })
-      .then((data) => {
-        const rows = (data.configs || []).map(configToActivationRow);
-        setActivationRows(rows);
-        // Use num_images from the first config (they should all be equal)
-        const n = data.configs?.[0]?.num_images || data.total_images || 0;
-        setNumImages(n);
-
-        // Back-fill the 128-bit security row with real deg-2 data
-        const deg2 = data.configs?.find((c) => c.degree === 2);
-        if (deg2) {
-          SECURITY_ROWS[0].accuracy = deg2.accuracy;
-          SECURITY_ROWS[0].accuracyPct = deg2.accuracy_pct;
-          SECURITY_ROWS[0].avgInferenceMs = deg2.avg_total_ms;
+    const loadAll = async () => {
+      // Load activation degree data
+      try {
+        const res = await fetch("/benchmark_data.json");
+        if (res.ok) {
+          const data = await res.json();
+          const rows = (data.configs || []).map(configToActivationRow);
+          setActivationRows(rows);
+          const n = data.configs?.[0]?.num_images || data.total_images || 0;
+          setNumImages(n);
+          const deg2 = data.configs?.find((c) => c.degree === 2);
+          if (deg2) {
+            SECURITY_ROWS[0].accuracy = deg2.accuracy;
+            SECURITY_ROWS[0].accuracyPct = deg2.accuracy_pct;
+            SECURITY_ROWS[0].avgInferenceMs = deg2.avg_total_ms;
+          }
         }
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+      } catch (e) { /* ignore */ }
+
+      // Load scale factor data
+      try {
+        const res = await fetch("/scale_factor_data.json");
+        if (res.ok) {
+          const data = await res.json();
+          const rows = (data.configs || []).map((c) => configToExperimentRow(c, "Scale Factor"));
+          setScaleRows(rows);
+          setScaleNumImages(data.total_images || 0);
+        }
+      } catch (e) { /* ignore */ }
+
+      // Load plaintext modulus data
+      try {
+        const res = await fetch("/plaintext_modulus_data.json");
+        if (res.ok) {
+          const data = await res.json();
+          const rows = (data.configs || []).map((c) => configToExperimentRow(c, "Plaintext Modulus"));
+          setModulusRows(rows);
+          setModulusNumImages(data.total_images || 0);
+        }
+      } catch (e) { /* ignore */ }
+
+      setLoading(false);
+    };
+    loadAll();
   }, []);
 
-  const rows = activeTab === "activation" ? activationRows : SECURITY_ROWS;
+  const rows =
+    activeTab === "activation" ? activationRows :
+    activeTab === "security" ? SECURITY_ROWS :
+    activeTab === "scale" ? scaleRows :
+    modulusRows;
+
+  const showLayerChart = activeTab === "activation" || activeTab === "scale" || activeTab === "modulus";
+  const chartRows =
+    activeTab === "scale" ? scaleRows :
+    activeTab === "modulus" ? modulusRows :
+    activationRows;
 
   if (loading) {
     return (
@@ -156,11 +216,13 @@ export default function ParameterComparison() {
   return (
     <div>
       {/* Tab selector */}
-      <div className="flex gap-2 mb-5">
+      <div className="flex flex-wrap gap-2 mb-5">
         {[
           { id: "activation", label: "Activation Degree", desc: "x² vs degree 3 vs degree 4" },
           { id: "security", label: "Security Level", desc: "128-bit vs 192-bit vs 256-bit" },
-        ].map((tab) => (
+          { id: "scale", label: "Scale Factor", desc: "S=100 vs S=1,000 vs S=10,000", hidden: scaleRows.length === 0 },
+          { id: "modulus", label: "Plaintext Modulus", desc: "16-bit vs baseline vs 32-bit", hidden: modulusRows.length === 0 },
+        ].filter((t) => !t.hidden).map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
@@ -268,8 +330,8 @@ export default function ParameterComparison() {
         </table>
       </div>
 
-      {/* Per-layer breakdown chart (activation tab only) */}
-      {activeTab === "activation" && (
+      {/* Per-layer breakdown chart (activation, scale, modulus tabs) */}
+      {showLayerChart && chartRows.length > 0 && (
         <div className="mt-6">
           <h4 className="text-xs font-medium uppercase tracking-wider mb-3" style={{ color: "#888" }}>
             Per-Layer Timing Breakdown (ms)
@@ -278,17 +340,17 @@ export default function ParameterComparison() {
             <div style={{ height: 260 }}>
               <Bar
                 data={{
-                  labels: activationRows.map((r) => r.value),
+                  labels: chartRows.map((r) => r.value),
                   datasets: [
-                    { label: "Encrypt", data: activationRows.map((r) => r.encMs), backgroundColor: "#0db7c4" },
-                    { label: "Conv1", data: activationRows.map((r) => r.conv1Ms), backgroundColor: "#7b3ff2" },
-                    { label: "Act1", data: activationRows.map((r) => r.act1Ms), backgroundColor: "#e68a00" },
-                    { label: "Pool1", data: activationRows.map((r) => r.pool1Ms), backgroundColor: "#f4b942" },
-                    { label: "Conv2", data: activationRows.map((r) => r.conv2Ms), backgroundColor: "#9b6dff" },
-                    { label: "Act2", data: activationRows.map((r) => r.act2Ms), backgroundColor: "#ff9f43" },
-                    { label: "Pool2", data: activationRows.map((r) => r.pool2Ms), backgroundColor: "#ffc857" },
-                    { label: "FC", data: activationRows.map((r) => r.fcMs), backgroundColor: "#e03e52" },
-                    { label: "Decrypt", data: activationRows.map((r) => r.decMs), backgroundColor: "#0aa35e" },
+                    { label: "Encrypt", data: chartRows.map((r) => r.encMs), backgroundColor: "#0db7c4" },
+                    { label: "Conv1", data: chartRows.map((r) => r.conv1Ms), backgroundColor: "#7b3ff2" },
+                    { label: "Act1", data: chartRows.map((r) => r.act1Ms), backgroundColor: "#e68a00" },
+                    { label: "Pool1", data: chartRows.map((r) => r.pool1Ms), backgroundColor: "#f4b942" },
+                    { label: "Conv2", data: chartRows.map((r) => r.conv2Ms), backgroundColor: "#9b6dff" },
+                    { label: "Act2", data: chartRows.map((r) => r.act2Ms), backgroundColor: "#ff9f43" },
+                    { label: "Pool2", data: chartRows.map((r) => r.pool2Ms), backgroundColor: "#ffc857" },
+                    { label: "FC", data: chartRows.map((r) => r.fcMs), backgroundColor: "#e03e52" },
+                    { label: "Decrypt", data: chartRows.map((r) => r.decMs), backgroundColor: "#0aa35e" },
                   ],
                 }}
                 options={{
@@ -332,6 +394,20 @@ export default function ParameterComparison() {
             <li>• <b>Degree 4</b> drops to {activationRows[2]?.accuracyPct ?? "—"}% accuracy — higher-degree terms cause complete signal corruption despite plaintext float model achieving 86.91%.</li>
             <li>• Inference time is similar across degrees (~12–14s) since the bottleneck is Conv/FC layers, not activation.</li>
           </ul>
+        ) : activeTab === "scale" ? (
+          <ul className="text-xs space-y-1" style={{ color: "#8c6200" }}>
+            <li>• <b>S = 100</b> — Low precision: more quantization error, but faster computation. Accuracy: {scaleRows[0]?.accuracyPct ?? "—"}%.</li>
+            <li>• <b>S = 1,000</b> — Baseline precision used during training. Accuracy: {scaleRows[1]?.accuracyPct ?? "—"}%.</li>
+            <li>• <b>S = 10,000</b> — High precision: less quantization error, but larger ciphertexts. Accuracy: {scaleRows[2]?.accuracyPct ?? "—"}%.</li>
+            <li>• Higher scale factors reduce rounding errors but increase the risk of plaintext modulus overflow.</li>
+          </ul>
+        ) : activeTab === "modulus" ? (
+          <ul className="text-xs space-y-1" style={{ color: "#8c6200" }}>
+            <li>• <b>p = 65,537</b> — Small 16-bit modulus: high overflow risk, accuracy {modulusRows[0]?.accuracyPct ?? "—"}%.</li>
+            <li>• <b>p = 100,073,473</b> — Baseline: sufficient headroom for scale=1000. Accuracy: {modulusRows[1]?.accuracyPct ?? "—"}%.</li>
+            <li>• <b>p = 4,294,967,311</b> — Large 32-bit modulus: more headroom but slower operations. Accuracy: {modulusRows[2]?.accuracyPct ?? "—"}%.</li>
+            <li>• The plaintext modulus must be large enough to hold all intermediate computation values without wrapping around.</li>
+          </ul>
         ) : (
           <ul className="text-xs space-y-1" style={{ color: "#8c6200" }}>
             <li>• <b>128-bit</b> security works well on t3.xlarge (7.6 GB RAM) with BFV keygen completing in under 5 seconds.</li>
@@ -346,10 +422,22 @@ export default function ParameterComparison() {
       <div className="mt-3 text-[10px] flex flex-wrap gap-x-4 gap-y-1" style={{ color: "#bbb" }}>
         <span>EC2: t3.xlarge (4 vCPU, 7.6 GB RAM)</span>
         <span>OpenFHE v1.2.2 (BFV)</span>
-        <span>p = 100,073,473</span>
-        <span>mult_depth = 6</span>
-        <span>scale = 1000</span>
-        <span>{numImages} MNIST test images per config</span>
+        {activeTab === "scale" ? (
+          <span>p = 100,073,473 · degree = 2</span>
+        ) : activeTab === "modulus" ? (
+          <span>scale = 1,000 · degree = 2</span>
+        ) : (
+          <>
+            <span>p = 100,073,473</span>
+            <span>mult_depth = 6</span>
+            <span>scale = 1000</span>
+          </>
+        )}
+        <span>
+          {activeTab === "scale" ? scaleNumImages :
+           activeTab === "modulus" ? modulusNumImages :
+           numImages} MNIST test images per config
+        </span>
       </div>
     </div>
   );
