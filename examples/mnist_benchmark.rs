@@ -1,7 +1,8 @@
-/// Automated MNIST Benchmark: 100 images × configurable activation degree
+/// Automated MNIST Benchmark: configurable image count × configurable activation degree
 ///
-/// Runs the full encrypted CNN inference pipeline on 100 test images
-/// (10 per digit) and outputs detailed CSV results for dissertation analysis.
+/// Runs the full encrypted CNN inference pipeline on test images
+/// (default: 10 images from test_images.csv) and outputs detailed CSV results
+/// for dissertation analysis.
 ///
 /// This binary runs DIRECTLY on the compute server (EC2 #2), bypassing
 /// the gRPC/Spring Boot/frontend layers for maximum throughput.
@@ -9,11 +10,14 @@
 /// # Usage
 ///
 /// ```bash
-/// # Default: use weights/ directory (deg2, 128-bit)
+/// # Default: use weights/ directory (deg2, 128-bit), 10 images
 /// cargo run --release --example mnist_benchmark
 ///
 /// # Specify weight directory explicitly (deg3):
 /// cargo run --release --example mnist_benchmark -- --weights mnist_training/weights_deg3
+///
+/// # Limit to first N images (useful for quick tests):
+/// cargo run --release --example mnist_benchmark -- --limit 5
 ///
 /// # Specify output CSV path:
 /// cargo run --release --example mnist_benchmark -- --output results_deg2.csv
@@ -91,14 +95,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ================================================================
     // Phase 1: Load test images
     // ================================================================
-    let images_path = Path::new(&weights_dir).join("test_images_100.csv");
-    let labels_path = Path::new(&weights_dir).join("test_labels_100.csv");
+    // Prefer test_images.csv (10 images — fits in EC2 memory) over test_images_100.csv
+    let images_10_path = Path::new(&weights_dir).join("test_images.csv");
+    let labels_10_path = Path::new(&weights_dir).join("test_labels.csv");
+    let images_100_path = Path::new(&weights_dir).join("test_images_100.csv");
+    let labels_100_path = Path::new(&weights_dir).join("test_labels_100.csv");
 
-    if !images_path.exists() {
-        eprintln!("ERROR: {} not found", images_path.display());
-        eprintln!("Run: cd mnist_training && python export_test_images_100.py");
+    let (images_path, labels_path) = if images_10_path.exists() {
+        (images_10_path, labels_10_path)
+    } else if images_100_path.exists() {
+        (images_100_path, labels_100_path)
+    } else {
+        eprintln!("ERROR: No test images found in {}", weights_dir);
+        eprintln!("Expected: test_images.csv (10 images) or test_images_100.csv (100 images)");
+        eprintln!("Run: cd mnist_training && python export_test_images.py");
         std::process::exit(1);
-    }
+    };
 
     println!("  Loading test images from: {}", images_path.display());
     let (mut images, mut labels) = load_test_data(&images_path, &labels_path)?;
@@ -130,7 +142,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Auto-generate output path if not specified
     if output_path.is_empty() {
         output_path = format!(
-            "mnist_training/fhe_benchmark_deg{}_128bit.csv",
+            "mnist_training/fhe_test_results_deg{}_128bit.csv",
             engine.activation_degree
         );
     }
@@ -145,12 +157,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let file = fs::File::create(&output_path)?;
     let mut writer = BufWriter::new(file);
 
-    // Write header
+    // Write header (must match csv_to_json.py expectations)
     writeln!(
         writer,
-        "image_index,true_label,predicted_digit,correct,encryption_ms,conv1_ms,\
-         bias1_ms,act1_ms,pool1_ms,conv2_ms,bias2_ms,act2_ms,pool2_ms,\
-         fc_ms,bias_fc_ms,decryption_ms,total_ms,logits"
+        "image_index,true_label,predicted,correct,confidence,total_ms,encryption_ms,conv1_ms,\
+         act1_ms,pool1_ms,conv2_ms,act2_ms,pool2_ms,fc_ms,decryption_ms,\
+         activation_degree,security_level_label,status"
     )?;
 
     let mut correct_count = 0;
@@ -179,29 +191,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             result.predicted_digit, status, wall_ms
         );
 
-        // Write CSV row
-        let logits_str: Vec<String> = result.logits.iter().map(|v| v.to_string()).collect();
+        // Compute a simple confidence score
+        let max_logit = *result.logits.iter().max().unwrap_or(&0) as f64;
+        let sum_positive: f64 = result.logits.iter().filter(|&&v| v > 0).map(|&v| v as f64).sum();
+        let confidence = if sum_positive > 0.0 { max_logit / sum_positive } else { 0.0 };
+
+        // Write CSV row (format matches csv_to_json.py: predicted as bool string, etc.)
         writeln!(
             writer,
-            "{},{},{},{},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},\"[{}]\"",
+            "{},{},{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},128-bit,success",
             idx,
             true_label,
             result.predicted_digit,
-            if is_correct { 1 } else { 0 },
+            if is_correct { "True" } else { "False" },
+            confidence,
+            result.timing.total_ms,
             result.timing.encryption_ms,
             result.timing.conv1_ms,
-            result.timing.bias1_ms,
             result.timing.act1_ms,
             result.timing.pool1_ms,
             result.timing.conv2_ms,
-            result.timing.bias2_ms,
             result.timing.act2_ms,
             result.timing.pool2_ms,
             result.timing.fc_ms,
-            result.timing.bias_fc_ms,
             result.timing.decryption_ms,
-            result.timing.total_ms,
-            logits_str.join(",")
+            engine.activation_degree,
         )?;
         writer.flush()?;
     }

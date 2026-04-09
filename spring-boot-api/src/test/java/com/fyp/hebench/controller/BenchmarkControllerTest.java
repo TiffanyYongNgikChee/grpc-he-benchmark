@@ -112,7 +112,7 @@ class BenchmarkControllerTest {
             mockResponse.setConv1Ms(3475);
             mockResponse.setDecryptionMs(26);
 
-            when(grpcClientService.predictDigit(anyList(), eq(1000L), eq(0)))
+            when(grpcClientService.predictDigit(anyList(), eq(1000L), eq(0), eq(2)))
                     .thenReturn(mockResponse);
 
             mockMvc.perform(post("/api/predict")
@@ -127,7 +127,7 @@ class BenchmarkControllerTest {
         @Test
         @DisplayName("returns 500 when gRPC server is unreachable")
         void handlesGrpcConnectionError() throws Exception {
-            when(grpcClientService.predictDigit(anyList(), anyLong(), anyInt()))
+            when(grpcClientService.predictDigit(anyList(), anyLong(), anyInt(), anyInt()))
                     .thenThrow(new io.grpc.StatusRuntimeException(
                             io.grpc.Status.UNAVAILABLE.withDescription("Connection refused")));
 
@@ -149,7 +149,7 @@ class BenchmarkControllerTest {
             mockResponse.setStatus("success");
 
             // When scaleFactor <= 0, controller should use 1000
-            when(grpcClientService.predictDigit(anyList(), eq(1000L), anyInt()))
+            when(grpcClientService.predictDigit(anyList(), eq(1000L), anyInt(), anyInt()))
                     .thenReturn(mockResponse);
 
             mockMvc.perform(post("/api/predict")

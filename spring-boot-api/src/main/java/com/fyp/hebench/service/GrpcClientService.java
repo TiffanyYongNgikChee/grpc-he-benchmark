@@ -1,18 +1,18 @@
 package com.fyp.hebench.service;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;      // Generated from .proto message
-
-import com.fyp.hebench.grpc.BenchmarkRequest;     // Generated from .proto message
-import com.fyp.hebench.grpc.BenchmarkResponse;  // Generated from .proto message
-import com.fyp.hebench.grpc.ComparisonBenchmarkResponse;         // Generated from .proto PredictRequest message
-import com.fyp.hebench.grpc.HEServiceGrpc;        // Generated from .proto PredictResponse message
-import com.fyp.hebench.grpc.PredictRequest;         // Generated gRPC client stub
-import com.fyp.hebench.grpc.PredictResponse; // Injects config values
-import com.fyp.hebench.grpc.PredictProgressEvent; // Streaming progress event
-
-import java.util.concurrent.TimeUnit;
 import java.util.Iterator;
+import java.util.concurrent.TimeUnit;      // Generated from .proto message
+
+import org.springframework.beans.factory.annotation.Value;     // Generated from .proto message
+import org.springframework.stereotype.Service;  // Generated from .proto message
+
+import com.fyp.hebench.grpc.BenchmarkRequest;         // Generated from .proto PredictRequest message
+import com.fyp.hebench.grpc.BenchmarkResponse;        // Generated from .proto PredictResponse message
+import com.fyp.hebench.grpc.ComparisonBenchmarkResponse;         // Generated gRPC client stub
+import com.fyp.hebench.grpc.HEServiceGrpc; // Injects config values
+import com.fyp.hebench.grpc.PredictProgressEvent; // Streaming progress event
+import com.fyp.hebench.grpc.PredictRequest;
+import com.fyp.hebench.grpc.PredictResponse;
 
 import io.grpc.ManagedChannel;           // gRPC network connection handler
 import io.grpc.ManagedChannelBuilder;    // Builder to create the channel
@@ -263,15 +263,17 @@ public class GrpcClientService {
      * @param scaleFactor - Quantisation scale factor (default: 1000)
      * @return PredictResponse with predicted digit, confidence, timing breakdown
      */
-    public com.fyp.hebench.model.PredictResponse predictDigit(java.util.List<Long> pixels, long scaleFactor, int securityLevel) {
+    public com.fyp.hebench.model.PredictResponse predictDigit(java.util.List<Long> pixels, long scaleFactor, int securityLevel, int activationDegree) {
         // Step 1: Build Protobuf PredictRequest
         // .addAllPixels() converts Java List<Long> to protobuf repeated int64
         // .setScaleFactor() sets the quantisation scale (1000 = multiply weights by 1000)
         // .setSecurityLevel() sets the HE security level (0=128, 1=192, 2=256)
+        // .setActivationDegree() selects which polynomial activation to use (2=x², 3=cubic, 4=quartic)
         PredictRequest request = PredictRequest.newBuilder()
                 .addAllPixels(pixels)
                 .setScaleFactor(scaleFactor)
                 .setSecurityLevel(securityLevel)
+                .setActivationDegree(activationDegree)
                 .build();
 
         // Step 2: Call the Rust gRPC server's PredictDigit RPC
@@ -323,11 +325,12 @@ public class GrpcClientService {
      * @param scaleFactor - Quantisation scale factor (default: 1000)
      * @return Iterator of PredictProgressEvent from the Rust streaming RPC
      */
-    public Iterator<PredictProgressEvent> predictDigitStream(java.util.List<Long> pixels, long scaleFactor, int securityLevel) {
+    public Iterator<PredictProgressEvent> predictDigitStream(java.util.List<Long> pixels, long scaleFactor, int securityLevel, int activationDegree) {
         PredictRequest request = PredictRequest.newBuilder()
                 .addAllPixels(pixels)
                 .setScaleFactor(scaleFactor)
                 .setSecurityLevel(securityLevel)
+                .setActivationDegree(activationDegree)
                 .build();
 
         // Use blocking stub with server-streaming — returns an Iterator

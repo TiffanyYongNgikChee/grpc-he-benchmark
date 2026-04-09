@@ -296,7 +296,7 @@ EXPOSE 50051
 # - ./he-grpc-server  (gRPC server for HE operations)
 # - ./benchmark       (3-way HE library comparison)
 # - ./medical_data    (SEAL medical record demo)
-# - ./mnist_benchmark (100-image encrypted CNN benchmark)
+# - ./mnist_benchmark (10-image encrypted CNN benchmark per activation degree)
 # 
 # Usage:
 #   docker run -p 50051:50051 <image>                    # Run gRPC server

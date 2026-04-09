@@ -3,7 +3,8 @@
 # Run the MNIST encrypted inference benchmark for all activation degrees.
 #
 # This script runs directly on EC2 #2 (compute server) inside the Docker container.
-# It benchmarks 100 images × 3 activation degrees (deg2, deg3, deg4).
+# It benchmarks 10 images × 3 activation degrees (deg2, deg3, deg4).
+# (10 images is the practical max on t3.xlarge due to memory constraints)
 #
 # Usage:
 #   chmod +x scripts/run_all_benchmarks.sh
@@ -12,14 +13,14 @@
 # Or inside Docker:
 #   docker exec -it <container> bash -c "./scripts/run_all_benchmarks.sh"
 #
-# Expected runtime: ~100 images × ~27s/image × 3 configs ≈ 2.25 hours total
+# Expected runtime: ~10 images × ~14s/image × 3 configs ≈ 7 minutes total
 #
 
 set -euo pipefail
 
 echo "================================================================"
 echo "  MNIST FHE Benchmark Suite"
-echo "  100 images × 3 activation degrees (deg2, deg3, deg4)"
+echo "  10 images × 3 activation degrees (deg2, deg3, deg4)"
 echo "================================================================"
 echo ""
 
@@ -43,9 +44,10 @@ for WDIR in "${WEIGHT_DIRS[@]}"; do
         continue
     fi
 
-    if [ ! -f "$WDIR/test_images_100.csv" ]; then
-        echo "SKIP: $WDIR/test_images_100.csv not found"
-        echo "Run: cd mnist_training && python export_test_images_100.py"
+    if [ ! -f "$WDIR/test_images.csv" ] && [ ! -f "$WDIR/test_images_100.csv" ]; then
+        echo "SKIP: No test images found in $WDIR"
+        echo "Expected: test_images.csv (10 images) or test_images_100.csv (100 images)"
+        echo "Run: cd mnist_training && python export_test_images.py"
         echo ""
         continue
     fi
@@ -60,7 +62,7 @@ for WDIR in "${WEIGHT_DIRS[@]}"; do
 
     cargo run --release --example mnist_benchmark -- \
         --weights "$WDIR" \
-        --output "mnist_training/fhe_benchmark_deg${DEG}_128bit.csv"
+        --output "mnist_training/fhe_test_results_deg${DEG}_128bit.csv"
 
     END=$(date +%s)
     ELAPSED=$((END - START))
@@ -77,7 +79,10 @@ echo "  Total time: ${TOTAL_ELAPSED}s ($((TOTAL_ELAPSED / 60))m $((TOTAL_ELAPSED
 echo "================================================================"
 echo ""
 echo "  Results:"
-ls -la mnist_training/fhe_benchmark_*.csv 2>/dev/null || echo "  (no CSV files found)"
+ls -la mnist_training/fhe_test_results_deg*_128bit.csv 2>/dev/null || echo "  (no CSV files found)"
 echo ""
 echo "  Summaries:"
 ls -la mnist_training/fhe_benchmark_summary_*.txt 2>/dev/null || echo "  (no summary files found)"
+echo ""
+echo "  To generate frontend dashboard data:"
+echo "    python scripts/csv_to_json.py"

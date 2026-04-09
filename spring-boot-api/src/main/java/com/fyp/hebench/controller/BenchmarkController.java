@@ -92,7 +92,8 @@ public class BenchmarkController {
             PredictResponse response = grpcClientService.predictDigit(
                 request.getPixels(), 
                 scaleFactor,
-                request.getSecurityLevel()
+                request.getSecurityLevel(),
+                request.getActivationDegree()
             );
             return ResponseEntity.ok(response);
         } catch (io.grpc.StatusRuntimeException e) {
@@ -149,7 +150,7 @@ public class BenchmarkController {
         new Thread(() -> {
             try {
                 java.util.Iterator<com.fyp.hebench.grpc.PredictProgressEvent> stream = 
-                    grpcClientService.predictDigitStream(request.getPixels(), scaleFactor, request.getSecurityLevel());
+                    grpcClientService.predictDigitStream(request.getPixels(), scaleFactor, request.getSecurityLevel(), request.getActivationDegree());
 
                 while (stream.hasNext()) {
                     com.fyp.hebench.grpc.PredictProgressEvent event = stream.next();

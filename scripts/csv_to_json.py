@@ -122,6 +122,10 @@ def main():
             continue
 
         rows = load_csv(csv_path)
+        if not rows:
+            print(f"⚠ Skipping {config['file']} — file is empty (0 rows)")
+            continue
+
         summary = compute_summary(rows, config)
         output["configs"].append(summary)
         output["raw_results"][f"deg{config['degree']}"] = rows
