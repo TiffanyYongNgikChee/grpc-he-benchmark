@@ -158,23 +158,91 @@ describe("MetricsStrip", () => {
    ParameterComparison
    ══════════════════════════════════════════ */
 describe("ParameterComparison", () => {
-  it("renders activation tab by default", () => {
-    render(<ParameterComparison />);
-    // Default tab shows activation degree configurations in the table
-    expect(screen.getAllByText(/x\u00B2 \(degree 2\)/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("degree 3").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("degree 4").length).toBeGreaterThanOrEqual(1);
+  const mockBenchmarkJson = {
+    generated_at: "auto",
+    scheme: "BFV",
+    library: "OpenFHE v1.2.2",
+    plaintext_modulus: 100073473,
+    scale_factor: 1000,
+    total_images: 30,
+    configs: [
+      {
+        degree: 2,
+        label: "x\u00b2 (degree 2)",
+        security: "128-bit",
+        num_images: 10,
+        accuracy: "10/10",
+        accuracy_pct: 100.0,
+        avg_total_ms: 13919.2,
+        layer_averages: {
+          encryption_ms: 64, conv1_ms: 3475, act1_ms: 342, pool1_ms: 474,
+          conv2_ms: 3133, act2_ms: 307, pool2_ms: 485, fc_ms: 5611, decryption_ms: 26,
+        },
+      },
+      {
+        degree: 3,
+        label: "x\u00b3 (degree 3)",
+        security: "128-bit",
+        num_images: 10,
+        accuracy: "3/10",
+        accuracy_pct: 30.0,
+        avg_total_ms: 12160.2,
+        layer_averages: {
+          encryption_ms: 65, conv1_ms: 2777, act1_ms: 85, pool1_ms: 446,
+          conv2_ms: 2885, act2_ms: 83, pool2_ms: 438, fc_ms: 5353, decryption_ms: 26,
+        },
+      },
+      {
+        degree: 4,
+        label: "x\u2074 (degree 4)",
+        security: "128-bit",
+        num_images: 10,
+        accuracy: "0/10",
+        accuracy_pct: 0.0,
+        avg_total_ms: 13695.8,
+        layer_averages: {
+          encryption_ms: 61, conv1_ms: 3454, act1_ms: 88, pool1_ms: 510,
+          conv2_ms: 3348, act2_ms: 85, pool2_ms: 505, fc_ms: 5617, decryption_ms: 26,
+        },
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockBenchmarkJson),
+    });
   });
 
-  it("shows accuracy values for activation degrees", () => {
-    render(<ParameterComparison />);
-    expect(screen.getByText("10/10")).toBeInTheDocument();
-    expect(screen.getByText("3/10")).toBeInTheDocument();
-    expect(screen.getByText("0/10")).toBeInTheDocument();
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
-  it("switches to security level tab", () => {
+  it("renders activation tab by default", async () => {
     render(<ParameterComparison />);
+    await waitFor(() => {
+      // Default tab shows activation degree configurations in the table
+      expect(screen.getAllByText(/x\u00B2 \(degree 2\)/).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText(/degree 3/).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText(/degree 4/).length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  it("shows accuracy values for activation degrees", async () => {
+    render(<ParameterComparison />);
+    await waitFor(() => {
+      expect(screen.getByText("10/10")).toBeInTheDocument();
+      expect(screen.getByText("3/10")).toBeInTheDocument();
+      expect(screen.getByText("0/10")).toBeInTheDocument();
+    });
+  });
+
+  it("switches to security level tab", async () => {
+    render(<ParameterComparison />);
+    await waitFor(() => {
+      expect(screen.getByText("Security Level")).toBeInTheDocument();
+    });
     // Click security tab
     fireEvent.click(screen.getByText("Security Level"));
     // Security-specific data should appear (OOM notes only in security tab)
@@ -183,36 +251,61 @@ describe("ParameterComparison", () => {
     expect(screen.getAllByText("256-bit").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("shows key findings callout for activation tab", () => {
+  it("shows key findings callout for activation tab", async () => {
     render(<ParameterComparison />);
-    expect(screen.getByText("Key Findings")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Key Findings")).toBeInTheDocument();
+    });
     // Activation-specific finding about polynomial matching training
     expect(screen.getByText(/matches training activation/i)).toBeInTheDocument();
   });
 
-  it("shows different key findings for security tab", () => {
+  it("shows different key findings for security tab", async () => {
     render(<ParameterComparison />);
+    await waitFor(() => {
+      expect(screen.getByText("Security Level")).toBeInTheDocument();
+    });
     fireEvent.click(screen.getByText("Security Level"));
     // Security-specific findings about memory requirements
     expect(screen.getAllByText(/ring dimension/i).length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders experiment metadata", () => {
+  it("renders experiment metadata", async () => {
     render(<ParameterComparison />);
-    expect(screen.getByText(/OpenFHE v1\.2\.2/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/OpenFHE v1\.2\.2/)).toBeInTheDocument();
+    });
     expect(screen.getByText(/p = 100,073,473/)).toBeInTheDocument();
   });
 
-  it("shows per-layer breakdown chart on activation tab", () => {
+  it("shows per-layer breakdown chart on activation tab", async () => {
     render(<ParameterComparison />);
-    // The stacked bar chart should be rendered (mocked)
-    expect(screen.getByText("Per-Layer Timing Breakdown (ms)")).toBeInTheDocument();
+    await waitFor(() => {
+      // The stacked bar chart should be rendered (mocked)
+      expect(screen.getByText("Per-Layer Timing Breakdown (ms)")).toBeInTheDocument();
+    });
   });
 
-  it("hides per-layer chart on security tab", () => {
+  it("hides per-layer chart on security tab", async () => {
     render(<ParameterComparison />);
+    await waitFor(() => {
+      expect(screen.getByText("Security Level")).toBeInTheDocument();
+    });
     fireEvent.click(screen.getByText("Security Level"));
     expect(screen.queryByText("Per-Layer Timing Breakdown (ms)")).not.toBeInTheDocument();
+  });
+
+  it("shows dynamic image count in metadata", async () => {
+    render(<ParameterComparison />);
+    await waitFor(() => {
+      expect(screen.getByText("10 MNIST test images per config")).toBeInTheDocument();
+    });
+  });
+
+  it("shows loading state while fetching", () => {
+    global.fetch.mockReturnValue(new Promise(() => {}));
+    render(<ParameterComparison />);
+    expect(screen.getByText(/loading experiment/i)).toBeInTheDocument();
   });
 });
 
