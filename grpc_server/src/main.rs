@@ -44,56 +44,106 @@ struct SessionConfig {
 }
 
 // Our gRPC service implementation
+//
+// Lazy-loading strategy: Only the default engine (degree 2) is loaded at startup
+// to keep memory usage at ~2.5 GB. Other engines are loaded on-demand when a
+// request arrives with a different activation_degree, then cached for reuse.
+// This avoids OOM on t3.xlarge (7.6 GB RAM) where loading all 3 engines at once
+// would require ~7.5 GB and cause heavy swap thrashing.
 pub struct HEServiceImpl {
     sessions: Arc<Mutex<HashMap<String, SessionConfig>>>,
-    /// Pre-initialized encrypted inference engines (OpenFHE BFV), keyed by activation degree.
-    /// Multiple engines allow per-request activation degree selection without re-initialization.
-    /// Wrapped in SendSyncEngine for async safety; only accessed in spawn_blocking.
-    inference_engines: HashMap<u32, Arc<SendSyncEngine>>,
+    /// Cached inference engines, keyed by activation degree. Populated lazily.
+    inference_engines: Arc<Mutex<HashMap<u32, Arc<SendSyncEngine>>>>,
     /// Default activation degree (used when request doesn't specify or specifies 0)
     default_degree: u32,
+    /// Security level for creating new engines on demand
+    security_level: u32,
+    /// Available weight directories keyed by degree (for lazy-loading)
+    weight_dirs: HashMap<u32, String>,
 }
 
 impl HEServiceImpl {
-    fn new(engine: EncryptedInferenceEngine) -> Self {
+    fn new(engine: EncryptedInferenceEngine, security_level: u32, weight_dirs: HashMap<u32, String>) -> Self {
         let degree = engine.activation_degree;
         let mut engines = HashMap::new();
         engines.insert(degree, Arc::new(SendSyncEngine(engine)));
         HEServiceImpl {
             sessions: Arc::new(Mutex::new(HashMap::new())),
-            inference_engines: engines,
+            inference_engines: Arc::new(Mutex::new(engines)),
             default_degree: degree,
-        }
-    }
-
-    fn new_multi(engines: Vec<EncryptedInferenceEngine>, default_degree: u32) -> Self {
-        let mut engine_map = HashMap::new();
-        for engine in engines {
-            let degree = engine.activation_degree;
-            engine_map.insert(degree, Arc::new(SendSyncEngine(engine)));
-        }
-        HEServiceImpl {
-            sessions: Arc::new(Mutex::new(HashMap::new())),
-            inference_engines: engine_map,
-            default_degree,
+            security_level,
+            weight_dirs,
         }
     }
 
     /// Get the inference engine for the requested activation degree.
-    /// Falls back to the default engine if the requested degree is not loaded.
+    ///
+    /// If the engine is already loaded, returns it immediately from cache.
+    /// If not loaded but weight directory exists, loads it on-demand (takes ~2-5s).
+    /// Falls back to the default engine if the requested degree is unavailable.
     fn get_engine(&self, activation_degree: i32) -> Arc<SendSyncEngine> {
         let degree = if activation_degree >= 2 && activation_degree <= 4 {
             activation_degree as u32
         } else {
             self.default_degree
         };
-        self.inference_engines
-            .get(&degree)
-            .cloned()
-            .unwrap_or_else(|| {
-                println!("⚠ Requested activation_degree={} not loaded, using default degree={}", degree, self.default_degree);
-                self.inference_engines.get(&self.default_degree).unwrap().clone()
-            })
+
+        // Fast path: engine already cached
+        {
+            let engines = self.inference_engines.lock().unwrap();
+            if let Some(engine) = engines.get(&degree) {
+                return engine.clone();
+            }
+        }
+
+        // Slow path: try to lazy-load the engine
+        if let Some(dir) = self.weight_dirs.get(&degree) {
+            let sec_label = match self.security_level {
+                1 => "192-bit",
+                2 => "256-bit",
+                _ => "128-bit",
+            };
+            println!("🔄 Lazy-loading engine for degree {} (weights: {}, security: {})...", degree, dir, sec_label);
+
+            match EncryptedInferenceEngine::new_with_security(dir, self.security_level) {
+                Ok(engine) => {
+                    let act_label = match engine.activation_degree {
+                        3 => "degree-3 (0.125x³+0.5x)",
+                        4 => "degree-4 (0.0625x⁴+0.25x²+0.1)",
+                        _ => "degree-2 (x²)",
+                    };
+                    println!(
+                        "  ✓ Engine ready (degree={}, float accuracy: {:.2}%, activation: {})",
+                        engine.activation_degree, engine.float_accuracy, act_label
+                    );
+                    let arc_engine = Arc::new(SendSyncEngine(engine));
+                    let mut engines = self.inference_engines.lock().unwrap();
+                    engines.insert(degree, arc_engine.clone());
+                    return arc_engine;
+                }
+                Err(e) => {
+                    println!("  ⚠ Failed to load engine for degree {}: {}", degree, e);
+                }
+            }
+        }
+
+        // Fallback to default
+        println!("⚠ Requested activation_degree={} not available, using default degree={}", degree, self.default_degree);
+        let engines = self.inference_engines.lock().unwrap();
+        engines.get(&self.default_degree).unwrap().clone()
+    }
+
+    /// Get the number of currently loaded engines (for status display)
+    fn loaded_engine_count(&self) -> usize {
+        self.inference_engines.lock().unwrap().len()
+    }
+
+    /// Get the degrees of currently loaded engines
+    fn loaded_degrees(&self) -> Vec<u32> {
+        let engines = self.inference_engines.lock().unwrap();
+        let mut degrees: Vec<u32> = engines.keys().cloned().collect();
+        degrees.sort();
+        degrees
     }
 }
 
@@ -1325,9 +1375,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bind_addr = std::env::var("GRPC_BIND_ADDR").unwrap_or_else(|_| "[::]:50051".to_string());
     let addr = bind_addr.parse()?;
 
-    // Initialize encrypted inference engines (loads weights, creates BFV context, keygen)
-    // Pre-load engines for all available activation degrees so requests can switch on-the-fly.
-    // Each engine takes ~2-5 seconds to initialize — done once at startup.
+    // Lazy-loading strategy for inference engines:
+    //   - Only load the default engine (degree 2) at startup → ~2.5 GB
+    //   - Other engines are loaded on-demand when a request specifies a different degree
+    //   - This keeps startup fast and avoids OOM on t3.xlarge (7.6 GB RAM)
     let base_weights_dir = std::env::var("MNIST_WEIGHTS_DIR")
         .unwrap_or_else(|_| "mnist_training/weights".to_string());
     let security_level: u32 = std::env::var("HE_SECURITY_LEVEL")
@@ -1340,68 +1391,66 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => "128-bit",
     };
 
-    // Determine weight directories for each activation degree
-    // Convention: weights_deg2/, weights_deg3/, weights_deg4/ alongside the base dir
+    // Discover weight directories for each activation degree
     let base_parent = std::path::Path::new(&base_weights_dir)
         .parent()
         .unwrap_or(std::path::Path::new("."));
-    let degree_dirs = vec![
-        (2, base_parent.join("weights_deg2")),
-        (3, base_parent.join("weights_deg3")),
-        (4, base_parent.join("weights_deg4")),
+    let degree_candidates = vec![
+        (2u32, base_parent.join("weights_deg2")),
+        (3u32, base_parent.join("weights_deg3")),
+        (4u32, base_parent.join("weights_deg4")),
     ];
 
-    let mut engines: Vec<EncryptedInferenceEngine> = Vec::new();
-    let mut default_degree: u32 = 2;
-
-    for (deg, dir) in &degree_dirs {
+    let mut weight_dirs: HashMap<u32, String> = HashMap::new();
+    for (deg, dir) in &degree_candidates {
         let dir_str = dir.to_string_lossy().to_string();
         if dir.join("model_config.json").exists() {
-            println!("Initializing engine for degree {} (weights: {}, security: {})...", deg, dir_str, sec_label);
-            match EncryptedInferenceEngine::new_with_security(&dir_str, security_level) {
-                Ok(engine) => {
-                    let act_label = match engine.activation_degree {
-                        3 => "degree-3 (0.125x³+0.5x)",
-                        4 => "degree-4 (0.0625x⁴+0.25x²+0.1)",
-                        _ => "degree-2 (x²)",
-                    };
-                    println!(
-                        "  ✓ Engine ready (degree={}, float accuracy: {:.2}%, activation: {})",
-                        engine.activation_degree, engine.float_accuracy, act_label
-                    );
-                    engines.push(engine);
-                }
-                Err(e) => {
-                    println!("  ⚠ Failed to load engine for degree {}: {}", deg, e);
-                }
-            }
+            println!("  📁 Found weights for degree {}: {}", deg, dir_str);
+            weight_dirs.insert(*deg, dir_str);
         } else {
             println!("  ⏭ Skipping degree {} — {} not found", deg, dir_str);
         }
     }
 
-    // Fallback: if no degree-specific dirs found, load from the base weights_dir
-    if engines.is_empty() {
-        println!("No degree-specific weight dirs found, loading from base: {}", base_weights_dir);
-        let engine = EncryptedInferenceEngine::new_with_security(&base_weights_dir, security_level)
-            .expect("Failed to initialize EncryptedInferenceEngine");
-        default_degree = engine.activation_degree;
-        engines.push(engine);
+    // Fallback: if no degree-specific dirs, use base_weights_dir for default
+    if weight_dirs.is_empty() {
+        println!("No degree-specific weight dirs found, using base: {}", base_weights_dir);
+        weight_dirs.insert(2, base_weights_dir.clone());
     }
 
-    println!("\nLoaded {} inference engine(s), default degree: {}\n", engines.len(), default_degree);
+    // Eagerly load ONLY the default engine (degree 2) to keep startup memory at ~2.5 GB
+    let default_degree: u32 = 2;
+    let default_dir = weight_dirs.get(&default_degree)
+        .expect("No weight directory found for default degree 2");
+    println!("\n🚀 Loading default engine (degree {}, security: {})...", default_degree, sec_label);
+    let default_engine = EncryptedInferenceEngine::new_with_security(default_dir, security_level)
+        .expect("Failed to initialize default EncryptedInferenceEngine");
+    let act_label = match default_engine.activation_degree {
+        3 => "degree-3 (0.125x³+0.5x)",
+        4 => "degree-4 (0.0625x⁴+0.25x²+0.1)",
+        _ => "degree-2 (x²)",
+    };
+    println!(
+        "  ✓ Default engine ready (degree={}, float accuracy: {:.2}%, activation: {})",
+        default_engine.activation_degree, default_engine.float_accuracy, act_label
+    );
 
-    let service = HEServiceImpl::new_multi(engines, default_degree);
+    let available_degrees: Vec<u32> = {
+        let mut d: Vec<u32> = weight_dirs.keys().cloned().collect();
+        d.sort();
+        d
+    };
 
-    println!("╔════════════════════════════════════════════════════════════╗");
+    let service = HEServiceImpl::new(default_engine, security_level, weight_dirs);
+
+    println!("\n╔════════════════════════════════════════════════════════════╗");
     println!("║      Homomorphic Encryption gRPC Server                    ║");
     println!("╚════════════════════════════════════════════════════════════╝");
     println!();
     println!("   Listening on: {}", addr);
     println!("   Libraries: Microsoft SEAL (BFV), HELib (BGV), OpenFHE (BFV)");
-    println!("   Inference engines: {} loaded (degrees: {:?})",
-        service.inference_engines.len(),
-        service.inference_engines.keys().collect::<Vec<_>>());
+    println!("   Loaded engines:  {} (degree {})", service.loaded_engine_count(), default_degree);
+    println!("   Available degrees: {:?} (others load on-demand)", available_degrees);
     println!();
     println!("  Available services:");
     println!("    • GenerateKeys           - Create encryption context and keys");
