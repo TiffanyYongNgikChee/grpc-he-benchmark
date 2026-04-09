@@ -61,19 +61,17 @@ extern "C" OpenFHEContext* openfhe_create_bfv_context(
         parameters.SetPlaintextModulus(plaintext_modulus);
         parameters.SetMultiplicativeDepth(multiplicative_depth);
 
-        // Set security level: 0=128-bit (default), 1=192-bit, 2=256-bit
-        switch (security_level) {
-            case 1:
-                parameters.SetSecurityLevel(HEStd_192_classic);
-                break;
-            case 2:
-                parameters.SetSecurityLevel(HEStd_256_classic);
-                break;
-            default:
-                parameters.SetSecurityLevel(HEStd_128_classic);
-                break;
-        }
-        
+        // HEStd_*_classic forces OpenFHE to pick ring dimension n=65536 to meet
+        // the lattice security standard, which requires ~6-7 GB RAM per engine.
+        // For this benchmark we use HEStd_NotSet and pin ringDim=32768 instead:
+        //   - Correct for p=100073473 at mult_depth=6
+        //   - Uses ~1-2 GB per engine → all 3 degrees fit in 8 GB RAM
+        //   - Users can switch degree 2/3/4 live in the demo
+        // The security_level parameter is kept for ABI compatibility and logging.
+        (void)security_level;
+        parameters.SetSecurityLevel(HEStd_NotSet);
+        parameters.SetRingDim(32768);
+
         // Generate crypto context
         CryptoContext<DCRTPoly> cryptoContext = GenCryptoContext(parameters);
         
