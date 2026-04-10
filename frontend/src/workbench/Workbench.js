@@ -796,22 +796,6 @@ function ControlStaticLabel({ label, value }) {
   );
 }
 
-function ControlDropdown({ label, options }) {
-  return (
-    <div className="px-2 md:px-3">
-      <div className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: "#999" }}>{label}</div>
-      <select
-        className="text-sm font-medium bg-white border rounded px-2 py-0.5 cursor-pointer appearance-none pr-6"
-        style={{ color: "#333", borderColor: "#ccc", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}
-      >
-        {options.map((o) => (
-          <option key={o}>{o}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
 function ControlDropdownStateful({ label, options, value, onChange, disabled }) {
   const selectedOption = options.find((o) => o.value === value);
   const warningTitle = selectedOption?.title || null;
