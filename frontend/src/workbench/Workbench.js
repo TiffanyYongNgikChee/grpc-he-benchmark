@@ -241,17 +241,6 @@ export default function Workbench() {
             )}
           </button>
 
-          {/* Step */}
-          <button
-            onClick={handleRun}
-            disabled={!pixels || loading}
-            className="w-9 h-9 rounded-full flex items-center justify-center border border-gray-300 bg-white hover:bg-gray-100 text-gray-500 disabled:opacity-40 transition-colors"
-            title="Step"
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M6 4v16l10-8z" /><rect x="16" y="4" width="3" height="16" rx="0.5" />
-            </svg>
-          </button>
         </div>
 
         {/* Epoch */}
@@ -260,14 +249,14 @@ export default function Workbench() {
         <Divider />
 
         {/* Dropdowns */}
-        <ControlDropdown label="Library" options={["OpenFHE", "SEAL", "HElib"]} />
-        <ControlDropdown label="Encryption" options={["BFV"]} />
+        <ControlStaticLabel label="Library" value="OpenFHE" />
+        <ControlStaticLabel label="Encryption" value="BFV" />
         <ControlDropdownStateful
           label="Security"
           options={[
             { label: "128-bit", value: 0 },
-            { label: "192-bit", value: 1 },
-            { label: "256-bit", value: 2 },
+            { label: "192-bit ⚠️", value: 1, title: "OOM on demo server — 128-bit recommended" },
+            { label: "256-bit ⚠️", value: 2, title: "OOM on demo server — 128-bit recommended" },
           ]}
           value={securityLevel}
           onChange={setSecurityLevel}
@@ -277,15 +266,15 @@ export default function Workbench() {
           label="Activation"
           options={[
             { label: "x² (degree 2)", value: 2 },
-            { label: "degree 3", value: 3 },
-            { label: "degree 4", value: 4 },
+            { label: "degree 3 ⚠️", value: 3, title: "May timeout — weights not optimised for this hardware" },
+            { label: "degree 4 ⚠️", value: 4, title: "May timeout — weights not optimised for this hardware" },
           ]}
           value={activationDegree}
           onChange={setActivationDegree}
           disabled={loading}
         />
-        <ControlDropdown label="Scale factor" options={["1000"]} />
-        <ControlDropdown label="Model" options={["CNN (LeNet-5)"]} />
+        <ControlStaticLabel label="Scale factor" value="1000" />
+        <ControlStaticLabel label="Model" value="CNN (LeNet-5)" />
 
         {/* Spacer + health + total time */}
         <div className="ml-auto flex items-center gap-3">
@@ -507,7 +496,7 @@ export default function Workbench() {
               PARAMETER EXPERIMENTS
             </h3>
             <span className="text-[10px]" style={{ color: "#bbb" }}>
-              Security Level, Activation Degree, Scale Factor & Plaintext Modulus
+              Activation Degree · Security Level
             </span>
           </div>
           <div
@@ -793,6 +782,20 @@ function ControlLabel({ label, value, mono }) {
   );
 }
 
+function ControlStaticLabel({ label, value }) {
+  return (
+    <div className="px-2 md:px-3">
+      <div className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: "#999" }}>{label}</div>
+      <div
+        className="text-sm font-medium px-2 py-0.5 rounded border"
+        style={{ color: "#555", borderColor: "#e0e0e0", background: "#f5f5f5", whiteSpace: "nowrap" }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
 function ControlDropdown({ label, options }) {
   return (
     <div className="px-2 md:px-3">
@@ -810,6 +813,8 @@ function ControlDropdown({ label, options }) {
 }
 
 function ControlDropdownStateful({ label, options, value, onChange, disabled }) {
+  const selectedOption = options.find((o) => o.value === value);
+  const warningTitle = selectedOption?.title || null;
   return (
     <div className="px-2 md:px-3">
       <div className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: "#999" }}>{label}</div>
@@ -817,11 +822,12 @@ function ControlDropdownStateful({ label, options, value, onChange, disabled }) 
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         disabled={disabled}
+        title={warningTitle || undefined}
         className="text-sm font-medium bg-white border rounded px-2 py-0.5 cursor-pointer appearance-none pr-6 disabled:opacity-50"
-        style={{ color: "#333", borderColor: "#ccc", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}
+        style={{ color: warningTitle ? "#e68a00" : "#333", borderColor: warningTitle ? "#e68a00" : "#ccc", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}
       >
         {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
+          <option key={o.value} value={o.value} title={o.title || undefined}>{o.label}</option>
         ))}
       </select>
     </div>
