@@ -322,7 +322,8 @@ fn run_seal_benchmark(poly_modulus_degree: u64, num_operations: i32, custom_valu
     };
 
     let total_start = Instant::now();
-    let plain_modulus = 1032193u64;
+    // Use 65537 (2^16+1) as plain modulus — valid for both 4096 and 8192 poly degree
+    let plain_modulus = 65537u64;
     
     let key_start = Instant::now();
     let context = match SealContext::new(poly_modulus_degree, plain_modulus) {
@@ -836,7 +837,7 @@ impl HeService for HEServiceImpl {
         
         let session_id = uuid::Uuid::new_v4().to_string();
         let poly_degree = req.poly_modulus_degree as u64;
-        let plain_modulus = 1032193u64;
+        let plain_modulus = 65537u64;
         let library = req.library.clone();
         
         // Validate context creation
@@ -1091,7 +1092,7 @@ impl HeService for HEServiceImpl {
             tokio::task::spawn_blocking(move || run_openfhe_benchmark(num_ops, test_vals))
                 .await.map_err(|e| Status::internal(format!("Benchmark failed: {}", e)))?
         } else {
-            let poly_degree = 8192u64;
+            let poly_degree = 4096u64;
             tokio::task::spawn_blocking(move || run_seal_benchmark(poly_degree, num_ops, test_vals))
                 .await.map_err(|e| Status::internal(format!("Benchmark failed: {}", e)))?
         };
@@ -1112,21 +1113,22 @@ impl HeService for HEServiceImpl {
         println!("📥 Comparison benchmark request ({} ops per library)", num_ops);
         println!("   Running SEAL benchmark...");
         
-        // Run all three benchmarks
+        // Run all three benchmarks sequentially (NOT in parallel) to limit peak memory usage.
+        // Use poly_modulus_degree=4096 (instead of 8192) to keep SEAL context smaller.
         let seal_ops = num_ops;
         let seal_vals = test_vals.clone();
         let seal_result = tokio::task::spawn_blocking(move || {
-            run_seal_benchmark(8192, seal_ops, seal_vals)
+            run_seal_benchmark(4096, seal_ops, seal_vals)
         }).await.map_err(|e| Status::internal(format!("SEAL benchmark failed: {}", e)))?;
         
-        println!("   Running HELib benchmark...");
+        println!("   ✓ SEAL done. Running HELib benchmark...");
         let helib_ops = num_ops;
         let helib_vals = test_vals.clone();
         let helib_result = tokio::task::spawn_blocking(move || {
             run_helib_benchmark(helib_ops, helib_vals)
         }).await.map_err(|e| Status::internal(format!("HELib benchmark failed: {}", e)))?;
         
-        println!("   Running OpenFHE benchmark...");
+        println!("   ✓ HELib done. Running OpenFHE benchmark...");
         let openfhe_ops = num_ops;
         let openfhe_vals = test_vals;
         let openfhe_result = tokio::task::spawn_blocking(move || {
@@ -1404,6 +1406,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut weight_dirs: HashMap<u32, String> = HashMap::new();
     for (deg, dir) in &degree_candidates {
         let dir_str = dir.to_string_lossy().to_string();
+        if *deg != 2 {
+            // Only degree 2 is supported in production — skip degree 3/4 entirely
+            // to avoid accidental lazy-loading that would OOM the server (~5 GB each)
+            println!("  ⏭ Skipping degree {} — disabled to conserve memory", deg);
+            continue;
+        }
         if dir.join("model_config.json").exists() {
             println!("  📁 Found weights for degree {}: {}", deg, dir_str);
             weight_dirs.insert(*deg, dir_str);

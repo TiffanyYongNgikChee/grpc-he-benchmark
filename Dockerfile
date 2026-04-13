@@ -149,11 +149,9 @@ COPY build.rs ./
 # gRPC server files
 COPY proto ./proto
 COPY grpc_server ./grpc_server
-# MNIST weights (needed for encrypted inference — all activation degrees)
+# MNIST weights (degree 2 only — degrees 3/4 disabled to conserve memory)
 COPY mnist_training/weights ./mnist_training/weights
 COPY mnist_training/weights_deg2 ./mnist_training/weights_deg2
-COPY mnist_training/weights_deg3 ./mnist_training/weights_deg3
-COPY mnist_training/weights_deg4 ./mnist_training/weights_deg4
 COPY scripts ./scripts
 
 # Build the wrappers
@@ -271,11 +269,9 @@ COPY --from=builder /app/target/release/examples/medical_data /app/medical_data
 COPY --from=builder /app/target/release/examples/mnist_benchmark /app/mnist_benchmark
 COPY --from=builder /app/grpc_server/target/release/he-grpc-server /app/he-grpc-server
 
-# Copy MNIST weights for encrypted inference (all activation degrees)
+# Copy MNIST weights for encrypted inference (degree 2 only — degrees 3/4 disabled)
 COPY --from=builder /app/mnist_training/weights /app/mnist_training/weights
 COPY --from=builder /app/mnist_training/weights_deg2 /app/mnist_training/weights_deg2
-COPY --from=builder /app/mnist_training/weights_deg3 /app/mnist_training/weights_deg3
-COPY --from=builder /app/mnist_training/weights_deg4 /app/mnist_training/weights_deg4
 
 # Copy benchmark script
 COPY --from=builder /app/scripts/run_all_benchmarks.sh /app/scripts/run_all_benchmarks.sh
