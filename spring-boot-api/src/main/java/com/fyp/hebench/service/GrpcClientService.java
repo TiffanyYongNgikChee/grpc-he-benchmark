@@ -120,11 +120,10 @@ public class GrpcClientService {
         }
         BenchmarkRequest request = builder.build();
         
-        // Step 2: Call the Rust server via gRPC
-        // stub.runBenchmark() sends the request over the network
-        // This BLOCKS until Rust responds (because we use BlockingStub)
-        // The actual HE operations happen inside Docker right now!
-        BenchmarkResponse result = stub.runBenchmark(request);
+        // Step 2: Call the Rust server via gRPC with a 5-minute deadline
+        BenchmarkResponse result = stub
+                .withDeadlineAfter(5, TimeUnit.MINUTES)
+                .runBenchmark(request);
         
         // Step 3: Convert Protobuf response to our Java POJO
         // Why? Because Spring converts POJOs to JSON automatically
@@ -177,8 +176,11 @@ public class GrpcClientService {
         }
         BenchmarkRequest request = builder.build();
         
-        // Call Rust server - this takes longer because it runs 3 benchmarks
-        ComparisonBenchmarkResponse result = stub.runComparisonBenchmark(request);
+        // Call Rust server - this takes longer because it runs 3 benchmarks sequentially.
+        // Set a 10-minute deadline: SEAL (~30s) + HELib (~60s) + OpenFHE (~60s) + margin.
+        ComparisonBenchmarkResponse result = stub
+                .withDeadlineAfter(10, TimeUnit.MINUTES)
+                .runComparisonBenchmark(request);
         
         // Create list to hold results for each library
         java.util.List<com.fyp.hebench.model.LibraryResult> libraryResults = new java.util.ArrayList<>();
