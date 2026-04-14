@@ -32,9 +32,9 @@ export default function Workbench() {
   const [error, setError] = useState(null);
   const [healthy, setHealthy] = useState(null);
 
-  /* Parameter panel state */
-  const [securityLevel, setSecurityLevel] = useState(0);       // 0=128-bit, 1=192-bit, 2=256-bit
-  const [activationDegree, setActivationDegree] = useState(2); // 2=x², 3=cubic, 4=quartic
+  /* Fixed inference parameters — only degree 2 + 128-bit work on this server */
+  const securityLevel = 0;    // 128-bit
+  const activationDegree = 2; // x²
 
   /* Animation — layer-by-layer progress */
   const progress = useInferenceProgress();
@@ -248,31 +248,11 @@ export default function Workbench() {
 
         <Divider />
 
-        {/* Dropdowns */}
+        {/* Static labels — fixed for this deployment */}
         <ControlStaticLabel label="Library" value="OpenFHE" />
         <ControlStaticLabel label="Encryption" value="BFV" />
-        <ControlDropdownStateful
-          label="Security"
-          options={[
-            { label: "128-bit", value: 0 },
-            { label: "192-bit ⚠️", value: 1, title: "OOM on demo server — 128-bit recommended" },
-            { label: "256-bit ⚠️", value: 2, title: "OOM on demo server — 128-bit recommended" },
-          ]}
-          value={securityLevel}
-          onChange={setSecurityLevel}
-          disabled={loading}
-        />
-        <ControlDropdownStateful
-          label="Activation"
-          options={[
-            { label: "x² (degree 2)", value: 2 },
-            { label: "degree 3 ⚠️", value: 3, title: "May timeout — weights not optimised for this hardware" },
-            { label: "degree 4 ⚠️", value: 4, title: "May timeout — weights not optimised for this hardware" },
-          ]}
-          value={activationDegree}
-          onChange={setActivationDegree}
-          disabled={loading}
-        />
+        <ControlStaticLabel label="Security" value="128-bit" />
+        <ControlStaticLabel label="Activation" value="x² (degree 2)" />
         <ControlStaticLabel label="Scale factor" value="1000" />
         <ControlStaticLabel label="Model" value="CNN (LeNet-5)" />
 
@@ -641,9 +621,9 @@ export default function Workbench() {
               The model was trained in PyTorch on the MNIST dataset with a{" "}
               <b>polynomial activation function</b> instead of the usual ReLU. This is because
               HE can only do addition and multiplication — it cannot do comparisons like
-              max(0, x). You can choose between x² (degree 2), degree 3, and degree 4
-              polynomials using the controls above. The x² function gives the best accuracy
-              as it matches the training configuration.
+              max(0, x). This demo uses the <b>x² (degree 2)</b> activation, which gives the
+              best accuracy and runs within the server's memory constraints. The benchmark
+              section below shows results across degree 2, 3, and 4 for comparison.
             </p>
 
             {/* Visual pipeline walkthrough */}
@@ -792,28 +772,6 @@ function ControlStaticLabel({ label, value }) {
       >
         {value}
       </div>
-    </div>
-  );
-}
-
-function ControlDropdownStateful({ label, options, value, onChange, disabled }) {
-  const selectedOption = options.find((o) => o.value === value);
-  const warningTitle = selectedOption?.title || null;
-  return (
-    <div className="px-2 md:px-3">
-      <div className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: "#999" }}>{label}</div>
-      <select
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        disabled={disabled}
-        title={warningTitle || undefined}
-        className="text-sm font-medium bg-white border rounded px-2 py-0.5 cursor-pointer appearance-none pr-6 disabled:opacity-50"
-        style={{ color: warningTitle ? "#e68a00" : "#333", borderColor: warningTitle ? "#e68a00" : "#ccc", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value} title={o.title || undefined}>{o.label}</option>
-        ))}
-      </select>
     </div>
   );
 }
