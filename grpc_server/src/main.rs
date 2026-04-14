@@ -629,7 +629,7 @@ fn run_helib_benchmark(num_operations: i32, custom_values: Vec<i64>) -> Benchmar
 // ============================================
 
 const OPENFHE_PLAINTEXT_MOD: u64 = 65537;
-const OPENFHE_MULT_DEPTH: u32 = 6;
+const OPENFHE_MULT_DEPTH: u32 = 2; // Reduced from 6 — depth=6 OOMs on t3.xlarge during comparison benchmark
 
 fn run_openfhe_encrypt(values: Vec<i64>) -> Result<usize, String> {
     use he_benchmark::{OpenFHEContext, OpenFHEKeyPair, OpenFHEPlaintext, OpenFHECiphertext};
