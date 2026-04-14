@@ -1,4 +1,5 @@
 import { useState } from "react";
+import OwlGuide from "./OwlGuide";
 
 // ─── Library colour palette ────────────────────────────────────────────────────
 const LIB = {
@@ -157,6 +158,16 @@ function TotalTimeBars({ results }) {
 // ─── Main component ────────────────────────────────────────────────────────────
 export default function LibraryComparison({ data, loading, error, onRun }) {
   const [activeOp, setActiveOp] = useState(null);
+  const [showOwl, setShowOwl] = useState(false);
+  const [owlDone, setOwlDone] = useState(false);
+
+  // Trigger owl guide when benchmark results first arrive
+  const prevData = useState(null);
+  const handleRun = (v) => {
+    setOwlDone(false);
+    setShowOwl(false);
+    onRun(v);
+  };
 
   const Banner = () => (
     <div className="rounded-xl px-4 py-3 mb-5 flex items-start gap-3"
@@ -188,7 +199,7 @@ export default function LibraryComparison({ data, loading, error, onRun }) {
                 </div>
               ))}
             </div>
-            <button onClick={() => onRun(null)}
+            <button onClick={() => handleRun(null)}
               className="px-7 py-2.5 rounded-xl text-sm font-black text-white shadow-lg hover:shadow-xl transition-all hover:scale-[1.03] active:scale-[0.97]"
               style={{ background: "linear-gradient(135deg,#4285f4,#9333ea)" }}>
               ▶ Run Library Comparison
@@ -240,8 +251,19 @@ export default function LibraryComparison({ data, loading, error, onRun }) {
   const slowest = sortedResults[sortedResults.length - 1];
   const speedup = (slowest.totalTimeMs / fastest.totalTimeMs).toFixed(1);
 
+  // Show owl guide whenever results arrive and not yet dismissed
+  const shouldShowOwl = data && !owlDone && !showOwl;
+  const owlVisible = showOwl || shouldShowOwl;
+
   return (
     <div>
+      {/* Owl guide — takes over the whole panel, hides results underneath */}
+      {owlVisible && (
+        <OwlGuide onDone={() => { setShowOwl(false); setOwlDone(true); }} />
+      )}
+
+      {/* Results are hidden while the owl guide is showing */}
+      <div style={{ display: owlVisible ? "none" : "block" }}>
       <Banner />
 
       {/* ══ Section A: Total time + radar ══ */}
@@ -458,13 +480,19 @@ export default function LibraryComparison({ data, loading, error, onRun }) {
         })}
       </div>
 
-      <div className="text-center">
-        <button onClick={() => onRun(null)}
+      <div className="text-center flex items-center justify-center gap-3">
+        <button onClick={() => { setShowOwl(true); setOwlDone(false); }}
+          className="px-5 py-2 rounded-xl text-xs font-bold border-2 hover:bg-amber-50 transition-colors flex items-center gap-1.5"
+          style={{ borderColor: "#fbbf24", color: "#92400e", background: "#fffbeb" }}>
+          🦉 Guide me again
+        </button>
+        <button onClick={() => handleRun(null)}
           className="px-5 py-2 rounded-xl text-xs font-bold border-2 hover:bg-slate-50 transition-colors"
           style={{ borderColor: "#e2e8f0", color: "#64748b" }}>
           ↺ Run Again
         </button>
       </div>
+      </div> {/* end results wrapper */}
     </div>
   );
 }
