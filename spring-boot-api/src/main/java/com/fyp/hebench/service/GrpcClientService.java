@@ -136,8 +136,8 @@ public class GrpcClientService {
                 result.getMultiplicationTimeMs(),
                 result.getDecryptionTimeMs(),
                 result.getTotalTimeMs(),
-                result.getStatus().equals("success"),
-                result.getStatus().equals("success") ? "" : result.getStatus()
+                result.getStatus().contains("complete") || result.getStatus().equals("success"),
+                (result.getStatus().contains("complete") || result.getStatus().equals("success")) ? "" : result.getStatus()
         );
     }
 
@@ -189,6 +189,7 @@ public class GrpcClientService {
         // hasSeal() checks if the Rust server included SEAL results
         if (result.hasSeal()) {
             BenchmarkResponse seal = result.getSeal();
+            boolean sealOk = seal.getStatus().contains("complete") || seal.getStatus().equals("success");
             libraryResults.add(new com.fyp.hebench.model.LibraryResult(
                     "SEAL",
                     seal.getKeyGenTimeMs(),
@@ -197,14 +198,15 @@ public class GrpcClientService {
                     seal.getMultiplicationTimeMs(),
                     seal.getDecryptionTimeMs(),
                     seal.getTotalTimeMs(),
-                    seal.getStatus().equals("success"),
-                    seal.getStatus().equals("success") ? "" : seal.getStatus()
+                    sealOk,
+                    sealOk ? "" : seal.getStatus()
             ));
         }
         
         // Extract HELib results (if present)
         if (result.hasHelib()) {
             BenchmarkResponse helib = result.getHelib();
+            boolean helibOk = helib.getStatus().contains("complete") || helib.getStatus().equals("success");
             libraryResults.add(new com.fyp.hebench.model.LibraryResult(
                     "HELib",
                     helib.getKeyGenTimeMs(),
@@ -213,14 +215,15 @@ public class GrpcClientService {
                     helib.getMultiplicationTimeMs(),
                     helib.getDecryptionTimeMs(),
                     helib.getTotalTimeMs(),
-                    helib.getStatus().equals("success"),
-                    helib.getStatus().equals("success") ? "" : helib.getStatus()
+                    helibOk,
+                    helibOk ? "" : helib.getStatus()
             ));
         }
         
         // Extract OpenFHE results (if present)
         if (result.hasOpenfhe()) {
             BenchmarkResponse openfhe = result.getOpenfhe();
+            boolean openfheOk = openfhe.getStatus().contains("complete") || openfhe.getStatus().equals("success");
             libraryResults.add(new com.fyp.hebench.model.LibraryResult(
                     "OpenFHE",
                     openfhe.getKeyGenTimeMs(),
@@ -229,8 +232,8 @@ public class GrpcClientService {
                     openfhe.getMultiplicationTimeMs(),
                     openfhe.getDecryptionTimeMs(),
                     openfhe.getTotalTimeMs(),
-                    openfhe.getStatus().equals("success"),
-                    openfhe.getStatus().equals("success") ? "" : openfhe.getStatus()
+                    openfheOk,
+                    openfheOk ? "" : openfhe.getStatus()
             ));
         }
         
