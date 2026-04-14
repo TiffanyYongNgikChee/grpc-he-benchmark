@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -15,41 +14,15 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 /**
  * LibraryComparison — Side-by-side benchmark comparison of 3 HE libraries.
  *
- * HOW IT WORKS:
- *   1. The user types a list of numbers (e.g. "42, 7, 100") into the input field.
- *      These are the actual values that get encrypted, added, multiplied, and
- *      decrypted by each library. If left blank, the backend uses its default
- *      test data (sequential integers 0,1,2,…).
- *
- *   2. The user clicks "Run Library Comparison". This sends a POST request to
- *      /api/benchmark/compare with { library: "ALL", numOperations: 10, testValues: [...] }.
- *
- *   3. The Rust gRPC server runs the same 5 operations for each library:
- *        Key Gen   → create encryption keys
- *        Encrypt   → turn the plaintext numbers into ciphertexts
- *        Addition  → add pairs of ciphertexts together (homomorphic add)
- *        Multiply  → multiply pairs of ciphertexts (homomorphic multiply)
- *        Decrypt   → turn ciphertexts back into plaintext numbers
- *      Each operation is repeated 10 times and averaged (to smooth out noise).
- *
- *   4. The results come back as timing data (ms per operation per library).
- *      This component renders:
- *        • Summary cards — one per library, showing total time + "FASTEST" badge
- *        • Grouped bar chart — 5 bars per library, side by side
- *
- * WHERE THE DATA COMES FROM:
- *   Frontend (this file)
- *     → api/client.js  runComparisonBenchmark(10, testValues)
- *       → Spring Boot  POST /api/benchmark/compare
- *         → gRPC stub  RunComparisonBenchmark
- *           → Rust server  run_seal_benchmark() / run_helib_benchmark() / run_openfhe_benchmark()
- *             → Each calls the real C/C++ HE library (SEAL, HELib, OpenFHE)
+ * Benchmarks the five primitive HE operations that underpin MNIST encrypted
+ * inference, at the same parameters used by the CNN pipeline:
+ *   n = 4096, 128-bit security, BFV (SEAL / OpenFHE) and BGV (HELib).
  *
  * PROPS:
  *   data     — the comparison response from the backend (null until first run)
  *   loading  — true while the benchmark is in progress
  *   error    — error message string, if the benchmark failed
- *   onRun    — callback to trigger the benchmark (called with testValues array)
+ *   onRun    — callback to trigger the benchmark
  */
 
 // Colour palette for the three HE libraries
@@ -59,75 +32,52 @@ const LIB_COLORS = {
   OpenFHE: { bg: "rgba(13,183,196,0.75)",  border: "#0db7c4"  },   // teal
 };
 
-// The 5 primitive HE operations we benchmark.
+// The 5 primitive HE operations we benchmark, labelled in ML inference context.
 // Each `key` matches a field name in the JSON response from the backend.
 const OPERATIONS = [
-  { key: "keyGenTimeMs",         label: "Key Gen" },    // time to generate public + secret keys
-  { key: "encryptionTimeMs",     label: "Encrypt" },    // time to encrypt plaintext → ciphertext
-  { key: "additionTimeMs",       label: "Addition" },   // time to add two ciphertexts (homomorphic)
-  { key: "multiplicationTimeMs", label: "Multiply" },   // time to multiply two ciphertexts (homomorphic)
-  { key: "decryptionTimeMs",     label: "Decrypt" },    // time to decrypt ciphertext → plaintext
+  { key: "keyGenTimeMs",         label: "Key\nGeneration",        mlContext: "Setup — generate public & secret keys" },
+  { key: "encryptionTimeMs",     label: "Encrypt\nInput",         mlContext: "Encrypt the 784-pixel MNIST image" },
+  { key: "additionTimeMs",       label: "Bias\nAddition",         mlContext: "Homomorphic bias addition (FC layer)" },
+  { key: "multiplicationTimeMs", label: "Weight\nMultiply",       mlContext: "Homomorphic weight multiply (Conv/FC)" },
+  { key: "decryptionTimeMs",     label: "Decrypt\nOutput",        mlContext: "Decrypt the 10-class prediction logits" },
 ];
 
 export default function LibraryComparison({ data, loading, error, onRun, onCancel }) {
-  // The user can type custom numbers to encrypt/benchmark (e.g. "42, 7, 100")
-  // If left empty, the backend uses default sequential test data.
-  const [inputValues, setInputValues] = useState("");
 
-  /**
-   * Parse the user's comma-separated input into an array of integers.
-   * Returns null if empty (meaning "use default data").
-   */
-  function parseTestValues() {
-    const trimmed = inputValues.trim();
-    if (!trimmed) return null; // empty → let backend use defaults
-    return trimmed
-      .split(",")
-      .map((s) => parseInt(s.trim(), 10))
-      .filter((n) => !isNaN(n));
-  }
-
-  /* ─── Shared input section (shown in both empty state and results) ─── */
-  const inputSection = (
-    <div className="mb-5">
-      <label className="block text-xs font-medium mb-1.5" style={{ color: "#666" }}>
-        Test Values
-        <span className="font-normal ml-1" style={{ color: "#aaa" }}>
-          (comma-separated integers to encrypt — leave blank for default)
-        </span>
-      </label>
-      <input
-        type="text"
-        value={inputValues}
-        onChange={(e) => setInputValues(e.target.value)}
-        placeholder="e.g. 42, 7, 100, 256, 999"
-        disabled={loading}
-        className="w-full px-3 py-2 rounded-lg text-sm border focus:outline-none focus:ring-2 transition-all font-mono"
-        style={{
-          borderColor: "#d9d9d9",
-          color: "#333",
-          background: loading ? "#f5f5f5" : "#fff",
-        }}
-      />
-      {inputValues.trim() && (
-        <p className="text-[10px] mt-1" style={{ color: "#999" }}>
-          {parseTestValues()?.length || 0} value(s) will be encrypted by each library
+  /* ─── Workload description banner ─── */
+  const workloadBanner = (
+    <div
+      className="rounded-lg px-4 py-3 mb-5 flex items-start gap-3"
+      style={{ background: "#f0f4ff", border: "1px solid #c7d7ff" }}
+    >
+      <svg className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#3b82f6" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20A10 10 0 0012 2z" />
+      </svg>
+      <div>
+        <p className="text-xs font-semibold mb-0.5" style={{ color: "#1e40af" }}>
+          MNIST Inference Workload Parameters
         </p>
-      )}
+        <p className="text-[11px] leading-relaxed" style={{ color: "#3b5bdb" }}>
+          Operations benchmarked at <strong>n = 4096</strong>, <strong>128-bit security</strong>,
+          using <strong>BFV</strong> (SEAL &amp; OpenFHE) and <strong>BGV</strong> (HELib) —
+          the same parameters used for encrypted digit classification.
+          Each operation averaged over 3 repetitions.
+        </p>
+      </div>
     </div>
   );
 
   /* ─── Empty state (no results yet) ─── */
   if (!data && !loading && !error) {
     return (
-      <div className="py-6">
-        {inputSection}
+      <div className="py-2">
+        {workloadBanner}
         <div className="text-center">
           <p className="text-sm mb-4" style={{ color: "#888" }}>
-            Compare primitive HE operations across all three libraries
+            Run a side-by-side comparison of SEAL, HELib, and OpenFHE
           </p>
           <button
-            onClick={() => onRun(parseTestValues())}
+            onClick={() => onRun(null)}
             className="px-5 py-2.5 rounded-lg text-sm font-medium text-white shadow-sm hover:shadow transition-all hover:scale-[1.02] active:scale-[0.98]"
             style={{ background: "#1a1a2e" }}
           >
@@ -171,7 +121,7 @@ export default function LibraryComparison({ data, loading, error, onRun, onCance
         </div>
         <div className="mt-4">
           <button
-            onClick={() => onRun(parseTestValues())}
+            onClick={() => onRun(null)}
             className="px-4 py-2 rounded-lg text-xs font-medium text-white"
             style={{ background: "#1a1a2e" }}
           >
@@ -209,7 +159,7 @@ export default function LibraryComparison({ data, loading, error, onRun, onCance
 
   // Chart.js data object — labels on the x-axis, 3 datasets (one per library)
   const chartData = {
-    labels: OPERATIONS.map((op) => op.label),
+    labels: OPERATIONS.map((op) => op.label.split("\n")),
     datasets,
   };
 
@@ -266,8 +216,8 @@ export default function LibraryComparison({ data, loading, error, onRun, onCance
 
   return (
     <div>
-      {/* Test values input — lets user provide custom data to encrypt */}
-      {inputSection}
+      {/* Workload context banner */}
+      {workloadBanner}
 
       {/* Summary row — one card per library with total time + FASTEST badge */}
       <div className="flex gap-3 mb-5 flex-wrap">
@@ -291,15 +241,18 @@ export default function LibraryComparison({ data, loading, error, onRun, onCance
                   FASTEST
                 </span>
               )}
-              <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "#999" }}>
+              <p className="text-[10px] uppercase tracking-wider font-semibold mb-0.5" style={{ color: colors.border }}>
                 {lib.library}
               </p>
+              {lib.schemeInfo && (
+                <p className="text-[9px] mb-1.5" style={{ color: "#aaa" }}>{lib.schemeInfo}</p>
+              )}
               <p className="text-2xl font-bold font-mono" style={{ color: colors.border }}>
                 {lib.totalTimeMs.toFixed(1)}
                 <span className="text-xs font-normal ml-0.5" style={{ color: "#bbb" }}>ms</span>
               </p>
               <p className="text-[10px] mt-1" style={{ color: lib.success ? "#059669" : "#dc2626" }}>
-                {lib.success ? "Success" : lib.errorMessage || "Failed"}
+                {lib.success ? "✓ All operations passed" : lib.errorMessage || "Failed"}
               </p>
             </div>
           );
@@ -308,15 +261,35 @@ export default function LibraryComparison({ data, loading, error, onRun, onCance
 
       {/* Grouped bar chart — 5 operation categories, 3 bars each */}
       <div className="rounded-lg p-4" style={{ background: "#fff", border: "1px solid #e5e5e5" }}>
+        <p className="text-[10px] uppercase tracking-wider font-semibold mb-3" style={{ color: "#bbb" }}>
+          Operation Breakdown
+        </p>
         <div style={{ height: 280 }}>
           <Bar data={chartData} options={chartOptions} />
         </div>
       </div>
 
-      {/* Rerun button — re-runs with the current test values */}
+      {/* Per-operation ML context legend */}
+      <div className="mt-3 rounded-lg px-4 py-3" style={{ background: "#fafafa", border: "1px solid #efefef" }}>
+        <p className="text-[10px] uppercase tracking-wider font-semibold mb-2" style={{ color: "#bbb" }}>
+          Operation → ML Inference Context
+        </p>
+        <div className="grid grid-cols-1 gap-1">
+          {OPERATIONS.map((op) => (
+            <div key={op.key} className="flex items-baseline gap-2">
+              <span className="text-[10px] font-semibold font-mono w-28 shrink-0" style={{ color: "#666" }}>
+                {op.label.replace("\n", " ")}
+              </span>
+              <span className="text-[10px]" style={{ color: "#999" }}>{op.mlContext}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Rerun button */}
       <div className="text-center mt-4">
         <button
-          onClick={() => onRun(parseTestValues())}
+          onClick={() => onRun(null)}
           className="px-4 py-1.5 rounded-lg text-xs font-medium border hover:bg-gray-50 transition-colors"
           style={{ borderColor: "#ccc", color: "#666" }}
         >
