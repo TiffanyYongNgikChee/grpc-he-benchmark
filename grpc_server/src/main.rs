@@ -592,15 +592,17 @@ fn run_helib_benchmark(num_operations: i32, custom_values: Vec<i64>) -> Benchmar
     }
     let encryption_time = encrypt_start.elapsed();
     
+    // Use fresh consecutive pairs ct[i] × ct[i+1] — same pattern as SEAL benchmark,
+    // so addition and multiplication times are directly comparable across libraries.
     let add_start = Instant::now();
-    for i in 1..ciphertexts.len() {
-        let _ = ciphertexts[0].add(&ciphertexts[i]);
+    for i in 0..(ciphertexts.len().saturating_sub(1)) {
+        let _ = ciphertexts[i].add(&ciphertexts[i + 1]);
     }
     let addition_time = add_start.elapsed();
-    
+
     let mult_start = Instant::now();
-    for i in 1..ciphertexts.len() {
-        let _ = ciphertexts[0].multiply(&ciphertexts[i]);
+    for i in 0..(ciphertexts.len().saturating_sub(1)) {
+        let _ = ciphertexts[i].multiply(&ciphertexts[i + 1]);
     }
     let multiplication_time = mult_start.elapsed();
     
