@@ -736,24 +736,63 @@ export default function Workbench() {
       </div>
 
       {/* ═══════════ MNIST BATCH BENCHMARK ═══════════ */}
-      <div id="benchmarks" className="px-4 md:px-8 py-8" style={{ background: "#ebeaea", borderTop: "1px solid #d9d9d9" }}>
+      <div id="benchmarks" style={{
+        background: "#5a5a5a",
+        borderTop: "4px solid #888",
+        borderBottom: "4px solid #2a2a2a",
+        padding: "14px 18px 18px",
+      }}>
         <div className="max-w-[1100px] mx-auto">
-          <div className="flex items-center gap-3 mb-4">
-            <h3
-              className="text-xs font-medium uppercase tracking-widest"
-              style={{ color: "#888", letterSpacing: "0.12em" }}
-            >
-              MNIST BATCH BENCHMARK
-            </h3>
-            <span className="text-[10px]" style={{ color: "#bbb" }}>
-              10 test images • Encrypted CNN Inference
-            </span>
-          </div>
-          <div
-            className="rounded-lg p-5"
-            style={{ background: "#fafafa", border: "1px solid #e5e5e5" }}
-          >
-            <MnistBatchBenchmark />
+          {/* Habbo-style outer frame */}
+          <div style={{
+            background: "#4a4a4a",
+            borderTop: "3px solid #777",
+            borderLeft: "3px solid #666",
+            borderBottom: "3px solid #1a1a1a",
+            borderRight: "3px solid #1a1a1a",
+            borderRadius: 3,
+            overflow: "hidden",
+          }}>
+            {/* Orange nav bar — Habbo 2007 top bar */}
+            <div style={{
+              background: "linear-gradient(180deg, #f0a030 0%, #c87000 100%)",
+              borderBottom: "3px solid #7a4000",
+              borderTop: "2px solid #f8c060",
+              padding: "6px 14px",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{
+                  display: "inline-block",
+                  width: 10, height: 10,
+                  background: "linear-gradient(135deg, #ffe080, #c07000)",
+                  border: "2px solid #7a4000",
+                  borderTop: "2px solid #ffe8a0",
+                  borderRadius: 2,
+                  flexShrink: 0,
+                }} />
+                <span style={{
+                  fontFamily: "'Press Start 2P', monospace",
+                  fontSize: "0.65rem", letterSpacing: "0.16em",
+                  color: "#1a0800",
+                  textShadow: "0 1px 0 rgba(255,200,80,0.4)",
+                }}>MNIST BATCH BENCHMARK</span>
+              </div>
+              <span style={{
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: "0.38rem", letterSpacing: "0.08em",
+                color: "rgba(26,8,0,0.6)",
+              }}>10 test images · Encrypted CNN Inference</span>
+            </div>
+
+            {/* Cream content body */}
+            <div style={{
+              background: "#d8d0c0",
+              borderTop: "2px solid #c0b8a8",
+              padding: "14px",
+            }}>
+              <MnistBatchBenchmark />
+            </div>
           </div>
         </div>
       </div>

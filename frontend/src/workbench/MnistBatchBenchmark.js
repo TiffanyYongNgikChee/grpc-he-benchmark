@@ -70,8 +70,9 @@ function DigitThumbnail({ pixels, size = 28 }) {
         width: size,
         height: size,
         imageRendering: "pixelated",
-        borderRadius: 4,
-        border: "1px solid #e0e0e0",
+        borderRadius: 2,
+        border: "2px solid #333",
+        borderTop: "2px solid #666",
         background: "#000",
       }}
     />
@@ -81,30 +82,21 @@ function DigitThumbnail({ pixels, size = 28 }) {
 /* ── Stage pipeline mini-bar for one image ── */
 function StagePipeline({ activeStage, done, error }) {
   return (
-    <div className="flex items-center gap-[3px]">
+    <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
       {STAGES.map((stage, i) => {
         let bg, opacity;
         if (error) {
-          bg = "#ef4444";
-          opacity = 0.3;
+          bg = "#cc2222"; opacity = 0.5;
         } else if (done) {
-          bg = stage.color;
-          opacity = 1;
+          bg = stage.color; opacity = 1;
         } else if (activeStage > i) {
-          /* completed stage */
-          bg = stage.color;
-          opacity = 1;
+          bg = stage.color; opacity = 1;
         } else if (activeStage === i) {
-          /* active stage – wider */
-          bg = stage.color;
-          opacity = 1;
+          bg = stage.color; opacity = 1;
         } else {
-          bg = "#e0e0e0";
-          opacity = 0.6;
+          bg = "#aaaaaa"; opacity = 0.35;
         }
-
         const isActive = activeStage === i && !done && !error;
-
         return (
           <div
             key={stage.id}
@@ -112,24 +104,32 @@ function StagePipeline({ activeStage, done, error }) {
             style={{
               width: isActive ? 22 : 14,
               height: 7,
-              borderRadius: 3,
+              borderRadius: 2,
               background: bg,
               opacity,
               transition: "all 0.4s ease",
+              border: isActive ? `1px solid ${stage.color}` : "1px solid rgba(0,0,0,0.2)",
             }}
           >
-            {/* Tooltip on hover */}
             <span
-              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 rounded text-[8px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-10"
-              style={{ background: "#333", color: "#fff" }}
+              style={{
+                position: "absolute", bottom: "calc(100% + 4px)", left: "50%",
+                transform: "translateX(-50%)",
+                padding: "2px 6px", borderRadius: 2,
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: "0.32rem", whiteSpace: "nowrap",
+                background: "#1a2a3a", color: "#e8d8a0",
+                opacity: 0, pointerEvents: "none",
+                transition: "opacity 0.15s", zIndex: 10,
+              }}
+              className="group-hover:opacity-100"
             >
               {stage.label}
             </span>
-            {/* Pulsing glow on active stage */}
             {isActive && (
               <span
-                className="absolute inset-0 rounded-sm animate-pulse"
-                style={{ background: stage.color, opacity: 0.45 }}
+                className="absolute inset-0 animate-pulse"
+                style={{ borderRadius: 2, background: stage.color, opacity: 0.5 }}
               />
             )}
           </div>
@@ -139,158 +139,186 @@ function StagePipeline({ activeStage, done, error }) {
   );
 }
 
-/* ── Per-image card ── */
+/* ── Per-image card — Habbo 2007 style ── */
 function ImageCard({ index, pixels, label, result, status, activeStage, isCurrent }) {
-  const isDone = status === "done";
-  const isError = status === "error";
+  const isDone   = status === "done";
+  const isError  = status === "error";
   const isQueued = status === "queued";
-  const isIdle = status === "idle";
+  const isIdle   = status === "idle";
+  const dimmed   = isQueued || isIdle;
 
-  let borderColor = "#e5e5e5";
-  let bg = "#fff";
+  /* Card background & border based on state */
+  let cardBg     = "#ddd8c8";   // default cream
+  let borderT    = "#c8c0a8";
+  let borderL    = "#bbb4a0";
+  let borderB    = "#888";
+  let borderR    = "#888";
+
   if (isCurrent) {
-    borderColor = STAGES[Math.max(0, activeStage)]?.color || "#6366f1";
-    bg = "#fffbeb";
+    cardBg  = "#e8dfa0";   // warm amber highlight
+    borderT = "#f0c030";
+    borderL = "#d4a800";
+    borderB = "#7a5e00";
+    borderR = "#7a5e00";
   } else if (isDone && result?.correct) {
-    borderColor = "#10b981";
-    bg = "#f0fdf4";
+    cardBg  = "#d0e8d0";
+    borderT = "#44aa66";
+    borderL = "#338855";
+    borderB = "#226644";
+    borderR = "#226644";
   } else if (isDone && !result?.correct) {
-    borderColor = "#ef4444";
-    bg = "#fef2f2";
+    cardBg  = "#e8d0d0";
+    borderT = "#cc5555";
+    borderL = "#aa3333";
+    borderB = "#882222";
+    borderR = "#882222";
   } else if (isError) {
-    borderColor = "#ef4444";
-    bg = "#fef2f2";
+    cardBg  = "#e8d0d0";
+    borderT = "#cc5555";
+    borderL = "#aa3333";
+    borderB = "#882222";
+    borderR = "#882222";
   }
 
-  const dimmed = isQueued || isIdle;
-
   return (
-    <div
-      className="flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-300"
-      style={{
-        background: bg,
-        border: `1.5px solid ${borderColor}`,
-        opacity: dimmed ? 0.45 : 1,
-        boxShadow: isCurrent ? `0 0 8px ${borderColor}44` : "none",
-      }}
-    >
-      {/* Index badge */}
-      <span
-        className="text-[10px] font-mono font-bold w-4 text-center shrink-0"
-        style={{ color: "#999" }}
-      >
-        {index + 1}
-      </span>
+    <div style={{
+      display: "flex", alignItems: "center", gap: 10,
+      padding: "6px 10px",
+      background: cardBg,
+      borderTop: `2px solid ${borderT}`,
+      borderLeft: `2px solid ${borderL}`,
+      borderBottom: `2px solid ${borderB}`,
+      borderRight: `2px solid ${borderR}`,
+      borderRadius: 2,
+      opacity: dimmed ? 0.5 : 1,
+      transition: "all 0.3s ease",
+    }}>
+      {/* Index badge — Habbo pill style */}
+      <span style={{
+        fontFamily: "'Press Start 2P', monospace",
+        fontSize: "0.42rem", letterSpacing: "0.06em",
+        color: "#5a4a22",
+        width: 18, textAlign: "center", flexShrink: 0,
+      }}>{index + 1}</span>
 
       {/* Thumbnail */}
-      <DigitThumbnail pixels={pixels} size={28} />
+      <DigitThumbnail pixels={pixels} size={30} />
 
       {/* True label */}
-      <span
-        className="font-mono font-bold text-sm w-5 text-center shrink-0"
-        style={{ color: "#555" }}
-      >
-        {label}
-      </span>
+      <span style={{
+        fontFamily: "'Press Start 2P', monospace",
+        fontSize: "0.75rem", fontWeight: "bold",
+        color: "#2a1a00",
+        width: 16, textAlign: "center", flexShrink: 0,
+      }}>{label}</span>
 
-      {/* Arrow → */}
-      <svg className="w-4 h-4 shrink-0" style={{ color: "#ccc" }} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-      </svg>
+      {/* Arrow */}
+      <span style={{ color: "#8a7a5a", fontSize: "0.8rem", flexShrink: 0 }}>›</span>
 
-      {/* Pipeline stages — the heart of the "transparency" */}
-      <div className="flex-1 min-w-0">
+      {/* Pipeline stages */}
+      <div style={{ flex: 1, minWidth: 0 }}>
         {dimmed ? (
-          /* Idle / queued – grey placeholder bar */
-          <div className="flex items-center gap-1.5">
-            <div className="flex gap-[3px]">
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ display: "flex", gap: 3 }}>
               {STAGES.map((s) => (
-                <div
-                  key={s.id}
-                  style={{ width: 14, height: 7, borderRadius: 3, background: "#e5e5e5" }}
-                />
+                <div key={s.id} style={{
+                  width: 14, height: 7, borderRadius: 2,
+                  background: "#aaa", opacity: 0.25,
+                  border: "1px solid rgba(0,0,0,0.15)",
+                }} />
               ))}
             </div>
-            <span className="text-[9px]" style={{ color: "#bbb" }}>
-              {isQueued ? "Queued" : "Waiting"}
-            </span>
+            <span style={{
+              fontFamily: "'Press Start 2P', monospace",
+              fontSize: "0.32rem", color: "#8a7a5a",
+            }}>{isQueued ? "Queued" : "Waiting"}</span>
           </div>
         ) : (
-          <div className="flex items-center gap-1.5">
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <StagePipeline activeStage={activeStage} done={isDone} error={isError} />
             {isCurrent && !isDone && (
-              <div className="flex items-center gap-1">
-                {/* Pulsing dot */}
-                <span className="relative flex h-2.5 w-2.5">
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span className="relative flex" style={{ width: 10, height: 10 }}>
                   <span
                     className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
                     style={{ background: STAGES[Math.max(0, activeStage)]?.color }}
                   />
                   <span
-                    className="relative inline-flex rounded-full h-2.5 w-2.5"
-                    style={{ background: STAGES[Math.max(0, activeStage)]?.color }}
+                    className="relative inline-flex rounded-full"
+                    style={{ width: 10, height: 10, background: STAGES[Math.max(0, activeStage)]?.color }}
                   />
                 </span>
-                <span
-                  className="text-[9px] font-medium whitespace-nowrap"
-                  style={{ color: STAGES[Math.max(0, activeStage)]?.color }}
-                >
+                <span style={{
+                  fontFamily: "'Press Start 2P', monospace",
+                  fontSize: "0.32rem", whiteSpace: "nowrap",
+                  color: STAGES[Math.max(0, activeStage)]?.color,
+                }}>
                   {STAGES[Math.max(0, activeStage)]?.label}…
                 </span>
               </div>
             )}
             {isDone && !isError && (
-              <span className="text-[9px] font-medium" style={{ color: "#10b981" }}>✓ Done</span>
+              <span style={{
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: "0.35rem", color: "#226644",
+              }}>✓ Done</span>
             )}
             {isError && (
-              <span className="text-[9px] font-medium" style={{ color: "#ef4444" }}>✗ Failed</span>
+              <span style={{
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: "0.35rem", color: "#882222",
+              }}>✗ Failed</span>
             )}
           </div>
         )}
       </div>
 
-      {/* Arrow → */}
-      <svg className="w-4 h-4 shrink-0" style={{ color: "#ccc" }} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-      </svg>
+      {/* Arrow */}
+      <span style={{ color: "#8a7a5a", fontSize: "0.8rem", flexShrink: 0 }}>›</span>
 
       {/* Prediction result */}
-      <div className="w-20 text-right shrink-0">
+      <div style={{ width: 64, textAlign: "right", flexShrink: 0 }}>
         {isDone && result && !isError ? (
-          <div className="flex items-center justify-end gap-1.5">
-            <span
-              className="font-mono font-bold text-sm"
-              style={{ color: result.correct ? "#10b981" : "#ef4444" }}
-            >
-              {result.predicted}
-            </span>
-            <span
-              className="text-[9px] px-1 py-0.5 rounded font-bold"
-              style={{
-                background: result.correct ? "#d1fae5" : "#fee2e2",
-                color: result.correct ? "#059669" : "#dc2626",
-              }}
-            >
-              {result.correct ? "✓" : "✗"}
-            </span>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 5 }}>
+            <span style={{
+              fontFamily: "'Press Start 2P', monospace",
+              fontSize: "0.85rem",
+              color: result.correct ? "#226644" : "#882222",
+            }}>{result.predicted}</span>
+            <span style={{
+              fontFamily: "'Press Start 2P', monospace",
+              fontSize: "0.38rem",
+              padding: "2px 5px", borderRadius: 2,
+              background: result.correct ? "#b0ddb0" : "#ddb0b0",
+              color: result.correct ? "#155533" : "#771111",
+              border: `1px solid ${result.correct ? "#338855" : "#aa3333"}`,
+            }}>{result.correct ? "✓" : "✗"}</span>
           </div>
         ) : isCurrent ? (
-          <span className="text-[9px]" style={{ color: "#d97706" }}>Running…</span>
+          <span style={{
+            fontFamily: "'Press Start 2P', monospace",
+            fontSize: "0.32rem", color: "#8a6a00",
+          }}>Running…</span>
         ) : isError ? (
-          <span className="text-[9px]" style={{ color: "#ef4444" }}>Error</span>
+          <span style={{
+            fontFamily: "'Press Start 2P', monospace",
+            fontSize: "0.32rem", color: "#882222",
+          }}>Error</span>
         ) : (
-          <span className="text-[9px]" style={{ color: "#ccc" }}>—</span>
+          <span style={{ color: "#9a8a6a", fontSize: "0.8rem" }}>—</span>
         )}
       </div>
 
       {/* Time */}
-      <div className="w-14 text-right shrink-0">
+      <div style={{ width: 52, textAlign: "right", flexShrink: 0 }}>
         {isDone && result ? (
-          <span className="text-[10px] font-mono" style={{ color: "#888" }}>
-            {(result.totalMs / 1000).toFixed(1)}s
-          </span>
+          <span style={{
+            fontFamily: "'Press Start 2P', monospace",
+            fontSize: "0.38rem", letterSpacing: "0.04em",
+            color: "#4a5a7a",
+          }}>{(result.totalMs / 1000).toFixed(1)}s</span>
         ) : (
-          <span className="text-[10px]" style={{ color: "#ddd" }}>—</span>
+          <span style={{ color: "#9a8a6a", fontSize: "0.8rem" }}>—</span>
         )}
       </div>
     </div>
@@ -455,13 +483,21 @@ export default function MnistBatchBenchmark() {
     : 0;
   const totalTime = doneResults.reduce((s, r) => s + r.totalMs, 0);
 
-  /* ─── Stage legend (reused in both views) ─── */
+  /* ─── Stage legend ─── */
   const StageLegend = (
-    <div className="flex items-center justify-center gap-1 flex-wrap">
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
       {STAGES.map((s) => (
-        <div key={s.id} className="flex items-center gap-1 px-1.5">
-          <div style={{ width: 10, height: 7, borderRadius: 3, background: s.color }} />
-          <span className="text-[9px]" style={{ color: "#999" }}>{s.label}</span>
+        <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <div style={{
+            width: 12, height: 7, borderRadius: 2,
+            background: s.color,
+            border: "1px solid rgba(0,0,0,0.2)",
+          }} />
+          <span style={{
+            fontFamily: "'Press Start 2P', monospace",
+            fontSize: "0.32rem", letterSpacing: "0.08em",
+            color: "#5a4a22",
+          }}>{s.label}</span>
         </div>
       ))}
     </div>
@@ -470,53 +506,89 @@ export default function MnistBatchBenchmark() {
   /* ━━━ Empty state ━━━ */
   if (!running && results.length === 0) {
     return (
-      <div className="py-6">
-        <div className="text-center mb-5">
-          <p className="text-sm mb-1" style={{ color: "#888" }}>
-            Run all 10 MNIST test digits through encrypted CNN inference
-          </p>
-          <p className="text-[10px]" style={{ color: "#bbb" }}>
-            Each image takes ~30s • Total: ~5 minutes • OpenFHE BFV scheme
-          </p>
+      <div>
+        {/* Info bar */}
+        <div style={{
+          background: "linear-gradient(180deg, #e8a030 0%, #c07800 100%)",
+          border: "2px solid #7a4a00",
+          borderTop: "2px solid #f0b840",
+          borderRadius: 2,
+          padding: "6px 12px",
+          marginBottom: 12,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <span style={{
+            fontFamily: "'Press Start 2P', monospace",
+            fontSize: "0.42rem", letterSpacing: "0.1em",
+            color: "#1a0e00",
+          }}>Each image ~30s · Total ~5 min</span>
+          <span style={{
+            fontFamily: "'Press Start 2P', monospace",
+            fontSize: "0.38rem", color: "rgba(26,14,0,0.65)",
+          }}>Sequential · BFV 128-bit</span>
         </div>
 
-        {/* Stage legend */}
-        <div className="mb-5">{StageLegend}</div>
+        {/* Legend */}
+        <div style={{
+          background: "#c8c0b0",
+          border: "2px solid #999",
+          borderTop: "2px solid #bbb",
+          borderLeft: "2px solid #b0b0b0",
+          borderRadius: 2,
+          padding: "7px 12px",
+          marginBottom: 12,
+        }}>
+          <span style={{
+            fontFamily: "'Press Start 2P', monospace",
+            fontSize: "0.36rem", letterSpacing: "0.14em",
+            color: "#5a4a22", textTransform: "uppercase",
+            display: "block", marginBottom: 6,
+          }}>Pipeline stages</span>
+          {StageLegend}
+        </div>
 
-        {/* Preview: 10 digit cards in idle state */}
-        <div className="space-y-1.5 mb-6">
+        {/* Preview cards */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 14 }}>
           {TEST_IMAGES.map((img, i) => (
-            <ImageCard
-              key={i}
-              index={i}
-              pixels={img}
-              label={TEST_LABELS[i]}
-              result={null}
-              status="idle"
-              activeStage={-1}
-              isCurrent={false}
-            />
+            <ImageCard key={i} index={i} pixels={img} label={TEST_LABELS[i]}
+              result={null} status="idle" activeStage={-1} isCurrent={false} />
           ))}
         </div>
 
-        <div className="text-center">
+        {/* Run button */}
+        <div style={{ textAlign: "center" }}>
           <button
             onClick={handleRun}
-            className="px-5 py-2.5 rounded-lg text-sm font-medium text-white shadow-sm hover:shadow transition-all hover:scale-[1.02] active:scale-[0.98]"
-            style={{ background: "#1a1a2e" }}
+            style={{
+              fontFamily: "'Press Start 2P', monospace",
+              fontSize: "0.6rem", letterSpacing: "0.14em",
+              padding: "10px 28px",
+              background: "linear-gradient(180deg, #f0c030 0%, #c89800 100%)",
+              border: "2px solid #7a5e00",
+              borderTop: "2px solid #f8e060",
+              borderLeft: "2px solid #e8b820",
+              borderRadius: 3, cursor: "pointer",
+              color: "#1a0e00",
+              boxShadow: "0 3px 8px rgba(0,0,0,0.4)",
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = "linear-gradient(180deg, #f8d040 0%, #d4a400 100%)"}
+            onMouseLeave={e => e.currentTarget.style.background = "linear-gradient(180deg, #f0c030 0%, #c89800 100%)"}
           >
-            ▶ Run MNIST Batch Benchmark
+            ▶ Run MNIST Batch
           </button>
         </div>
 
-        {/* Error banner */}
         {batchError && (
-          <div
-            className="mt-4 rounded-lg p-3 text-center text-xs"
-            style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626" }}
-          >
-            ⚠ {batchError}
-          </div>
+          <div style={{
+            marginTop: 10,
+            background: "#e8c0c0", color: "#771111",
+            border: "2px solid #aa3333",
+            borderTop: "2px solid #cc5555",
+            borderRadius: 2, padding: "8px 12px",
+            fontFamily: "'Press Start 2P', monospace",
+            fontSize: "0.38rem", letterSpacing: "0.08em",
+            textAlign: "center",
+          }}>⚠ {batchError}</div>
         )}
       </div>
     );
@@ -532,13 +604,13 @@ export default function MnistBatchBenchmark() {
         label: "Inference Time",
         data: doneResults.map((r) => r.totalMs),
         backgroundColor: doneResults.map((r) =>
-          r.correct ? "rgba(16,185,129,0.7)" : "rgba(239,68,68,0.7)"
+          r.correct ? "rgba(34,102,68,0.75)" : "rgba(170,51,51,0.75)"
         ),
         borderColor: doneResults.map((r) =>
-          r.correct ? "#10b981" : "#ef4444"
+          r.correct ? "#226644" : "#aa3333"
         ),
-        borderWidth: 1,
-        borderRadius: 4,
+        borderWidth: 2,
+        borderRadius: 2,
       },
     ],
   };
@@ -549,7 +621,9 @@ export default function MnistBatchBenchmark() {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: "#333",
+        backgroundColor: "#1a2a3a",
+        titleColor: "#e8d8a0",
+        bodyColor: "#c8c0a0",
         callbacks: {
           label: (ctx) => {
             const r = doneResults[ctx.dataIndex];
@@ -563,157 +637,225 @@ export default function MnistBatchBenchmark() {
       },
     },
     scales: {
-      x: { grid: { display: false }, ticks: { color: "#888", font: { size: 11 } } },
+      x: {
+        grid: { display: false },
+        ticks: { color: "#5a4a22", font: { family: "'Press Start 2P'", size: 7 } },
+      },
       y: {
-        grid: { color: "rgba(0,0,0,0.06)" },
-        ticks: { color: "#999", font: { size: 10 }, callback: (v) => `${(v / 1000).toFixed(0)}s` },
-        title: { display: true, text: "Inference Time", color: "#aaa", font: { size: 10 } },
+        grid: { color: "rgba(0,0,0,0.08)" },
+        ticks: { color: "#5a4a22", font: { family: "'Press Start 2P'", size: 7 }, callback: (v) => `${(v / 1000).toFixed(0)}s` },
+        title: { display: true, text: "Time (s)", color: "#7a6a42", font: { size: 9 } },
       },
     },
   };
 
   return (
     <div>
-      {/* ── Header: stage legend + stop button ── */}
-      <div className="flex items-center justify-between mb-3">
-        {StageLegend}
-        {running && (
+      {/* Stop button — shown while running */}
+      {running && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
           <button
             onClick={handleStop}
-            className="text-[10px] px-2.5 py-1 rounded border hover:bg-red-50 transition-colors"
-            style={{ borderColor: "#fca5a5", color: "#dc2626" }}
-          >
-            ■ Stop
-          </button>
-        )}
-      </div>
+            style={{
+              fontFamily: "'Press Start 2P', monospace",
+              fontSize: "0.38rem", letterSpacing: "0.1em",
+              padding: "5px 12px",
+              background: "linear-gradient(180deg, #cc4444, #882222)",
+              border: "2px solid #551111",
+              borderTop: "2px solid #ee6666",
+              borderRadius: 2, cursor: "pointer",
+              color: "#ffe8e8",
+            }}
+          >■ Stop</button>
+        </div>
+      )}
 
-      {/* ── Overall progress bar (only while running) ── */}
+      {/* Progress bar — while running */}
       {running && (
-        <div className="mb-3">
-          <div className="flex items-center justify-between text-[10px] mb-1" style={{ color: "#888" }}>
-            <span>
-              Image <strong>{Math.min(results.length + 1, TEST_IMAGES.length)}</strong> of {TEST_IMAGES.length}
-            </span>
-            <span>
-              ~{Math.round((TEST_IMAGES.length - results.length) * 30)}s remaining
-            </span>
+        <div style={{
+          background: "#c8c0b0",
+          border: "2px solid #999",
+          borderTop: "2px solid #bbb",
+          borderLeft: "2px solid #b0b0b0",
+          borderRadius: 2,
+          padding: "8px 12px",
+          marginBottom: 10,
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+            <span style={{
+              fontFamily: "'Press Start 2P', monospace",
+              fontSize: "0.38rem", color: "#5a4a22",
+            }}>Image {Math.min(results.length + 1, TEST_IMAGES.length)} of {TEST_IMAGES.length}</span>
+            <span style={{
+              fontFamily: "'Press Start 2P', monospace",
+              fontSize: "0.38rem", color: "#7a6a42",
+            }}>~{Math.round((TEST_IMAGES.length - results.length) * 30)}s remaining</span>
           </div>
-          <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: "#e5e5e5" }}>
-            <div
-              className="h-full rounded-full transition-all duration-1000"
-              style={{
-                width: `${(results.length / TEST_IMAGES.length) * 100}%`,
-                background: "linear-gradient(90deg, #0db7c4, #7b3ff2, #e03e52)",
-              }}
-            />
+          <div style={{
+            width: "100%", height: 10, borderRadius: 2, overflow: "hidden",
+            background: "#aaa8a0",
+            border: "2px solid #888",
+            borderTop: "2px solid #bbb",
+          }}>
+            <div style={{
+              height: "100%", borderRadius: 1,
+              width: `${(results.length / TEST_IMAGES.length) * 100}%`,
+              background: "linear-gradient(90deg, #2a8a5a, #2a5a8a, #7a3af0)",
+              transition: "width 1s ease",
+            }} />
           </div>
         </div>
       )}
 
-      {/* ── Image pipeline cards (the main transparent view) ── */}
-      <div className="space-y-1.5 mb-5">
+      {/* Legend */}
+      <div style={{
+        background: "#c8c0b0",
+        border: "2px solid #999",
+        borderTop: "2px solid #bbb",
+        borderLeft: "2px solid #b0b0b0",
+        borderRadius: 2,
+        padding: "6px 12px",
+        marginBottom: 8,
+      }}>
+        {StageLegend}
+      </div>
+
+      {/* Image pipeline cards */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 10 }}>
         {TEST_IMAGES.map((img, i) => (
-          <ImageCard
-            key={i}
-            index={i}
-            pixels={img}
-            label={TEST_LABELS[i]}
-            result={imageStates[i].result}
-            status={imageStates[i].status}
-            activeStage={imageStates[i].activeStage}
-            isCurrent={currentIdx === i && running}
-          />
+          <ImageCard key={i} index={i} pixels={img} label={TEST_LABELS[i]}
+            result={imageStates[i].result} status={imageStates[i].status}
+            activeStage={imageStates[i].activeStage} isCurrent={currentIdx === i && running} />
         ))}
       </div>
 
-      {/* ── Summary cards (appear after first result) ── */}
+      {/* Summary stat cards */}
       {doneResults.length > 0 && (
-        <div className="flex gap-3 mb-5 flex-wrap">
-          {/* Accuracy */}
-          <div
-            className="flex-1 min-w-[110px] rounded-lg p-3 text-center"
-            style={{
-              background: "#fff",
-              border: `2px solid ${accuracy >= 0.8 ? "#10b981" : accuracy >= 0.5 ? "#f59e0b" : "#ef4444"}`,
-            }}
-          >
-            <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "#999" }}>Accuracy</p>
-            <p
-              className="text-2xl font-bold font-mono"
-              style={{ color: accuracy >= 0.8 ? "#10b981" : accuracy >= 0.5 ? "#f59e0b" : "#ef4444" }}
-            >
-              {correctCount}/{doneResults.length}
-            </p>
-            <p className="text-[10px] mt-0.5" style={{ color: "#bbb" }}>
-              {(accuracy * 100).toFixed(0)}%
-            </p>
-          </div>
-
-          {/* Avg Time */}
-          <div className="flex-1 min-w-[110px] rounded-lg p-3 text-center" style={{ background: "#fff", border: "2px solid #3b82f6" }}>
-            <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "#999" }}>Avg Time</p>
-            <p className="text-2xl font-bold font-mono" style={{ color: "#3b82f6" }}>
-              {(avgTime / 1000).toFixed(1)}
-              <span className="text-xs font-normal ml-0.5" style={{ color: "#bbb" }}>s</span>
-            </p>
-            <p className="text-[10px] mt-0.5" style={{ color: "#bbb" }}>per image</p>
-          </div>
-
-          {/* Total Time */}
-          <div className="flex-1 min-w-[110px] rounded-lg p-3 text-center" style={{ background: "#fff", border: "2px solid #8b5cf6" }}>
-            <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "#999" }}>Total</p>
-            <p className="text-2xl font-bold font-mono" style={{ color: "#8b5cf6" }}>
-              {(totalTime / 1000).toFixed(1)}
-              <span className="text-xs font-normal ml-0.5" style={{ color: "#bbb" }}>s</span>
-            </p>
-            <p className="text-[10px] mt-0.5" style={{ color: "#bbb" }}>
-              {doneResults.length} image{doneResults.length !== 1 ? "s" : ""}
-            </p>
-          </div>
-
-          {/* Library */}
-          <div className="flex-1 min-w-[110px] rounded-lg p-3 text-center" style={{ background: "#fff", border: "2px solid #0db7c4" }}>
-            <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "#999" }}>Library</p>
-            <p className="text-lg font-bold" style={{ color: "#0db7c4" }}>OpenFHE</p>
-            <p className="text-[10px] mt-0.5" style={{ color: "#bbb" }}>BFV scheme</p>
-          </div>
+        <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+          {[
+            {
+              title: "Accuracy",
+              value: `${correctCount}/${doneResults.length}`,
+              sub: `${(accuracy * 100).toFixed(0)}%`,
+              borderT: accuracy >= 0.8 ? "#44aa66" : accuracy >= 0.5 ? "#d4a800" : "#cc4444",
+              borderB: accuracy >= 0.8 ? "#226644" : accuracy >= 0.5 ? "#7a5e00" : "#882222",
+              color: accuracy >= 0.8 ? "#155533" : accuracy >= 0.5 ? "#5a3a00" : "#771111",
+              bg: accuracy >= 0.8 ? "#c8e8c8" : accuracy >= 0.5 ? "#e8d8a0" : "#e8c0c0",
+            },
+            {
+              title: "Avg Time",
+              value: `${(avgTime / 1000).toFixed(1)}s`,
+              sub: "per image",
+              borderT: "#4a7acc", borderB: "#1a3a8a",
+              color: "#1a3a8a", bg: "#c8d4e8",
+            },
+            {
+              title: "Total",
+              value: `${(totalTime / 1000).toFixed(1)}s`,
+              sub: `${doneResults.length} images`,
+              borderT: "#8a5acc", borderB: "#4a1a8a",
+              color: "#4a1a8a", bg: "#d8c8e8",
+            },
+            {
+              title: "Library",
+              value: "OpenFHE",
+              sub: "BFV scheme",
+              borderT: "#2a9aaa", borderB: "#0a5a6a",
+              color: "#0a5a6a", bg: "#c0dce0",
+            },
+          ].map(({ title, value, sub, borderT, borderB, color, bg }) => (
+            <div key={title} style={{
+              flex: 1, minWidth: 100,
+              background: bg,
+              borderTop: `3px solid ${borderT}`,
+              borderLeft: `2px solid ${borderT}`,
+              borderBottom: `3px solid ${borderB}`,
+              borderRight: `2px solid ${borderB}`,
+              borderRadius: 2,
+              padding: "10px 10px 8px",
+              textAlign: "center",
+            }}>
+              <div style={{
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: "0.36rem", letterSpacing: "0.14em",
+                color: color, textTransform: "uppercase",
+                marginBottom: 5, opacity: 0.7,
+              }}>{title}</div>
+              <div style={{
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: "1.1rem", letterSpacing: "0.04em",
+                color,
+              }}>{value}</div>
+              <div style={{
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: "0.32rem", color, opacity: 0.6,
+                marginTop: 3,
+              }}>{sub}</div>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* ── Bar chart ── */}
+      {/* Bar chart */}
       {doneResults.length > 1 && (
-        <div className="rounded-lg p-4 mb-4" style={{ background: "#fff", border: "1px solid #e5e5e5" }}>
-          <p className="text-[10px] uppercase tracking-wider mb-3 font-medium" style={{ color: "#888" }}>
+        <div style={{
+          background: "#c8c0b0",
+          border: "2px solid #999",
+          borderTop: "2px solid #bbb",
+          borderLeft: "2px solid #b0b0b0",
+          borderRadius: 2,
+          padding: "10px 12px",
+          marginBottom: 10,
+        }}>
+          <div style={{
+            fontFamily: "'Press Start 2P', monospace",
+            fontSize: "0.4rem", letterSpacing: "0.14em",
+            color: "#5a4a22", textTransform: "uppercase",
+            marginBottom: 8,
+          }}>
             Per-Image Inference Time
-            <span className="font-normal ml-2" style={{ color: "#bbb" }}>(green = correct, red = wrong)</span>
-          </p>
+            <span style={{ color: "#7a6a42", marginLeft: 8, fontFamily: "system-ui,sans-serif", fontSize: "0.72rem", textTransform: "none", letterSpacing: 0 }}>
+              (green = correct, red = wrong)
+            </span>
+          </div>
           <div style={{ height: 200 }}>
             <Bar data={chartData} options={chartOptions} />
           </div>
         </div>
       )}
 
-      {/* ── Error banner ── */}
+      {/* Error banner */}
       {batchError && (
-        <div
-          className="rounded-lg p-3 mb-4 text-center text-xs"
-          style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626" }}
-        >
-          ⚠ {batchError}
-        </div>
+        <div style={{
+          background: "#e8c0c0", color: "#771111",
+          border: "2px solid #aa3333",
+          borderTop: "2px solid #cc5555",
+          borderRadius: 2, padding: "8px 12px",
+          fontFamily: "'Press Start 2P', monospace",
+          fontSize: "0.38rem", letterSpacing: "0.08em",
+          textAlign: "center", marginBottom: 8,
+        }}>⚠ {batchError}</div>
       )}
 
-      {/* ── Run again ── */}
+      {/* Run again */}
       {!running && results.length > 0 && (
-        <div className="text-center">
+        <div style={{ textAlign: "center" }}>
           <button
             onClick={handleRun}
-            className="px-4 py-1.5 rounded-lg text-xs font-medium border hover:bg-gray-50 transition-colors"
-            style={{ borderColor: "#ccc", color: "#666" }}
-          >
-            ▶ Run Again
-          </button>
+            style={{
+              fontFamily: "'Press Start 2P', monospace",
+              fontSize: "0.48rem", letterSpacing: "0.1em",
+              padding: "7px 20px",
+              background: "linear-gradient(180deg, #5a5a5a, #3a3a3a)",
+              border: "2px solid #222",
+              borderTop: "2px solid #888",
+              borderLeft: "2px solid #777",
+              borderRadius: 2, cursor: "pointer",
+              color: "#ddd",
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = "linear-gradient(180deg, #6a6a6a, #4a4a4a)"}
+            onMouseLeave={e => e.currentTarget.style.background = "linear-gradient(180deg, #5a5a5a, #3a3a3a)"}
+          >▶ Run Again</button>
         </div>
       )}
     </div>
