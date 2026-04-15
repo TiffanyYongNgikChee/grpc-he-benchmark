@@ -262,7 +262,7 @@ const LIBS = [
 ];
 
 /* ═══════════════════════════════ MAIN COMPONENT ══════════════════════════════ */
-export default function NeuralHero() {
+export default function NeuralHero({ hasHistory = false, onOpenHistory }) {
   const containerRef = useRef(null);
   const { scrollY }  = useScroll();
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
@@ -495,7 +495,51 @@ export default function NeuralHero() {
           </div>
 
           {/* ─── Cube — large, centred, textbook figure ─── */}
-          <BigCube rotY={rotY} rotX={rotX} size={cubeSize} def={def} brightness={br} />
+          <div style={{ position: "relative", display: "inline-block" }}>
+            <BigCube rotY={rotY} rotX={rotX} size={cubeSize} def={def} brightness={br} />
+
+            {/* ─── "View Log" badge — appears after first run ─── */}
+            {hasHistory && (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                onClick={onOpenHistory}
+                style={{
+                  position: "absolute",
+                  bottom: cubeSize * 0.05,
+                  right: -cubeSize * 0.08,
+                  background: "rgba(13,24,38,0.88)",
+                  border: "1.5px solid rgba(240,192,48,0.45)",
+                  borderRadius: 6,
+                  padding: "7px 13px",
+                  cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 7,
+                  backdropFilter: "blur(6px)",
+                  boxShadow: "0 0 18px rgba(240,192,48,0.12), 0 4px 20px rgba(0,0,0,0.4)",
+                  zIndex: 30,
+                }}
+                whileHover={{ scale: 1.06, boxShadow: "0 0 28px rgba(240,192,48,0.25)" }}
+                whileTap={{ scale: 0.97 }}
+              >
+                <motion.span
+                  animate={{ opacity: [1, 0.4, 1] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                  style={{
+                    width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+                    background: "#58c896",
+                    boxShadow: "0 0 6px #58c896",
+                  }}
+                />
+                <span style={{
+                  fontFamily: "'Press Start 2P', monospace",
+                  fontSize: "0.44rem", letterSpacing: "0.14em",
+                  textTransform: "uppercase", color: "#f0c030",
+                  whiteSpace: "nowrap",
+                }}>View Log</span>
+              </motion.button>
+            )}
+          </div>
 
           {/* ─── Textbook figure label + ruler ─── */}
           <div style={{

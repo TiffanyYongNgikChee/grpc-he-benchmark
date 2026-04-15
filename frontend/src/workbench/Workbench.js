@@ -5,6 +5,7 @@ import MiniCanvas from "./MiniCanvas";
 import OutputPanel from "./OutputPanel";
 import MetricsStrip from "./MetricsStrip";
 import LibraryComparison from "./LibraryComparison";
+import LiveStatusFeed from "./LiveStatusFeed";
 
 import MnistBatchBenchmark from "./MnistBatchBenchmark";
 import ParameterComparison from "./ParameterComparison";
@@ -43,6 +44,11 @@ export default function Workbench() {
   const [hoveredLayer, setHoveredLayer] = useState(null);
   const [runCount, setRunCount] = useState(0);
   const animTimers = useRef([]);
+
+  /* Run history — array of { log, result, runIndex, timestamp } */
+  const [runHistory, setRunHistory] = useState([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyIndex, setHistoryIndex] = useState(0); // which run to view
 
   /* Library comparison */
   const [compData, setCompData] = useState(null);
@@ -156,6 +162,19 @@ export default function Workbench() {
     if (compAbortRef.current) compAbortRef.current.abort();
   }, []);
 
+  /* Save completed run log to history */
+  const handleLogComplete = useCallback((log, runResult) => {
+    setRunHistory(prev => {
+      const entry = {
+        runIndex: prev.length + 1,
+        timestamp: new Date().toLocaleTimeString(),
+        log,
+        result: runResult,
+      };
+      return [...prev, entry];
+    });
+  }, []);
+
   useEffect(() => () => animTimers.current.forEach(clearTimeout), []);
 
   /* Tooltip */
@@ -166,9 +185,12 @@ export default function Workbench() {
     <div className="min-h-screen flex flex-col" style={{ background: "#f7f7f7" }}>
 
       {/* ═══════════ HERO — NEURAL NETWORK ANIMATION ═══════════ */}
-      <NeuralHero />
+      <NeuralHero
+        hasHistory={runHistory.length > 0}
+        onOpenHistory={() => { setHistoryIndex(runHistory.length - 1); setHistoryOpen(true); }}
+      />
 
-      {/* ═══════════ STICKY NAV BAR (appears after hero) ═══════════ */}
+      {/* ═══════════ STICKY NAV BAR ═══════════ */}
       <div
         className="sticky top-0 z-30 border-b backdrop-blur-xl"
         style={{
@@ -202,243 +224,513 @@ export default function Workbench() {
         </div>
       </div>
 
-      {/* ═══════════ CONTROLS BAR ═══════════ */}
+      {/* ═══════════ HABBO-STYLE WORKBENCH ═══════════ */}
       <div
-        className="border-b flex items-center gap-1 md:gap-0 px-4 py-2 flex-wrap"
-        style={{ background: "#ebeaea", borderColor: "#d9d9d9" }}
+        id="workbench"
+        style={{
+          background: "#5a5a5a",
+          borderTop: "3px solid #888",
+          borderBottom: "3px solid #333",
+          padding: "10px 12px 14px",
+        }}
       >
-        <div className="flex items-center gap-2 mr-4 md:mr-6">
+        {/* ── Top toolbar bar — gold Habbo header style ── */}
+        <div style={{
+          background: "linear-gradient(180deg, #d4a800 0%, #b08a00 100%)",
+          border: "2px solid #7a5e00",
+          borderRadius: "4px 4px 0 0",
+          padding: "5px 12px",
+          display: "flex", alignItems: "center", gap: 8,
+          marginBottom: 2,
+        }}>
+          <span style={{
+            fontFamily: "'Press Start 2P', monospace",
+            fontSize: "0.62rem", letterSpacing: "0.18em",
+            color: "#1a0e00", textTransform: "uppercase",
+            textShadow: "0 1px 0 rgba(255,220,80,0.4)",
+          }}>
+            ◈ Encrypted Inference Workbench
+          </span>
+          <div style={{ flex: 1 }} />
+          {/* health */}
+          <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+            <div style={{
+              width: 8, height: 8, borderRadius: "50%",
+              background: healthy === null ? "#888" : healthy ? "#22cc66" : "#cc2222",
+              border: "1.5px solid rgba(0,0,0,0.3)",
+              boxShadow: healthy ? "0 0 5px #22cc66" : "none",
+            }} />
+            <span style={{
+              fontFamily: "'Press Start 2P', monospace",
+              fontSize: "0.42rem", letterSpacing: "0.12em",
+              color: "#1a0e00",
+            }}>{healthy === null ? "..." : healthy ? "ONLINE" : "OFFLINE"}</span>
+          </div>
+        </div>
+
+        {/* ── Controls row — Habbo dark panel style ── */}
+        <div style={{
+          background: "linear-gradient(180deg, #404040 0%, #383838 100%)",
+          border: "2px solid #222",
+          borderTop: "1px solid #666",
+          padding: "7px 10px",
+          display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap",
+          marginBottom: 8,
+        }}>
           {/* Reset */}
           <button
             onClick={handleReset}
-            className="w-9 h-9 rounded-full flex items-center justify-center border border-gray-300 bg-white hover:bg-gray-100 text-gray-500 transition-colors"
             title="Reset"
+            style={{
+              height: 30, paddingLeft: 10, paddingRight: 10,
+              borderRadius: 3, flexShrink: 0,
+              display: "flex", alignItems: "center", gap: 5,
+              fontFamily: "'Press Start 2P', monospace",
+              fontSize: "0.42rem", letterSpacing: "0.1em",
+              color: "#ddd",
+              background: "linear-gradient(180deg,#5a5a5a,#3a3a3a)",
+              border: "2px solid #222",
+              borderTop: "2px solid #888",
+              borderLeft: "2px solid #777",
+              cursor: "pointer",
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = "linear-gradient(180deg,#6a6a6a,#4a4a4a)"}
+            onMouseLeave={e => e.currentTarget.style.background = "linear-gradient(180deg,#5a5a5a,#3a3a3a)"}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <svg style={{ width:10, height:10 }} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M5.09 15A8 8 0 0119 9M18.91 9A8 8 0 015 15" />
             </svg>
+            RESET
           </button>
 
-          {/* Play */}
+          {/* Run button — Habbo "Let's GO" style */}
           <button
             onClick={handleRun}
             disabled={!pixels || loading}
-            className={`w-11 h-11 rounded-full flex items-center justify-center text-white shadow transition-all ${
-              !pixels || loading
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-[#f4743a] hover:bg-[#e05a20] hover:scale-105 active:scale-95"
-            }`}
-            title={loading ? "Running…" : "Run Encrypted Inference"}
+            style={{
+              height: 34, paddingLeft: 16, paddingRight: 16,
+              borderRadius: 3, flexShrink: 0,
+              display: "flex", alignItems: "center", gap: 7,
+              fontFamily: "'Press Start 2P', monospace",
+              fontSize: "0.6rem", letterSpacing: "0.14em",
+              color: !pixels || loading ? "#888" : "#1a0e00",
+              background: !pixels || loading
+                ? "linear-gradient(180deg,#555,#3a3a3a)"
+                : "linear-gradient(180deg,#f0c030,#c89800)",
+              border: "2px solid",
+              borderColor: !pixels || loading ? "#222" : "#7a5e00",
+              borderTop: `2px solid ${!pixels || loading ? "#666" : "#f8e060"}`,
+              borderLeft: `2px solid ${!pixels || loading ? "#555" : "#e8b820"}`,
+              cursor: !pixels || loading ? "not-allowed" : "pointer",
+              boxShadow: !pixels || loading ? "none" : "0 2px 6px rgba(0,0,0,0.5)",
+            }}
+            onMouseEnter={e => { if (pixels && !loading) e.currentTarget.style.background = "linear-gradient(180deg,#f8d040,#d4a400)"; }}
+            onMouseLeave={e => { if (pixels && !loading) e.currentTarget.style.background = "linear-gradient(180deg,#f0c030,#c89800)"; }}
           >
             {loading ? (
-              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+              <svg className="animate-spin" style={{ width:10, height:10 }} viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
             ) : (
-              <svg className="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+              <svg style={{ width:10, height:10 }} fill="currentColor" viewBox="0 0 24 24">
                 <path d="M8 5v14l11-7z" />
               </svg>
             )}
+            {loading ? "RUNNING..." : "RUN ▶"}
           </button>
 
-        </div>
+          <div style={{ width: 1, height: 20, background: "#555", margin: "0 4px", flexShrink: 0 }} />
 
-        {/* Epoch */}
-        <ControlLabel label="Epoch" value={String(runCount).padStart(6, "0")} mono />
-
-        <Divider />
-
-        {/* Static labels — fixed for this deployment */}
-        <ControlStaticLabel label="Library" value="OpenFHE" />
-        <ControlStaticLabel label="Encryption" value="BFV" />
-        <ControlStaticLabel label="Security" value="128-bit" />
-        <ControlStaticLabel label="Activation" value="x² (degree 2)" />
-        <ControlStaticLabel label="Scale factor" value="1000" />
-        <ControlStaticLabel label="Model" value="CNN (LeNet-5)" />
-
-        {/* Spacer + health + total time */}
-        <div className="ml-auto flex items-center gap-3">
-          {result && (
-            <span className="text-xs font-medium" style={{ color: "#0aa35e" }}>
-              {result.totalMs?.toFixed(1)}ms total
-            </span>
-          )}
-          <div className="flex items-center gap-1.5">
-            <div
-              className="w-2 h-2 rounded-full"
-              style={{
-                background: healthy === null ? "#aaa" : healthy ? "#0aa35e" : "#e03e52",
-                boxShadow: healthy ? "0 0 6px rgba(10,163,94,0.5)" : "none",
-              }}
-            />
-            <span className="text-[11px]" style={{ color: "#999" }}>
-              {healthy === null ? "…" : healthy ? "Online" : "Offline"}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* ═══════════ MAIN AREA ═══════════ */}
-      <div id="workbench" className="flex-1 px-4 md:px-8 py-6">
-        <div className="max-w-[1440px] mx-auto flex gap-6" style={{ minHeight: 420 }}>
-
-          {/* ── INPUT COLUMN ── */}
-          <div className="flex-shrink-0" style={{ width: 210 }}>
-            <SectionTitle>INPUT</SectionTitle>
-            <p className="text-xs mb-3" style={{ color: "#999" }}>
-              Draw a digit (0-9)
-            </p>
-            <MiniCanvas onPixelsReady={setPixels} disabled={loading} />
-
-            {/* 28×28 preview */}
-            {pixels && (
-              <div className="mt-3">
-                <p className="text-[10px] mb-1" style={{ color: "#aaa" }}>28×28 model input</p>
-                <canvas
-                  width={28}
-                  height={28}
-                  className="rounded"
-                  style={{
-                    width: 56,
-                    height: 56,
-                    imageRendering: "pixelated",
-                    border: "1px solid #d9d9d9",
-                  }}
-                  ref={(el) => {
-                    if (!el || !pixels) return;
-                    const ctx = el.getContext("2d");
-                    const img = ctx.createImageData(28, 28);
-                    for (let i = 0; i < 784; i++) {
-                      const v = pixels[i];
-                      img.data[i * 4] = v;
-                      img.data[i * 4 + 1] = v;
-                      img.data[i * 4 + 2] = v;
-                      img.data[i * 4 + 3] = 255;
-                    }
-                    ctx.putImageData(img, 0, 0);
-                  }}
-                />
-              </div>
-            )}
-
-            <div className="mt-5 text-[10px]" style={{ color: "#999" }}>
-              <p className="font-medium text-[11px] mb-1" style={{ color: "#666" }}>
-                Layer colours
-              </p>
-              {[
-                ["Crypto", "#0db7c4"],
-                ["Conv / Bias", "#7b3ff2"],
-                ["Activation / Pool", "#e68a00"],
-                ["Fully Connected", "#e03e52"],
-                ["I/O", "#0aa35e"],
-              ].map(([label, color]) => (
-                <div key={label} className="flex items-center gap-2 mb-0.5">
-                  <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: color }} />
-                  <span>{label}</span>
-                </div>
-              ))}
+          {/* Spec pills — Habbo info box style */}
+          {[
+            { label:"Library",    val:"OpenFHE",    color:"#44cc88" },
+            { label:"Scheme",     val:"BFV",         color:"#6aabf7" },
+            { label:"Security",   val:"128-bit",     color:"#cc88ff" },
+            { label:"Activation", val:"x²",          color:"#f0c030" },
+            { label:"Model",      val:"LeNet-5",     color:"#cccccc" },
+          ].map(({ label, val, color }) => (
+            <div key={label} style={{
+              display: "flex", flexDirection: "column", gap: 1,
+              padding: "3px 9px",
+              background: "linear-gradient(180deg,#2a2a2a,#1e1e1e)",
+              border: "1px solid #111",
+              borderTop: "1px solid #444",
+              borderLeft: "1px solid #3a3a3a",
+              borderRadius: 2,
+            }}>
+              <span style={{
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: "0.36rem", letterSpacing: "0.16em",
+                color: "#888", textTransform: "uppercase",
+              }}>{label}</span>
+              <span style={{
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: "0.52rem", letterSpacing: "0.08em",
+                color,
+              }}>{val}</span>
             </div>
+          ))}
+
+          {/* Run count */}
+          <div style={{
+            display: "flex", flexDirection: "column", gap: 1,
+            padding: "3px 9px",
+            background: "linear-gradient(180deg,#2a2a2a,#1e1e1e)",
+            border: "1px solid #111",
+            borderTop: "1px solid #444",
+            borderLeft: "1px solid #3a3a3a",
+            borderRadius: 2,
+          }}>
+            <span style={{
+              fontFamily: "'Press Start 2P', monospace",
+              fontSize: "0.36rem", letterSpacing: "0.16em",
+              color: "#888", textTransform: "uppercase",
+            }}>Runs</span>
+            <span style={{
+              fontFamily: "'Press Start 2P', monospace",
+              fontSize: "0.52rem", letterSpacing: "0.08em",
+              color: "#eee",
+            }}>{String(runCount).padStart(4,"0")}</span>
           </div>
 
-          {/* ── NETWORK COLUMN ── */}
-          <div className="flex-1 min-w-0 flex flex-col">
-            <div className="flex items-center gap-2 mb-2">
-              <SectionTitle>ENCRYPTED CNN PIPELINE</SectionTitle>
-              <span className="text-[10px]" style={{ color: "#bbb" }}>
-                {LAYERS.length} layers
+          <div style={{ flex: 1 }} />
+
+          {/* Total time — Habbo highlighted box */}
+          {result && (
+            <div style={{
+              display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1,
+              padding: "3px 12px",
+              background: "linear-gradient(180deg,#1a3a1a,#122012)",
+              border: "2px solid #0a4a0a",
+              borderTop: "2px solid #2a6a2a",
+              borderRadius: 2,
+            }}>
+              <span style={{
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: "0.36rem", letterSpacing: "0.2em",
+                color: "#44aa44", textTransform: "uppercase",
+              }}>Total Time</span>
+              <span style={{
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: "0.9rem", letterSpacing: "0.06em",
+                color: "#44ee88",
+                textShadow: "0 0 8px rgba(68,238,136,0.5)",
+              }}>
+                {result.totalMs?.toFixed(1)}ms
               </span>
             </div>
+          )}
+        </div>
 
-            {/* Pipeline card */}
-            <div
-              className="flex-1 rounded-lg p-3 flex items-center"
-              style={{ background: "#fff", border: "1px solid #d9d9d9" }}
-            >
-              <CnnPipeline
-                timings={result}
-                activeStep={activeStep}
-                hovered={hoveredLayer}
-                onHover={setHoveredLayer}
-                layerStatus={progress.running || result ? progress.layerStatus : null}
+        {/* ── Three-column Habbo panel layout ── */}
+        <div style={{
+          display: "flex", gap: 6, alignItems: "stretch", minHeight: 620,
+        }}>
+
+          {/* ── INPUT PANEL — Habbo-style titled box ── */}
+          <div style={{
+            flexShrink: 0, width: 240,
+            display: "flex", flexDirection: "column",
+            border: "2px solid #222",
+            borderTop: "2px solid #777",
+            borderLeft: "2px solid #666",
+            borderRadius: 2,
+            overflow: "hidden",
+          }}>
+            {/* Panel title bar */}
+            <div style={{
+              background: "linear-gradient(180deg,#6aabf7,#3a7acc)",
+              padding: "4px 10px",
+              borderBottom: "2px solid #1a4a8a",
+            }}>
+              <span style={{
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: "0.48rem", letterSpacing: "0.16em",
+                color: "#fff",
+                textShadow: "0 1px 0 rgba(0,0,0,0.4)",
+                textTransform: "uppercase",
+              }}>◈ Input</span>
+            </div>
+            {/* Panel body */}
+            <div style={{
+              flex: 1, background: "#d8d0c0",
+              padding: "10px 10px",
+              display: "flex", flexDirection: "column", gap: 10,
+            }}>
+              <p style={{
+                fontFamily: "system-ui, sans-serif",
+                fontSize: "0.78rem", fontWeight: 600,
+                color: "#2a2a2a", lineHeight: 1.55, margin: 0,
+              }}>
+                Draw any digit (0–9) below.
+              </p>
+
+              {/* Canvas */}
+              <div style={{
+                border: "3px solid #555",
+                borderTop: "3px solid #888",
+                borderLeft: "3px solid #777",
+                borderRadius: 2, overflow: "hidden",
+                background: "#111",
+                boxShadow: "inset 2px 2px 4px rgba(0,0,0,0.5)",
+              }}>
+                <MiniCanvas onPixelsReady={setPixels} disabled={loading} />
+              </div>
+
+              {/* 28×28 preview */}
+              {pixels && (
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <canvas
+                    width={28} height={28}
+                    style={{
+                      width: 56, height: 56,
+                      imageRendering: "pixelated",
+                      border: "2px solid #555",
+                      borderTop: "2px solid #888",
+                      background: "#111",
+                    }}
+                    ref={(el) => {
+                      if (!el || !pixels) return;
+                      const ctx = el.getContext("2d");
+                      const img = ctx.createImageData(28, 28);
+                      for (let i = 0; i < 784; i++) {
+                        const v = pixels[i];
+                        img.data[i*4] = v; img.data[i*4+1] = v;
+                        img.data[i*4+2] = v; img.data[i*4+3] = 255;
+                      }
+                      ctx.putImageData(img, 0, 0);
+                    }}
+                  />
+                  <div>
+                    <p style={{
+                      fontFamily: "'Press Start 2P', monospace",
+                      fontSize: "0.4rem", letterSpacing: "0.1em",
+                      color: "#555", margin: "0 0 3px",
+                    }}>28×28 px</p>
+                    <p style={{
+                      fontFamily: "system-ui,sans-serif",
+                      fontSize: "0.75rem", color: "#666", margin: 0,
+                    }}>model input</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Layer legend */}
+              <div style={{
+                marginTop: "auto",
+                background: "#c8c0b0",
+                border: "2px solid #999",
+                borderTop: "2px solid #bbb",
+                borderLeft: "2px solid #b0b0b0",
+                borderRadius: 2,
+                padding: "8px 10px",
+              }}>
+                <p style={{
+                  fontFamily: "'Press Start 2P', monospace",
+                  fontSize: "0.4rem", letterSpacing: "0.16em",
+                  color: "#555", textTransform: "uppercase",
+                  margin: "0 0 7px",
+                }}>Layer types</p>
+                {[
+                  ["Crypto",            "#2266cc"],
+                  ["Conv / Bias",       "#882299"],
+                  ["Activation / Pool", "#aa8800"],
+                  ["Fully Connected",   "#cc2222"],
+                  ["I/O",               "#117744"],
+                ].map(([label, color]) => (
+                  <div key={label} style={{ display:"flex", alignItems:"center", gap:6, marginBottom:4 }}>
+                    <span style={{
+                      width:9, height:9, borderRadius:1, flexShrink:0,
+                      background:color, border:"1px solid rgba(0,0,0,0.3)",
+                    }} />
+                    <span style={{
+                      fontFamily: "system-ui,sans-serif",
+                      fontSize: "0.74rem", fontWeight:600, color:"#333",
+                    }}>{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ── PIPELINE PANEL ── */}
+          <div style={{
+            flex: 1, minWidth: 0,
+            display: "flex", flexDirection: "column",
+            border: "2px solid #222",
+            borderTop: "2px solid #777",
+            borderLeft: "2px solid #666",
+            borderRadius: 2,
+            overflow: "hidden",
+          }}>
+            {/* Title bar */}
+            <div style={{
+              background: "linear-gradient(180deg,#c890f0,#8844bb)",
+              padding: "4px 10px",
+              borderBottom: "2px solid #5a1a99",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <span style={{
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: "0.48rem", letterSpacing: "0.16em",
+                color: "#fff",
+                textShadow: "0 1px 0 rgba(0,0,0,0.4)",
+                textTransform: "uppercase",
+              }}>◈ Encrypted CNN Pipeline</span>
+              <span style={{
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: "0.36rem", color: "rgba(255,255,255,0.6)",
+              }}>{LAYERS.length} layers</span>
+            </div>
+            {/* Body */}
+            <div style={{
+              flex: 1, background: "#ccc8d8",
+              display: "flex", flexDirection: "column", gap: 6,
+            }}>
+              {/* Pipeline diagram */}
+              <div style={{
+                flex: 1,
+                background: "#1a1428",
+                borderBottom: "2px solid #444",
+                display: "flex", alignItems: "center",
+                overflow: "auto",
+                padding: "clamp(10px,2vw,20px)",
+              }}>
+                <CnnPipeline
+                  timings={result}
+                  activeStep={activeStep}
+                  hovered={hoveredLayer}
+                  onHover={setHoveredLayer}
+                  layerStatus={progress.running || result ? progress.layerStatus : null}
+                />
+              </div>
+
+              {/* Server log feed */}
+              <div style={{ padding: "0 8px 6px" }}>
+                <LiveStatusFeed
+                  layerStatus={progress.layerStatus}
+                  elapsedMs={progress.elapsedMs}
+                  running={progress.running}
+                  result={result}
+                  onLogComplete={handleLogComplete}
+                />
+              </div>
+
+              {/* Hover tooltip — Habbo dialogue box style */}
+              <AnimatePresence>
+                {tl && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    style={{
+                      margin: "0 8px 8px",
+                      padding: "8px 12px",
+                      background: "#f0ead8",
+                      border: "2px solid #888",
+                      borderTop: "2px solid #ccc",
+                      borderLeft: "2px solid #bbb",
+                      borderRadius: 2,
+                      display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+                    }}
+                  >
+                    <span style={{
+                      fontFamily: "'Press Start 2P', monospace",
+                      fontSize: "0.52rem", letterSpacing: "0.08em",
+                      color: "#222",
+                    }}>{tl.label}</span>
+                    <span style={{
+                      fontFamily: "'Press Start 2P', monospace",
+                      fontSize: "0.4rem", color: "#888", letterSpacing: "0.06em",
+                    }}>{tl.sub}</span>
+                    {tTime !== null && (
+                      <span style={{
+                        fontFamily: "'Press Start 2P', monospace",
+                        fontSize: "0.5rem", color: "#117744",
+                        letterSpacing: "0.06em",
+                      }}>
+                        {tTime.toFixed(2)}ms
+                        <span style={{ color:"#888", marginLeft:5 }}>
+                          ({((tTime / result.totalMs) * 100).toFixed(1)}%)
+                        </span>
+                      </span>
+                    )}
+                    <span style={{
+                      fontFamily: "system-ui,sans-serif",
+                      fontSize: "0.78rem", color: "#555",
+                    }}>
+                      — {getLayerDescription(tl.id)}
+                    </span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+
+          {/* ── OUTPUT PANEL ── */}
+          <div style={{
+            flexShrink: 0, width: 290,
+            display: "flex", flexDirection: "column",
+            border: "2px solid #222",
+            borderTop: "2px solid #777",
+            borderLeft: "2px solid #666",
+            borderRadius: 2,
+            overflow: "hidden",
+          }}>
+            {/* Title bar */}
+            <div style={{
+              background: "linear-gradient(180deg,#58c896,#229955)",
+              padding: "4px 10px",
+              borderBottom: "2px solid #116633",
+            }}>
+              <span style={{
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: "0.48rem", letterSpacing: "0.16em",
+                color: "#fff",
+                textShadow: "0 1px 0 rgba(0,0,0,0.4)",
+                textTransform: "uppercase",
+              }}>◈ Output</span>
+            </div>
+            {/* Body */}
+            <div style={{
+              flex: 1, background: "#ccd8cc",
+              padding: "clamp(8px,1.5vw,14px)",
+            }}>
+              <OutputPanel
+                result={result}
+                error={error}
+                loading={loading}
+                pixels={pixels}
+                layerStatus={progress.layerStatus}
+                elapsedMs={progress.elapsedMs}
               />
             </div>
-
-            {/* Hover tooltip */}
-            <AnimatePresence>
-              {tl && (
-                <motion.div
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="mt-2 rounded-lg px-4 py-2 text-xs"
-                  style={{ background: "#fff", border: "1px solid #d9d9d9" }}
-                >
-                  <span className="font-medium" style={{ color: "#333" }}>{tl.label}</span>
-                  <span className="ml-2" style={{ color: "#999" }}>{tl.sub}</span>
-                  {tTime !== null && (
-                    <span className="ml-3 font-mono" style={{ color: "#0aa35e" }}>
-                      {tTime.toFixed(2)}ms
-                      <span className="ml-1" style={{ color: "#bbb" }}>
-                        ({((tTime / result.totalMs) * 100).toFixed(1)}%)
-                      </span>
-                    </span>
-                  )}
-                  <span className="ml-3" style={{ color: "#999" }}>
-                    — {getLayerDescription(tl.id)}
-                  </span>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* ── OUTPUT COLUMN ── */}
-          <div className="flex-shrink-0" style={{ width: 240 }}>
-            <SectionTitle>OUTPUT</SectionTitle>
-            <OutputPanel
-              result={result}
-              error={error}
-              loading={loading}
-              pixels={pixels}
-              layerStatus={progress.layerStatus}
-              elapsedMs={progress.elapsedMs}
-            />
           </div>
         </div>
-      </div>
 
-      {/* ═══════════ METRICS BAR ═══════════ */}
-      <div style={{ background: "#ebeaea", borderTop: "1px solid #d9d9d9" }}>
-        <div className="max-w-[1440px] mx-auto px-4 md:px-8 py-3">
-          <MetricsStrip result={result} />
-        </div>
-      </div>
-
-      {/* ═══════════ LIBRARY COMPARISON ═══════════ */}
-      <div className="px-4 md:px-8 py-8" style={{ background: "#f7f7f7", borderTop: "1px solid #e5e5e5" }}>
-        <div className="max-w-[1100px] mx-auto">
-          <div className="flex items-center gap-3 mb-4">
-            <h3
-              className="text-xs font-medium uppercase tracking-widest"
-              style={{ color: "#888", letterSpacing: "0.12em" }}
-            >
-              LIBRARY COMPARISON
-            </h3>
-            <span className="text-[10px]" style={{ color: "#bbb" }}>
-              SEAL vs HElib vs OpenFHE
-            </span>
+        {/* ── Metrics strip inside the workbench frame ── */}
+        <div style={{
+          marginTop: 6,
+          border: "2px solid #222",
+          borderTop: "2px solid #777",
+          borderLeft: "2px solid #666",
+          borderRadius: 2,
+          overflow: "hidden",
+        }}>
+          <div style={{
+            background: "linear-gradient(180deg,#d4a800,#b08a00)",
+            padding: "4px 10px",
+            borderBottom: "2px solid #7a5e00",
+          }}>
+            <span style={{
+              fontFamily: "'Press Start 2P', monospace",
+              fontSize: "0.42rem", letterSpacing: "0.16em",
+              color: "#1a0e00", textTransform: "uppercase",
+            }}>◈ Layer Timing</span>
           </div>
-          <div
-            className="rounded-lg p-5"
-            style={{ background: "#fafafa", border: "1px solid #e5e5e5" }}
-          >
-            <LibraryComparison
-              data={compData}
-              loading={compLoading}
-              error={compError}
-              onRun={handleComparison}
-              onCancel={handleCompCancel}
-            />
+          <div style={{ background: "#1a1a2a", padding: "10px 14px" }}>
+            <MetricsStrip result={result} />
           </div>
         </div>
       </div>
@@ -466,6 +758,29 @@ export default function Workbench() {
         </div>
       </div>
 
+      {/* ═══════════ BENCHMARK RESULTS DASHBOARD ═══════════ */}
+      <div id="results" className="px-4 md:px-8 py-8" style={{ background: "#f7f7f7", borderTop: "1px solid #e5e5e5" }}>
+        <div className="max-w-[1100px] mx-auto">
+          <div className="flex items-center gap-3 mb-4">
+            <h3
+              className="text-xs font-medium uppercase tracking-widest"
+              style={{ color: "#888", letterSpacing: "0.12em" }}
+            >
+              BENCHMARK RESULTS
+            </h3>
+            <span className="text-[10px]" style={{ color: "#bbb" }}>
+              FHE CNN Performance across Activation Degrees
+            </span>
+          </div>
+          <div
+            className="rounded-lg p-5"
+            style={{ background: "#fafafa", border: "1px solid #e5e5e5" }}
+          >
+            <BenchmarkResultsDashboard />
+          </div>
+        </div>
+      </div>
+
       {/* ═══════════ PARAMETER COMPARISON ═══════════ */}
       <div className="px-4 md:px-8 py-8" style={{ background: "#fff", borderTop: "1px solid #e5e5e5" }}>
         <div className="max-w-[1100px] mx-auto">
@@ -489,25 +804,31 @@ export default function Workbench() {
         </div>
       </div>
 
-      {/* ═══════════ BENCHMARK RESULTS DASHBOARD ═══════════ */}
-      <div id="results" className="px-4 md:px-8 py-8" style={{ background: "#f7f7f7", borderTop: "1px solid #e5e5e5" }}>
+      {/* ═══════════ LIBRARY COMPARISON ═══════════ */}
+      <div className="px-4 md:px-8 py-8" style={{ background: "#ebeaea", borderTop: "1px solid #d9d9d9" }}>
         <div className="max-w-[1100px] mx-auto">
           <div className="flex items-center gap-3 mb-4">
             <h3
               className="text-xs font-medium uppercase tracking-widest"
               style={{ color: "#888", letterSpacing: "0.12em" }}
             >
-              BENCHMARK RESULTS
+              LIBRARY COMPARISON
             </h3>
             <span className="text-[10px]" style={{ color: "#bbb" }}>
-              FHE CNN Performance across Activation Degrees
+              SEAL vs HElib vs OpenFHE
             </span>
           </div>
           <div
             className="rounded-lg p-5"
             style={{ background: "#fafafa", border: "1px solid #e5e5e5" }}
           >
-            <BenchmarkResultsDashboard />
+            <LibraryComparison
+              data={compData}
+              loading={compLoading}
+              error={compError}
+              onRun={handleComparison}
+              onCancel={handleCompCancel}
+            />
           </div>
         </div>
       </div>
@@ -732,11 +1053,254 @@ export default function Workbench() {
       <footer className="text-center py-4 text-xs" style={{ color: "#999", background: "#f7f7f7", borderTop: "1px solid #e5e5e5" }}>
         Built by Tiffany Yong · FYP 2025-2026 · Powered by OpenFHE, SEAL, HElib, Spring Boot &amp; React
       </footer>
+
+      {/* ═══════════ RUN LOG HISTORY MODAL ═══════════ */}
+      <AnimatePresence>
+        {historyOpen && runHistory.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: "fixed", inset: 0, zIndex: 9999,
+              background: "rgba(5,10,20,0.82)",
+              backdropFilter: "blur(6px)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              padding: "20px",
+            }}
+            onClick={() => setHistoryOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.93, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ type: "spring", stiffness: 320, damping: 28 }}
+              onClick={e => e.stopPropagation()}
+              style={{
+                width: "100%", maxWidth: 620, maxHeight: "80vh",
+                borderRadius: 12,
+                background: "#0d1826",
+                border: "1.5px solid rgba(240,192,48,0.22)",
+                boxShadow: "0 0 60px rgba(240,192,48,0.08), 0 24px 80px rgba(0,0,0,0.6)",
+                display: "flex", flexDirection: "column",
+                overflow: "hidden",
+              }}
+            >
+              {/* Modal header */}
+              <div style={{
+                padding: "14px 18px",
+                borderBottom: "1px solid rgba(240,192,48,0.12)",
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                flexShrink: 0,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{
+                    fontFamily: "'Press Start 2P', monospace",
+                    fontSize: "0.58rem", letterSpacing: "0.2em", textTransform: "uppercase",
+                    color: "#f0c030",
+                  }}>Server Logs</span>
+                  <span style={{
+                    fontFamily: "'Press Start 2P', monospace",
+                    fontSize: "0.42rem", letterSpacing: "0.1em",
+                    color: "rgba(240,192,48,0.4)",
+                  }}>{runHistory.length} run{runHistory.length !== 1 ? "s" : ""}</span>
+                </div>
+                <button
+                  onClick={() => setHistoryOpen(false)}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    color: "rgba(255,248,220,0.4)", fontSize: "1.1rem",
+                    lineHeight: 1, padding: "2px 6px",
+                    transition: "color 0.15s",
+                  }}
+                  onMouseEnter={e => e.target.style.color = "rgba(255,248,220,0.9)"}
+                  onMouseLeave={e => e.target.style.color = "rgba(255,248,220,0.4)"}
+                >✕</button>
+              </div>
+
+              {/* Run tabs */}
+              {runHistory.length > 1 && (
+                <div style={{
+                  display: "flex", gap: 4, padding: "8px 14px",
+                  borderBottom: "1px solid rgba(240,192,48,0.08)",
+                  overflowX: "auto", flexShrink: 0,
+                }}>
+                  {runHistory.map((run, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setHistoryIndex(i)}
+                      style={{
+                        fontFamily: "'Press Start 2P', monospace",
+                        fontSize: "0.4rem", letterSpacing: "0.1em",
+                        padding: "5px 10px", borderRadius: 4, cursor: "pointer",
+                        border: i === historyIndex
+                          ? "1.5px solid rgba(240,192,48,0.5)"
+                          : "1.5px solid rgba(255,248,220,0.08)",
+                        background: i === historyIndex
+                          ? "rgba(240,192,48,0.1)"
+                          : "rgba(255,255,255,0.03)",
+                        color: i === historyIndex
+                          ? "#f0c030"
+                          : "rgba(255,248,220,0.35)",
+                        flexShrink: 0, transition: "all 0.15s",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Run #{run.runIndex}
+                      <span style={{ opacity: 0.6, marginLeft: 6 }}>{run.timestamp}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Log body */}
+              {(() => {
+                const run = runHistory[historyIndex];
+                if (!run) return null;
+                return (
+                  <ModalLogBody run={run} />
+                );
+              })()}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
 /* ─── Reusable sub-components ─── */
+
+/**
+ * ModalLogBody — renders the run log in the history modal.
+ * Rows match the live Server Log feed exactly.
+ * Hovering a row expands the full cryptographic description.
+ */
+function ModalLogBody({ run }) {
+  const [hoveredRow, setHoveredRow] = useState(null);
+
+  return (
+    <div style={{
+      overflowY: "auto", padding: "14px 18px",
+      display: "flex", flexDirection: "column", gap: 0,
+      flex: 1,
+    }}>
+      {/* ── Header matching the live feed ── */}
+      <div style={{
+        padding: "8px 14px",
+        borderBottom: "1px solid rgba(240,192,48,0.1)",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        marginBottom: 8,
+      }}>
+        <span style={{
+          fontFamily: "'Press Start 2P', monospace",
+          fontSize: "0.55rem", letterSpacing: "0.2em", textTransform: "uppercase",
+          color: "rgba(240,192,48,0.5)",
+        }}>Server Log</span>
+        <span style={{
+          fontFamily: "'Press Start 2P', monospace",
+          fontSize: "0.45rem", letterSpacing: "0.1em",
+          color: "#58c896",
+        }}>done · {run.result?.totalMs ? (run.result.totalMs / 1000).toFixed(2) + "s" : "—"}</span>
+      </div>
+
+      {/* ── Compact log rows — identical to live feed ── */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "0 4px" }}>
+        {run.log.map((entry, i) => (
+          <div
+            key={i}
+            onMouseEnter={() => setHoveredRow(i)}
+            onMouseLeave={() => setHoveredRow(null)}
+            style={{
+              borderRadius: 6,
+              transition: "background 0.15s",
+              background: hoveredRow === i ? `${entry.color}0d` : "transparent",
+              border: hoveredRow === i ? `1px solid ${entry.color}22` : "1px solid transparent",
+              cursor: "default",
+              overflow: "hidden",
+            }}
+          >
+            {/* ── Compact row — same layout as LiveStatusFeed compact log ── */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "7px 10px",
+            }}>
+              {/* Colour dot */}
+              <span style={{
+                width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+                background: entry.color,
+                boxShadow: `0 0 5px ${entry.color}66`,
+              }} />
+              {/* Timestamp */}
+              <span style={{
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: "0.4rem", letterSpacing: "0.06em",
+                color: "rgba(255,248,220,0.28)", flexShrink: 0, width: 38,
+              }}>{(entry.atMs / 1000).toFixed(1)}s</span>
+              {/* Label */}
+              <span style={{
+                fontFamily: "system-ui, sans-serif",
+                fontSize: "0.72rem", color: "rgba(255,248,220,0.72)",
+                flex: 1,
+              }}>{entry.label}</span>
+              {/* Duration */}
+              <span style={{
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: "0.38rem", letterSpacing: "0.06em",
+                color: entry.color, opacity: 0.85, flexShrink: 0,
+              }}>{(entry.durationMs / 1000).toFixed(1)}s</span>
+              {/* Tick */}
+              <span style={{ color: "#58c896", fontSize: "0.75rem", flexShrink: 0 }}>✓</span>
+            </div>
+
+            {/* ── Description — expands on hover ── */}
+            <AnimatePresence>
+              {hoveredRow === i && entry.desc && (
+                <motion.div
+                  key="desc"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22, ease: "easeOut" }}
+                  style={{ overflow: "hidden" }}
+                >
+                  <p style={{
+                    fontFamily: "Georgia, 'Times New Roman', serif",
+                    fontSize: "0.8rem",
+                    color: "rgba(255,248,210,0.65)",
+                    lineHeight: 1.8, margin: 0,
+                    padding: "0 10px 10px 24px",
+                    borderTop: `1px solid ${entry.color}18`,
+                    paddingTop: 8,
+                  }}>{entry.desc}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        ))}
+      </div>
+
+      {/* ── All done summary — same as live feed ── */}
+      <div style={{
+        marginTop: 10,
+        padding: "8px 12px",
+        borderRadius: 6,
+        background: "rgba(88,200,150,0.06)",
+        border: "1px solid rgba(88,200,150,0.2)",
+        display: "flex", alignItems: "center", gap: 8,
+      }}>
+        <span style={{ color: "#58c896", fontSize: "0.85rem" }}>★</span>
+        <span style={{
+          fontFamily: "'Press Start 2P', monospace",
+          fontSize: "0.42rem", letterSpacing: "0.1em",
+          color: "#58c896",
+        }}>
+          Inference complete — {run.log.length} layers · {run.result?.totalMs ? (run.result.totalMs / 1000).toFixed(2) + "s" : "—"} total
+        </span>
+      </div>
+    </div>
+  );
+}
 
 function SectionTitle({ children }) {
   return (
