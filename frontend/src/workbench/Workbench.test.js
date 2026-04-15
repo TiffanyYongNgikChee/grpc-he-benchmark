@@ -61,12 +61,12 @@ import ParameterComparison from "./ParameterComparison";
 describe("OutputPanel", () => {
   it("shows draw prompt when no pixels provided", () => {
     render(<OutputPanel />);
-    expect(screen.getByText("Draw a digit on the left to start")).toBeInTheDocument();
+    expect(screen.getByText(/draw a digit/i)).toBeInTheDocument();
   });
 
   it("shows run prompt when pixels exist but no result", () => {
     render(<OutputPanel pixels={new Array(784).fill(0)} />);
-    expect(screen.getByText("Press the run button to start encrypted inference")).toBeInTheDocument();
+    expect(screen.getByText(/press run/i)).toBeInTheDocument();
   });
 
   it("renders loading spinner with progress", () => {
@@ -95,16 +95,17 @@ describe("OutputPanel", () => {
     };
     render(<OutputPanel result={result} />);
 
-    // Predicted digit
-    expect(screen.getByText("7")).toBeInTheDocument();
-    // Confidence
-    expect(screen.getByText("95.0%")).toBeInTheDocument();
+    // Predicted digit appears at least once (also in logit bar chart digit labels)
+    expect(screen.getAllByText("7").length).toBeGreaterThanOrEqual(1);
+    // Confidence — computed from logits: logits[7]/sum(positive logits)*100
+    // logits sum = 1.22, logits[7]=0.95 → 77.9%
+    expect(screen.getByText("77.9%")).toBeInTheDocument();
     // Total time
     expect(screen.getByText("15000ms")).toBeInTheDocument();
     // Status badge
     expect(screen.getByText("success")).toBeInTheDocument();
-    // Chart
-    expect(screen.getByTestId("mock-chart-bar")).toBeInTheDocument();
+    // Logit section header is present (custom bar chart)
+    expect(screen.getByText("FHE Output Logits")).toBeInTheDocument();
   });
 
   it("shows float model accuracy when available", () => {
