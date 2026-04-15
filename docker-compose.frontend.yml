@@ -24,7 +24,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      # Point to EC2 #2's PRIVATE IP (set via environment variable)
-      - GRPC_SERVER_HOST=${GRPC_SERVER_HOST:-localhost}
+      # Point to EC2 #2's IP (override with: GRPC_SERVER_HOST=<ip> docker compose ... up)
+      - GRPC_SERVER_HOST=${GRPC_SERVER_HOST:-100.55.111.69}
       - GRPC_SERVER_PORT=50051
     restart: unless-stopped
