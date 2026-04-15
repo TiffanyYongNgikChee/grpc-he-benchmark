@@ -314,7 +314,7 @@ export default function OwlGuide({ onDone }) {
       borderRadius:12,
       overflow:"hidden",
       position:"relative",
-      minHeight:560,
+      minHeight: "min(90vh, 680px)",
       userSelect:"none",
     }}>
       <style>{PIXEL_STYLE}</style>

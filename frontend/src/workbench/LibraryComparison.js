@@ -435,62 +435,41 @@ function PixelRadar({ results }) {
 }
 
 /* ══════════════════════════════════════════════════════
-   TOTAL TIME PIXEL BARS
+   FULL-WIDTH TIME BARS  (readable, big)
    ══════════════════════════════════════════════════════ */
-function PixelTimeBars({ results }) {
+function BigTimeBars({ results }) {
   const sorted   = [...results].sort((a, b) => a.totalTimeMs - b.totalTimeMs);
   const maxTotal = Math.max(...results.map(r => r.totalTimeMs || 0), 1);
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       {sorted.map((lib, rank) => {
         const lc  = LIB[lib.library] || LIB.SEAL;
         const pct = Math.max((lib.totalTimeMs / maxTotal) * 100, 3);
         const segs = Math.max(1, Math.floor(pct / 5));
         return (
           <div key={lib.library}>
-            {/* Label row */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <div style={{ width: 8, height: 8, background: lc.color, flexShrink: 0,
-                              boxShadow: `0 0 0 1px ${P.borderLo}` }}/>
-                <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 8, color: lc.color }}>
-                  {lib.library}
-                </span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 12, height: 12, background: lc.color, flexShrink: 0, boxShadow: `0 0 0 2px ${P.borderLo}` }}/>
+                <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 12, color: lc.color }}>{lib.library}</span>
                 <PixelBadge color={lc.color}>{lc.scheme}</PixelBadge>
+                <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 13, color: P.cream, opacity: 0.55 }}>{lc.madeBy}</span>
                 {rank === 0 && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                    <IconTrophy size={10}/>
-                    <PixelBadge color={P.gold}>FASTEST</PixelBadge>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <IconTrophy size={16}/>
+                    <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 8, color: P.gold }}>FASTEST</span>
                   </div>
                 )}
               </div>
-              <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 9, color: lc.color }}>
-                {lib.totalTimeMs.toFixed(1)} ms
+              <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 26, fontWeight: 700, color: lc.color, letterSpacing: "-0.02em" }}>
+                {lib.totalTimeMs.toFixed(1)}<span style={{ fontSize: 14, fontWeight: 400, marginLeft: 4, opacity: 0.7 }}>ms</span>
               </span>
             </div>
-
             {/* Pixel bar */}
-            <div style={{
-              height: 16, background: P.panelBg,
-              border: `2px solid ${P.border}`,
-              boxShadow: `inset 2px 2px 0 ${P.borderLo}`,
-              position: "relative", overflow: "hidden",
-            }}>
-              {/* Filled region */}
-              <div style={{
-                position: "absolute", top: 0, left: 0, height: "100%",
-                width: `${pct}%`, background: lc.color,
-                boxShadow: `inset 0 4px 0 ${lc.color}80, inset 0 -3px 0 ${lc.dark}`,
-              }}>
-                {/* Segment dividers */}
+            <div style={{ height: 28, background: P.panelBg, border: `3px solid ${P.border}`, boxShadow: `inset 3px 3px 0 ${P.borderLo}`, position: "relative", overflow: "hidden" }}>
+              <div style={{ position: "absolute", top: 0, left: 0, height: "100%", width: `${pct}%`, background: lc.color, boxShadow: `inset 0 6px 0 ${lc.color}80, inset 0 -4px 0 ${lc.dark}` }}>
                 {Array.from({ length: segs }).map((_, i) => (
-                  <div key={i} style={{
-                    position: "absolute",
-                    left: `${((i + 1) / segs) * 100}%`,
-                    top: 0, bottom: 0, width: 2,
-                    background: `${P.borderLo}60`,
-                  }}/>
+                  <div key={i} style={{ position: "absolute", left: `${((i + 1) / segs) * 100}%`, top: 0, bottom: 0, width: 3, background: `${P.borderLo}55` }}/>
                 ))}
               </div>
             </div>
@@ -502,132 +481,75 @@ function PixelTimeBars({ results }) {
 }
 
 /* ══════════════════════════════════════════════════════
-   EXPANDABLE OPERATION ROW
+   FULL-WIDTH OP ROWS  (readable text, big bars)
    ══════════════════════════════════════════════════════ */
-function PixelOpRow({ op, results, isActive, onToggle }) {
+function BigOpRow({ op, results, isActive, onToggle }) {
   const maxVal   = Math.max(...results.map(r => r[op.key] || 0), 1);
   const opSorted = [...results].sort((a, b) => (a[op.key] || 0) - (b[op.key] || 0));
 
   return (
-    <div style={{
-      background: isActive ? `${op.color}0c` : "transparent",
-      border: `2px solid ${isActive ? op.color + "55" : "transparent"}`,
-      marginBottom: 4,
-    }}>
-      {/* Clickable header */}
-      <div onClick={onToggle} style={{
-        display: "flex", alignItems: "center", gap: 8,
-        padding: "8px 10px", cursor: "pointer", userSelect: "none",
-      }}>
-        <div style={{ width: 20, height: 20, display: "flex", alignItems: "center",
-                      justifyContent: "center", flexShrink: 0 }}>
+    <div style={{ background: isActive ? `${op.color}0c` : "transparent", border: `2px solid ${isActive ? op.color + "55" : "transparent"}`, marginBottom: 6 }}>
+      {/* Header */}
+      <div onClick={onToggle} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer", userSelect: "none" }}>
+        <div style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           {OP_ICONS[op.key]?.(op.color)}
         </div>
-        <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 8, color: op.color }}>
-            {op.short}
-          </span>
-          <PixelBadge color={op.color}>{op.param}</PixelBadge>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 11, color: op.color }}>{op.short}</span>
+            <PixelBadge color={op.color}>{op.param}</PixelBadge>
+          </div>
         </div>
-        <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 7, color: P.dim, flexShrink: 0 }}>
+        <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 8, color: P.dim, flexShrink: 0 }}>
           {isActive ? "[HIDE]" : "[INFO]"}
         </span>
       </div>
 
-      {/* Mini bars (always visible) */}
-      <div style={{ padding: "0 10px 10px" }}>
+      {/* Bars */}
+      <div style={{ padding: "0 16px 14px" }}>
         {results.map(lib => {
           const lc  = LIB[lib.library] || LIB.SEAL;
           const val = lib[op.key] || 0;
           const pct = Math.max(2, (val / maxVal) * 100);
           return (
-            <div key={lib.library} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
-              <span style={{
-                fontFamily: "'Press Start 2P', monospace", fontSize: 7, color: lc.color,
-                width: 54, textAlign: "right", flexShrink: 0,
-              }}>{lib.library}</span>
-              <div style={{
-                flex: 1, height: 10, background: P.panelBg,
-                border: `2px solid ${P.border}`,
-                boxShadow: `inset 1px 1px 0 ${P.borderLo}`,
-                overflow: "hidden", position: "relative",
-              }}>
-                <div style={{
-                  position: "absolute", top: 0, left: 0, height: "100%",
-                  width: `${pct}%`, background: lc.color,
-                  boxShadow: `inset 0 2px 0 ${lc.color}80`,
-                }}/>
+            <div key={lib.library} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 9, color: lc.color, width: 72, textAlign: "right", flexShrink: 0 }}>{lib.library}</span>
+              <div style={{ flex: 1, height: 18, background: P.panelBg, border: `2px solid ${P.border}`, boxShadow: `inset 2px 2px 0 ${P.borderLo}`, overflow: "hidden", position: "relative" }}>
+                <div style={{ position: "absolute", top: 0, left: 0, height: "100%", width: `${pct}%`, background: lc.color, boxShadow: `inset 0 4px 0 ${lc.color}80` }}/>
               </div>
-              <span style={{
-                fontFamily: "'Press Start 2P', monospace", fontSize: 7, color: lc.color,
-                width: 56, textAlign: "right", flexShrink: 0,
-              }}>{val.toFixed(1)} ms</span>
+              <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 16, fontWeight: 700, color: lc.color, width: 80, textAlign: "right", flexShrink: 0 }}>{val.toFixed(1)} ms</span>
             </div>
           );
         })}
       </div>
 
-      {/* Expanded detail */}
+      {/* Expanded */}
       {isActive && (
-        <div className="px-slide" style={{
-          margin: "0 10px 10px",
-          background: P.panelBg,
-          border: `2px solid ${op.color}44`,
-          boxShadow: `2px 2px 0 ${P.borderLo}`,
-          padding: "10px 12px",
-        }}>
-          {/* What / How / Why */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 10 }}>
-            {[
-              { label: "WHAT", body: op.what },
-              { label: "HOW",  body: op.how  },
-              { label: "WHY",  body: op.why  },
-            ].map(card => (
-              <div key={card.label} style={{
-                background: P.panel,
-                border: `2px solid ${op.color}33`,
-                padding: "8px 9px",
-              }}>
-                <div style={{
-                  fontFamily: "'Press Start 2P', monospace",
-                  fontSize: 7, color: op.color, marginBottom: 5, letterSpacing: "0.08em",
-                }}>{card.label}</div>
-                <div style={{
-                  fontFamily: "system-ui, sans-serif",
-                  fontSize: 11, color: P.cream, lineHeight: 1.65, opacity: 0.88,
-                }}>{card.body}</div>
+        <div className="px-slide" style={{ margin: "0 16px 14px", background: P.panelBg, border: `2px solid ${op.color}44`, boxShadow: `2px 2px 0 ${P.borderLo}`, padding: "16px 18px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
+            {[{ label: "WHAT", body: op.what }, { label: "HOW", body: op.how }, { label: "WHY", body: op.why }].map(card => (
+              <div key={card.label} style={{ background: P.panel, border: `2px solid ${op.color}33`, padding: "12px 14px" }}>
+                <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 8, color: op.color, marginBottom: 8, letterSpacing: "0.08em" }}>{card.label}</div>
+                <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 13, color: P.cream, lineHeight: 1.7, opacity: 0.9 }}>{card.body}</div>
               </div>
             ))}
           </div>
-
-          {/* Ranked timing tiles */}
-          <div style={{ display: "flex", gap: 6 }}>
+          <div style={{ display: "flex", gap: 10 }}>
             {opSorted.map((lib, idx) => {
               const lc  = LIB[lib.library] || LIB.SEAL;
               const val = lib[op.key] || 0;
               return (
-                <div key={lib.library} style={{
-                  flex: 1, background: P.panel,
-                  border: `2px solid ${idx === 0 ? lc.color : lc.color + "44"}`,
-                  boxShadow: idx === 0 ? `3px 3px 0 ${P.borderLo}` : `1px 1px 0 ${P.borderLo}`,
-                  padding: "8px 10px", textAlign: "center",
-                }}>
+                <div key={lib.library} style={{ flex: 1, background: P.panel, border: `2px solid ${idx === 0 ? lc.color : lc.color + "44"}`, boxShadow: idx === 0 ? `4px 4px 0 ${P.borderLo}` : `2px 2px 0 ${P.borderLo}`, padding: "12px 14px", textAlign: "center" }}>
                   {idx === 0 && (
-                    <div style={{ display: "flex", justifyContent: "center", marginBottom: 5, gap: 3 }}>
-                      <IconTrophy size={11}/>
-                      <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 6, color: P.gold }}>
-                        FASTEST
-                      </span>
+                    <div style={{ display: "flex", justifyContent: "center", marginBottom: 6, gap: 5 }}>
+                      <IconTrophy size={14}/>
+                      <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 7, color: P.gold }}>FASTEST</span>
                     </div>
                   )}
-                  <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 7, color: lc.color, marginBottom: 4 }}>
-                    {lib.library}
-                  </div>
-                  <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 16, color: lc.color, lineHeight: 1 }}>
-                    {val.toFixed(1)}
-                  </div>
-                  <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 7, color: P.dim, marginTop: 2 }}>ms</div>
-                  <div style={{ height: 4, background: P.panelBg, border: `1px solid ${P.border}`, marginTop: 6, overflow: "hidden" }}>
+                  <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 10, color: lc.color, marginBottom: 6 }}>{lib.library}</div>
+                  <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 32, fontWeight: 700, color: lc.color, lineHeight: 1, letterSpacing: "-0.02em" }}>{val.toFixed(1)}</div>
+                  <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 13, color: P.dim, marginTop: 3 }}>ms</div>
+                  <div style={{ height: 5, background: P.panelBg, border: `1px solid ${P.border}`, marginTop: 10, overflow: "hidden" }}>
                     <div style={{ height: "100%", width: `${(val / maxVal) * 100}%`, background: lc.color }}/>
                   </div>
                 </div>
@@ -642,91 +564,42 @@ function PixelOpRow({ op, results, isActive, onToggle }) {
 }
 
 /* ══════════════════════════════════════════════════════
-   PER-LIBRARY SUMMARY CARD
+   BIG LIBRARY SUMMARY CARD
    ══════════════════════════════════════════════════════ */
-function LibCard({ lib, rank }) {
+function BigLibCard({ lib, rank }) {
   const lc = LIB[lib.library] || LIB.SEAL;
   return (
-    <div style={{
-      background: P.panel,
-      border: `3px solid ${rank === 0 ? lc.color : P.border}`,
-      boxShadow: rank === 0
-        ? `4px 4px 0 ${P.borderLo}, inset 0 0 0 1px ${lc.color}22`
-        : `2px 2px 0 ${P.borderLo}`,
-      position: "relative", overflow: "hidden",
-    }}>
+    <div style={{ background: P.panel, border: `3px solid ${rank === 0 ? lc.color : P.border}`, boxShadow: rank === 0 ? `5px 5px 0 ${P.borderLo}` : `3px 3px 0 ${P.borderLo}`, position: "relative", overflow: "hidden" }}>
       <Scanlines/>
-
       {/* Header */}
-      <div style={{
-        background: `linear-gradient(90deg, ${lc.color}22, ${P.panelMid})`,
-        borderBottom: `2px solid ${lc.color}55`,
-        padding: "7px 10px",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        position: "relative", zIndex: 2,
-      }}>
+      <div style={{ background: `linear-gradient(90deg, ${lc.color}22, ${P.panelMid})`, borderBottom: `2px solid ${lc.color}55`, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", zIndex: 2 }}>
         <div>
-          <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 9, color: lc.color, marginBottom: 3 }}>
-            {lib.library}
-          </div>
-          <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 6, color: P.dim }}>
-            {lc.madeBy} · {lc.scheme}
-          </div>
+          <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 12, color: lc.color, marginBottom: 4 }}>{lib.library}</div>
+          <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 12, color: P.dim }}>{lc.madeBy} · {lc.scheme}</div>
         </div>
-        <div style={{
-          fontFamily: "'Press Start 2P', monospace", fontSize: 7,
-          color: rank === 0 ? P.gold : P.dim,
-          background: P.panelBg,
-          border: `2px solid ${rank === 0 ? P.gold : P.border}`,
-          padding: "3px 7px",
-          display: "flex", alignItems: "center", gap: 4,
-        }}>
-          {rank === 0 && <IconTrophy size={9}/>}
-          #{rank + 1}
+        <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 9, color: rank === 0 ? P.gold : P.dim, background: P.panelBg, border: `2px solid ${rank === 0 ? P.gold : P.border}`, padding: "4px 9px", display: "flex", alignItems: "center", gap: 5 }}>
+          {rank === 0 && <IconTrophy size={12}/>}#{rank + 1}
         </div>
       </div>
-
       {/* Big total */}
-      <div style={{
-        textAlign: "center", padding: "12px 10px 8px",
-        borderBottom: `1px solid ${P.border}`,
-        position: "relative", zIndex: 2,
-      }}>
-        <div style={{
-          fontFamily: "'Press Start 2P', monospace",
-          fontSize: 22, color: lc.color,
-          textShadow: `2px 2px 0 ${P.borderLo}`, lineHeight: 1,
-        }}>{lib.totalTimeMs.toFixed(0)}</div>
-        <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 7, color: P.dim, marginTop: 4 }}>
-          ms total
-        </div>
+      <div style={{ textAlign: "center", padding: "20px 14px 14px", borderBottom: `1px solid ${P.border}`, position: "relative", zIndex: 2 }}>
+        <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 48, fontWeight: 800, color: lc.color, textShadow: `3px 3px 0 ${P.borderLo}`, lineHeight: 1, letterSpacing: "-0.03em" }}>{lib.totalTimeMs.toFixed(0)}</div>
+        <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 16, color: P.dim, marginTop: 4, fontWeight: 500 }}>ms total</div>
       </div>
-
-      {/* Per-op rows */}
-      <div style={{ padding: "8px 10px", position: "relative", zIndex: 2 }}>
+      {/* Per-op */}
+      <div style={{ padding: "10px 14px", position: "relative", zIndex: 2 }}>
         {OPS.map(op => (
-          <div key={op.key} style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "4px 0", borderBottom: `1px solid ${P.border}44`,
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <div key={op.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 0", borderBottom: `1px solid ${P.border}44` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
               <div style={{ opacity: 0.7 }}>{OP_ICONS[op.key]?.(op.color)}</div>
-              <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 6, color: P.dim }}>
-                {op.short}
-              </span>
+              <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 13, color: P.cream, opacity: 0.7 }}>{op.short}</span>
             </div>
-            <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 7, color: lc.color }}>
-              {(lib[op.key] || 0).toFixed(1)} ms
-            </span>
+            <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 15, fontWeight: 700, color: lc.color }}>{(lib[op.key] || 0).toFixed(1)} ms</span>
           </div>
         ))}
       </div>
-
-      {/* Status */}
-      <div style={{ padding: "6px 10px 8px", position: "relative", zIndex: 2 }}>
-        <PixelBadge color={lib.success ? P.openfhe : "#ff6080"}>
-          {lib.success ? "ALL OK" : "FAILED"}
-        </PixelBadge>
+      <div style={{ padding: "8px 14px 10px", position: "relative", zIndex: 2 }}>
+        <PixelBadge color={lib.success ? P.openfhe : "#ff6080"}>{lib.success ? "ALL OK" : "FAILED"}</PixelBadge>
       </div>
     </div>
   );
@@ -742,147 +615,106 @@ export default function LibraryComparison({ data, loading, error, onRun }) {
 
   const handleRun = () => { setOwlDone(false); setShowOwl(false); onRun(null); };
 
-  /* ── Info Banner ── */
-  const InfoBanner = () => (
-    <PixelPanel accent={P.gold} titleIcon={<IconChart size={12}/>}
-      title="MNIST HE PRIMITIVE BENCHMARKS" style={{ marginBottom: 8 }}>
-      <div style={{ padding: "8px 12px 9px" }}>
-        <div style={{
-          fontFamily: "system-ui, sans-serif", fontSize: 11,
-          color: P.cream, opacity: 0.8, lineHeight: 1.6,
-          display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center",
-        }}>
-          <span>3 libraries · 5 ops · 10x averaged · n=4096 · 128-bit</span>
-          <PixelBadge color={P.seal}>SEAL=BFV</PixelBadge>
-          <PixelBadge color={P.helib}>HELib=BGV</PixelBadge>
-          <PixelBadge color={P.openfhe}>OpenFHE=BFV</PixelBadge>
-        </div>
-      </div>
-    </PixelPanel>
+  /* Shared full-width wrapper */
+  const FullBleed = ({ children, bg = P.panelBg }) => (
+    <div style={{ width: "100%", background: bg, overflow: "hidden" }}>
+      {children}
+    </div>
   );
 
   /* ── Idle / empty state ── */
   if (!data && !loading && !error) {
     return (
-      <div style={{ background: P.panelBg, padding: 10 }}>
+      <FullBleed>
         <style>{PIXEL_CSS}</style>
-        <InfoBanner/>
-
-        {/* Library preview tiles */}
-        <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 14 }}>
-          {Object.entries(LIB).map(([name, lc]) => (
-            <div key={name} style={{
-              background: P.panel,
-              border: `3px solid ${lc.color}`,
-              boxShadow: `3px 3px 0 ${P.borderLo}`,
-              padding: "10px 18px",
-              textAlign: "center",
-              minWidth: 94,
-              position: "relative",
-              overflow: "hidden",
-            }}>
-              <Scanlines/>
-              <div style={{ position: "relative", zIndex: 2 }}>
-                <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 9, color: lc.color, marginBottom: 4 }}>
-                  {name}
-                </div>
-                <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 7, color: P.dim }}>
-                  {lc.scheme}
-                </div>
-                <div style={{
-                  fontFamily: "system-ui, sans-serif", fontSize: 10,
-                  color: P.cream, opacity: 0.55, marginTop: 3,
-                }}>{lc.madeBy}</div>
-              </div>
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 48px" }}>
+          {/* Banner */}
+          <PixelPanel accent={P.gold} titleIcon={<IconChart size={14}/>} title="MNIST HE PRIMITIVE BENCHMARKS" style={{ marginBottom: 20 }}>
+            <div style={{ padding: "10px 16px 12px", fontFamily: "system-ui, sans-serif", fontSize: 14, color: P.cream, opacity: 0.8, lineHeight: 1.6, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+              <span>3 libraries · 5 operations · 10× averaged · n = 4096 · 128-bit security</span>
+              <PixelBadge color={P.seal}>SEAL = BFV</PixelBadge>
+              <PixelBadge color={P.helib}>HELib = BGV</PixelBadge>
+              <PixelBadge color={P.openfhe}>OpenFHE = BFV</PixelBadge>
             </div>
-          ))}
-        </div>
+          </PixelPanel>
 
-        <PixelDivider/>
-        <div style={{ display: "flex", justifyContent: "center", paddingTop: 14 }}>
-          <PixelButton onClick={handleRun} color={P.gold} bg={P.panelMid}>
-            <IconChart size={13}/>
-            RUN LIBRARY COMPARISON
-          </PixelButton>
-        </div>
-      </div>
-    );
-  }
+          {/* Library tiles */}
+          <div style={{ display: "flex", gap: 16, justifyContent: "center", marginBottom: 24 }}>
+            {Object.entries(LIB).map(([name, lc]) => (
+              <div key={name} style={{ background: P.panel, border: `3px solid ${lc.color}`, boxShadow: `4px 4px 0 ${P.borderLo}`, padding: "18px 32px", textAlign: "center", minWidth: 140, position: "relative", overflow: "hidden" }}>
+                <Scanlines/>
+                <div style={{ position: "relative", zIndex: 2 }}>
+                  <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 12, color: lc.color, marginBottom: 6 }}>{name}</div>
+                  <PixelBadge color={lc.color}>{lc.scheme}</PixelBadge>
+                  <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 13, color: P.cream, opacity: 0.5, marginTop: 6 }}>{lc.madeBy}</div>
+                </div>
+              </div>
+            ))}
+          </div>
 
-  /* ── Loading state ── */
-  if (loading) {
-    return (
-      <div style={{ background: P.panelBg, padding: 10 }}>
-        <style>{PIXEL_CSS}</style>
-        <InfoBanner/>
-        <div style={{
-          display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center",
-          padding: "32px 0", gap: 14,
-        }}>
-          {/* Pixel spinner */}
-          <div className="px-spin" style={{
-            width: 32, height: 32,
-            border: `4px solid ${P.border}`,
-            borderTop: `4px solid ${P.gold}`,
-            boxShadow: `3px 3px 0 ${P.borderLo}`,
-          }}/>
-          <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 9, color: P.gold, letterSpacing: "0.1em" }}>
-            RUNNING BENCHMARKS
-          </div>
-          <div style={{
-            fontFamily: "'Press Start 2P', monospace", fontSize: 7,
-            color: P.dim, textAlign: "center", lineHeight: 2.2,
-          }}>
-            SEAL <span className="px-blink" style={{ color: P.gold }}>...</span>
-            {"  "}HELib {"  "}OpenFHE
-            <br/>est. 30 - 90 seconds total
-          </div>
-          {/* Pixel progress bar */}
-          <div style={{
-            width: 220, height: 14, background: P.panel,
-            border: `2px solid ${P.border}`,
-            boxShadow: `inset 2px 2px 0 ${P.borderLo}`,
-            overflow: "hidden", position: "relative",
-          }}>
-            <div className="px-march" style={{
-              position: "absolute", top: 0, bottom: 0, left: 0, width: "35%",
-              backgroundImage: `repeating-linear-gradient(90deg, ${P.gold} 0px, ${P.gold} 12px, ${P.goldDim} 12px, ${P.goldDim} 14px)`,
-              backgroundSize: "28px 100%",
-            }}/>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  /* ── Error state ── */
-  if (error) {
-    return (
-      <div style={{ background: P.panelBg, padding: 10 }}>
-        <style>{PIXEL_CSS}</style>
-        <PixelPanel accent="#ff6080" title="BENCHMARK FAILED">
-          <div style={{ padding: "14px 12px", textAlign: "center" }}>
-            <div style={{
-              fontFamily: "'Press Start 2P', monospace", fontSize: 8,
-              color: "#ff6080", marginBottom: 10, lineHeight: 1.8,
-            }}>{error}</div>
-            <PixelButton onClick={handleRun} color="#ff6080" bg={P.panelMid}>
-              RETRY
+          <PixelDivider/>
+          <div style={{ display: "flex", justifyContent: "center", paddingTop: 20 }}>
+            <PixelButton onClick={handleRun} color={P.gold} bg={P.panelMid}>
+              <IconChart size={16}/>
+              RUN LIBRARY COMPARISON
             </PixelButton>
           </div>
-        </PixelPanel>
-      </div>
+        </div>
+      </FullBleed>
+    );
+  }
+
+  /* ── Loading ── */
+  if (loading) {
+    return (
+      <FullBleed>
+        <style>{PIXEL_CSS}</style>
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 48px" }}>
+          <PixelPanel accent={P.gold} titleIcon={<IconChart size={14}/>} title="MNIST HE PRIMITIVE BENCHMARKS" style={{ marginBottom: 20 }}>
+            <div style={{ padding: "10px 16px 12px", fontFamily: "system-ui, sans-serif", fontSize: 14, color: P.cream, opacity: 0.7 }}>
+              3 libraries · 5 operations · 10× averaged · n = 4096 · 128-bit security
+            </div>
+          </PixelPanel>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 0", gap: 20 }}>
+            <div className="px-spin" style={{ width: 48, height: 48, border: `5px solid ${P.border}`, borderTop: `5px solid ${P.gold}`, boxShadow: `4px 4px 0 ${P.borderLo}` }}/>
+            <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 13, color: P.gold, letterSpacing: "0.1em" }}>RUNNING BENCHMARKS</div>
+            <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 15, color: P.cream, opacity: 0.6, textAlign: "center", lineHeight: 2 }}>
+              SEAL <span className="px-blink" style={{ color: P.gold, fontFamily: "'Press Start 2P', monospace" }}>...</span>
+              {"  "}HELib{"  "}OpenFHE
+              <br/>Estimated 30 – 90 seconds total
+            </div>
+            <div style={{ width: 320, height: 18, background: P.panel, border: `2px solid ${P.border}`, boxShadow: `inset 2px 2px 0 ${P.borderLo}`, overflow: "hidden", position: "relative" }}>
+              <div className="px-march" style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: "40%", backgroundImage: `repeating-linear-gradient(90deg, ${P.gold} 0px, ${P.gold} 12px, ${P.goldDim} 12px, ${P.goldDim} 14px)`, backgroundSize: "28px 100%" }}/>
+            </div>
+          </div>
+        </div>
+      </FullBleed>
+    );
+  }
+
+  /* ── Error ── */
+  if (error) {
+    return (
+      <FullBleed>
+        <style>{PIXEL_CSS}</style>
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 48px" }}>
+          <PixelPanel accent="#ff6080" title="BENCHMARK FAILED">
+            <div style={{ padding: "20px 16px", textAlign: "center" }}>
+              <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 15, color: "#ff6080", marginBottom: 16, lineHeight: 1.7 }}>{error}</div>
+              <PixelButton onClick={handleRun} color="#ff6080" bg={P.panelMid}>RETRY</PixelButton>
+            </div>
+          </PixelPanel>
+        </div>
+      </FullBleed>
     );
   }
 
   /* ── Results ── */
   const results = data?.results || [];
   if (!results.length) return (
-    <div style={{
-      background: P.panelBg, padding: 16, textAlign: "center",
-      fontFamily: "'Press Start 2P', monospace", fontSize: 8, color: P.dim,
-    }}>NO RESULTS RETURNED</div>
+    <FullBleed>
+      <div style={{ padding: 24, textAlign: "center", fontFamily: "'Press Start 2P', monospace", fontSize: 10, color: P.dim }}>NO RESULTS RETURNED</div>
+    </FullBleed>
   );
 
   const sortedResults = [...results].sort((a, b) => a.totalTimeMs - b.totalTimeMs);
@@ -892,133 +724,131 @@ export default function LibraryComparison({ data, loading, error, onRun }) {
   const owlVisible    = showOwl || (data && !owlDone);
 
   return (
-    <div style={{ background: P.panelBg }}>
+    <>
       <style>{PIXEL_CSS}</style>
 
-      {/* Owl guide overlay */}
+      {/* ── Owl guide: fixed fullscreen overlay ── */}
       {owlVisible && (
-        <OwlGuide onDone={() => { setShowOwl(false); setOwlDone(true); }}/>
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 9999,
+          background: "rgba(10,5,2,0.92)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 0,
+        }}>
+          <div style={{ width: "100%", height: "100%", maxWidth: 1100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+            <OwlGuide onDone={() => { setShowOwl(false); setOwlDone(true); }}/>
+          </div>
+        </div>
       )}
 
-      {/* Results (hidden while owl shows) */}
-      <div style={{ display: owlVisible ? "none" : "block", padding: 10 }}>
-        <InfoBanner/>
+      {/* ── Results: full-bleed panel ── */}
+      <FullBleed>
+        {/* Top pixel border strip */}
+        <PixelDivider/>
 
-        {/* ── Row 1: Time bars + Radar ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 204px", gap: 8, marginBottom: 8 }}>
+        {/* Inner content — constrained width with padding */}
+        <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 32px 32px" }}>
 
-          <PixelPanel accent={P.gold} title="TOTAL PIPELINE TIME">
-            <div style={{ padding: "10px 12px" }}>
-              <PixelTimeBars results={results}/>
+          {/* ── Header bar ── */}
+          <PixelPanel accent={P.gold} titleIcon={<IconChart size={16}/>} title="MNIST HE PRIMITIVE BENCHMARKS" style={{ marginBottom: 24 }}>
+            <div style={{ padding: "10px 16px 12px", fontFamily: "system-ui, sans-serif", fontSize: 14, color: P.cream, opacity: 0.8, lineHeight: 1.6, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+              <span>3 libraries · 5 operations · 10× averaged · n = 4096 · 128-bit security</span>
+              <PixelBadge color={P.seal}>SEAL = BFV</PixelBadge>
+              <PixelBadge color={P.helib}>HELib = BGV</PixelBadge>
+              <PixelBadge color={P.openfhe}>OpenFHE = BFV</PixelBadge>
+            </div>
+          </PixelPanel>
+
+          {/* ── Row 1: Big time bars (full width) ── */}
+          <PixelPanel accent={P.gold} title="TOTAL PIPELINE TIME — 5 OPERATIONS SUMMED" style={{ marginBottom: 20 }}>
+            <div style={{ padding: "20px 24px" }}>
+              <BigTimeBars results={results}/>
               {results.length >= 2 && (
-                <div style={{
-                  marginTop: 10,
-                  background: `${LIB[fastest.library]?.color || P.gold}12`,
-                  border: `2px solid ${LIB[fastest.library]?.color || P.gold}44`,
-                  padding: "6px 10px",
-                  display: "flex", alignItems: "center", gap: 8,
-                }}>
-                  <IconTrophy size={12}/>
-                  <span style={{
-                    fontFamily: "'Press Start 2P', monospace", fontSize: 7,
-                    color: LIB[fastest.library]?.color || P.gold, lineHeight: 1.9,
-                  }}>
-                    {fastest.library} is {speedup}x faster than {slowest.library}
+                <div style={{ marginTop: 18, background: `${LIB[fastest.library]?.color || P.gold}12`, border: `2px solid ${LIB[fastest.library]?.color || P.gold}44`, padding: "10px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+                  <IconTrophy size={16}/>
+                  <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 16, fontWeight: 600, color: LIB[fastest.library]?.color || P.gold }}>
+                    <strong>{fastest.library}</strong> is <strong>{speedup}×</strong> faster than <strong>{slowest.library}</strong> overall
                   </span>
                 </div>
               )}
             </div>
           </PixelPanel>
 
-          <PixelPanel accent={P.goldDim} title="SPEED RADAR">
-            <div style={{ padding: "6px 4px 2px" }}>
-              <PixelRadar results={results}/>
-              <div style={{ padding: "2px 8px 6px", display: "flex", flexDirection: "column", gap: 4 }}>
-                {results.map(r => {
-                  const lc = LIB[r.library] || LIB.SEAL;
-                  return (
-                    <div key={r.library} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                      <div style={{ width: 8, height: 8, background: lc.color, flexShrink: 0 }}/>
-                      <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 6, color: lc.color }}>
-                        {r.library}
-                      </span>
-                    </div>
-                  );
-                })}
-                <div style={{
-                  fontFamily: "'Press Start 2P', monospace", fontSize: 5,
-                  color: P.dim, marginTop: 2, lineHeight: 1.8,
-                }}>Larger area = faster</div>
-              </div>
+          {/* ── Row 2: Operation breakdown (full width) ── */}
+          <PixelPanel accent={P.borderHi} title="OPERATION BREAKDOWN — CLICK ANY ROW FOR DETAILS" style={{ marginBottom: 20 }}>
+            {/* Legend */}
+            <div style={{ display: "flex", gap: 20, padding: "8px 16px", borderBottom: `1px solid ${P.border}`, alignItems: "center" }}>
+              {results.map(r => {
+                const lc = LIB[r.library] || LIB.SEAL;
+                return (
+                  <div key={r.library} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <div style={{ width: 20, height: 10, background: lc.color, boxShadow: `0 0 0 1px ${P.borderLo}` }}/>
+                    <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 9, color: lc.color }}>{r.library}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ padding: "8px 0" }}>
+              {OPS.map(op => (
+                <BigOpRow key={op.key} op={op} results={results} isActive={activeOp === op.key} onToggle={() => setActiveOp(activeOp === op.key ? null : op.key)}/>
+              ))}
+            </div>
+            <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 12, color: P.dim, fontStyle: "italic", padding: "0 16px 12px", lineHeight: 1.5 }}>
+              Fig. 1 — HE primitive latencies at n=4096, t=65537, 128-bit security, averaged over 10 repetitions. SEAL & OpenFHE: BFV. HELib: BGV.
             </div>
           </PixelPanel>
-        </div>
 
-        {/* ── Row 2: Operation breakdown ── */}
-        <PixelPanel accent={P.borderHi} title="OPERATION BREAKDOWN  —  CLICK ROW FOR DETAILS"
-          style={{ marginBottom: 8 }}>
-          {/* Library colour legend */}
-          <div style={{
-            display: "flex", gap: 14, padding: "5px 12px 5px",
-            borderBottom: `1px solid ${P.border}`, alignItems: "center",
-          }}>
-            {results.map(r => {
-              const lc = LIB[r.library] || LIB.SEAL;
-              return (
-                <div key={r.library} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <div style={{ width: 16, height: 8, background: lc.color,
-                                boxShadow: `0 0 0 1px ${P.borderLo}` }}/>
-                  <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 7, color: lc.color }}>
-                    {r.library}
-                  </span>
+          {/* ── Row 3: Big summary cards (full width grid) ── */}
+          <PixelPanel accent={P.borderHi} title="LIBRARY SUMMARY" style={{ marginBottom: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, padding: 12 }}>
+              {sortedResults.map((lib, rank) => (
+                <BigLibCard key={lib.library} lib={lib} rank={rank}/>
+              ))}
+            </div>
+          </PixelPanel>
+
+          {/* ── Radar + action buttons row ── */}
+          <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 16, alignItems: "start" }}>
+            <PixelPanel accent={P.goldDim} title="SPEED RADAR">
+              <div style={{ padding: "8px 4px 4px" }}>
+                <PixelRadar results={results}/>
+                <div style={{ padding: "4px 12px 8px", display: "flex", flexDirection: "column", gap: 6 }}>
+                  {results.map(r => {
+                    const lc = LIB[r.library] || LIB.SEAL;
+                    return (
+                      <div key={r.library} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                        <div style={{ width: 10, height: 10, background: lc.color, flexShrink: 0 }}/>
+                        <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 13, color: lc.color, fontWeight: 600 }}>{r.library}</span>
+                      </div>
+                    );
+                  })}
+                  <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 12, color: P.dim, marginTop: 2 }}>Larger area = faster per operation</div>
                 </div>
-              );
-            })}
-          </div>
-          <div style={{ padding: "6px 8px" }}>
-            {OPS.map(op => (
-              <PixelOpRow
-                key={op.key}
-                op={op}
-                results={results}
-                isActive={activeOp === op.key}
-                onToggle={() => setActiveOp(activeOp === op.key ? null : op.key)}
-              />
-            ))}
-          </div>
-          <div style={{
-            fontFamily: "system-ui, sans-serif", fontSize: 10,
-            color: P.dim, fontStyle: "italic",
-            padding: "0 12px 10px", lineHeight: 1.5,
-          }}>
-            Fig. 1 — HE primitive latencies at n=4096, t=65537, 128-bit security, 10 repetition average. SEAL & OpenFHE: BFV. HELib: BGV.
-          </div>
-        </PixelPanel>
+              </div>
+            </PixelPanel>
 
-        {/* ── Row 3: Summary cards ── */}
-        <PixelPanel accent={P.borderHi} title="LIBRARY SUMMARY" style={{ marginBottom: 10 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, padding: 8 }}>
-            {sortedResults.map((lib, rank) => (
-              <LibCard key={lib.library} lib={lib} rank={rank}/>
-            ))}
+            <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "flex-start", gap: 16, padding: "16px 0" }}>
+              <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 15, color: P.cream, opacity: 0.7, lineHeight: 1.8 }}>
+                The radar shows relative speed across all 5 HE operations.<br/>
+                A larger polygon means the library is faster overall.
+              </div>
+              <div style={{ display: "flex", gap: 12 }}>
+                <PixelButton onClick={() => { setShowOwl(true); setOwlDone(false); }} color={P.gold} bg={P.panelMid}>
+                  <IconOwl size={16}/>
+                  GUIDE ME AGAIN
+                </PixelButton>
+                <PixelButton onClick={handleRun} color={P.dim} bg={P.panelMid}>
+                  <IconRefresh size={14}/>
+                  RUN AGAIN
+                </PixelButton>
+              </div>
+            </div>
           </div>
-        </PixelPanel>
 
-        {/* ── Action buttons ── */}
-        <div style={{ display: "flex", justifyContent: "center", gap: 10 }}>
-          <PixelButton
-            onClick={() => { setShowOwl(true); setOwlDone(false); }}
-            color={P.gold} bg={P.panelMid} small>
-            <IconOwl size={12}/>
-            GUIDE ME AGAIN
-          </PixelButton>
-          <PixelButton onClick={handleRun} color={P.dim} bg={P.panelMid} small>
-            <IconRefresh size={10}/>
-            RUN AGAIN
-          </PixelButton>
         </div>
-      </div>
-    </div>
+        <PixelDivider/>
+      </FullBleed>
+    </>
   );
 }
 

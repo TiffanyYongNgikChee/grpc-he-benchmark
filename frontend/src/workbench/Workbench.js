@@ -736,32 +736,14 @@ export default function Workbench() {
       </div>
 
       {/* ═══════════ LIBRARY COMPARISON ═══════════ */}
-      <div className="px-4 md:px-8 py-8" style={{ background: "#ebeaea", borderTop: "1px solid #d9d9d9" }}>
-        <div className="max-w-[1100px] mx-auto">
-          <div className="flex items-center gap-3 mb-4">
-            <h3
-              className="text-xs font-medium uppercase tracking-widest"
-              style={{ color: "#888", letterSpacing: "0.12em" }}
-            >
-              LIBRARY COMPARISON
-            </h3>
-            <span className="text-[10px]" style={{ color: "#bbb" }}>
-              SEAL vs HElib vs OpenFHE
-            </span>
-          </div>
-          <div
-            className="rounded-lg p-5"
-            style={{ background: "#fafafa", border: "1px solid #e5e5e5" }}
-          >
-            <LibraryComparison
-              data={compData}
-              loading={compLoading}
-              error={compError}
-              onRun={handleComparison}
-              onCancel={handleCompCancel}
-            />
-          </div>
-        </div>
+      <div style={{ background: "#1a0f06", borderTop: "1px solid #5a3510", overflow: "hidden" }}>
+        <LibraryComparison
+          data={compData}
+          loading={compLoading}
+          error={compError}
+          onRun={handleComparison}
+          onCancel={handleCompCancel}
+        />
       </div>
 
       {/* ═══════════ MNIST BATCH BENCHMARK ═══════════ */}
