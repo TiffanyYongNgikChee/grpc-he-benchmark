@@ -70,9 +70,9 @@ function DigitThumbnail({ pixels, size = 28 }) {
         width: size,
         height: size,
         imageRendering: "pixelated",
-        borderRadius: 2,
-        border: "2px solid #333",
-        borderTop: "2px solid #666",
+        borderRadius: 3,
+        border: "3px solid #333",
+        borderTop: "3px solid #666",
         background: "#000",
       }}
     />
@@ -102,9 +102,9 @@ function StagePipeline({ activeStage, done, error }) {
             key={stage.id}
             className="relative group"
             style={{
-              width: isActive ? 22 : 14,
-              height: 7,
-              borderRadius: 2,
+              width: isActive ? 44 : 28,
+              height: 12,
+              borderRadius: 3,
               background: bg,
               opacity,
               transition: "all 0.4s ease",
@@ -115,9 +115,9 @@ function StagePipeline({ activeStage, done, error }) {
               style={{
                 position: "absolute", bottom: "calc(100% + 4px)", left: "50%",
                 transform: "translateX(-50%)",
-                padding: "2px 6px", borderRadius: 2,
+                padding: "3px 8px", borderRadius: 2,
                 fontFamily: "'Press Start 2P', monospace",
-                fontSize: "0.32rem", whiteSpace: "nowrap",
+                fontSize: "0.5rem", whiteSpace: "nowrap",
                 background: "#1a2a3a", color: "#e8d8a0",
                 opacity: 0, pointerEvents: "none",
                 transition: "opacity 0.15s", zIndex: 10,
@@ -182,8 +182,8 @@ function ImageCard({ index, pixels, label, result, status, activeStage, isCurren
 
   return (
     <div style={{
-      display: "flex", alignItems: "center", gap: 10,
-      padding: "6px 10px",
+      display: "flex", alignItems: "center", gap: 14,
+      padding: "10px 14px",
       background: cardBg,
       borderTop: `2px solid ${borderT}`,
       borderLeft: `2px solid ${borderL}`,
@@ -196,33 +196,33 @@ function ImageCard({ index, pixels, label, result, status, activeStage, isCurren
       {/* Index badge — Habbo pill style */}
       <span style={{
         fontFamily: "'Press Start 2P', monospace",
-        fontSize: "0.42rem", letterSpacing: "0.06em",
+        fontSize: "0.7rem", letterSpacing: "0.06em",
         color: "#5a4a22",
-        width: 18, textAlign: "center", flexShrink: 0,
+        width: 28, textAlign: "center", flexShrink: 0,
       }}>{index + 1}</span>
 
       {/* Thumbnail */}
-      <DigitThumbnail pixels={pixels} size={30} />
+      <DigitThumbnail pixels={pixels} size={60} />
 
       {/* True label */}
       <span style={{
         fontFamily: "'Press Start 2P', monospace",
-        fontSize: "0.75rem", fontWeight: "bold",
+        fontSize: "1.2rem", fontWeight: "bold",
         color: "#2a1a00",
-        width: 16, textAlign: "center", flexShrink: 0,
+        width: 28, textAlign: "center", flexShrink: 0,
       }}>{label}</span>
 
       {/* Arrow */}
-      <span style={{ color: "#8a7a5a", fontSize: "0.8rem", flexShrink: 0 }}>›</span>
+      <span style={{ color: "#8a7a5a", fontSize: "1.2rem", flexShrink: 0 }}>›</span>
 
       {/* Pipeline stages */}
       <div style={{ flex: 1, minWidth: 0 }}>
         {dimmed ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div style={{ display: "flex", gap: 3 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", gap: 4 }}>
               {STAGES.map((s) => (
                 <div key={s.id} style={{
-                  width: 14, height: 7, borderRadius: 2,
+                  width: 28, height: 12, borderRadius: 3,
                   background: "#aaa", opacity: 0.25,
                   border: "1px solid rgba(0,0,0,0.15)",
                 }} />
@@ -230,27 +230,27 @@ function ImageCard({ index, pixels, label, result, status, activeStage, isCurren
             </div>
             <span style={{
               fontFamily: "'Press Start 2P', monospace",
-              fontSize: "0.32rem", color: "#8a7a5a",
+              fontSize: "0.55rem", color: "#8a7a5a",
             }}>{isQueued ? "Queued" : "Waiting"}</span>
           </div>
         ) : (
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <StagePipeline activeStage={activeStage} done={isDone} error={isError} />
             {isCurrent && !isDone && (
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span className="relative flex" style={{ width: 10, height: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span className="relative flex" style={{ width: 14, height: 14 }}>
                   <span
                     className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
                     style={{ background: STAGES[Math.max(0, activeStage)]?.color }}
                   />
                   <span
                     className="relative inline-flex rounded-full"
-                    style={{ width: 10, height: 10, background: STAGES[Math.max(0, activeStage)]?.color }}
+                    style={{ width: 14, height: 14, background: STAGES[Math.max(0, activeStage)]?.color }}
                   />
                 </span>
                 <span style={{
                   fontFamily: "'Press Start 2P', monospace",
-                  fontSize: "0.32rem", whiteSpace: "nowrap",
+                  fontSize: "0.55rem", whiteSpace: "nowrap",
                   color: STAGES[Math.max(0, activeStage)]?.color,
                 }}>
                   {STAGES[Math.max(0, activeStage)]?.label}…
@@ -260,13 +260,13 @@ function ImageCard({ index, pixels, label, result, status, activeStage, isCurren
             {isDone && !isError && (
               <span style={{
                 fontFamily: "'Press Start 2P', monospace",
-                fontSize: "0.35rem", color: "#226644",
+                fontSize: "0.6rem", color: "#226644",
               }}>✓ Done</span>
             )}
             {isError && (
               <span style={{
                 fontFamily: "'Press Start 2P', monospace",
-                fontSize: "0.35rem", color: "#882222",
+                fontSize: "0.6rem", color: "#882222",
               }}>✗ Failed</span>
             )}
           </div>
@@ -274,21 +274,21 @@ function ImageCard({ index, pixels, label, result, status, activeStage, isCurren
       </div>
 
       {/* Arrow */}
-      <span style={{ color: "#8a7a5a", fontSize: "0.8rem", flexShrink: 0 }}>›</span>
+      <span style={{ color: "#8a7a5a", fontSize: "1.2rem", flexShrink: 0 }}>›</span>
 
       {/* Prediction result */}
-      <div style={{ width: 64, textAlign: "right", flexShrink: 0 }}>
+      <div style={{ width: 90, textAlign: "right", flexShrink: 0 }}>
         {isDone && result && !isError ? (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 5 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
             <span style={{
               fontFamily: "'Press Start 2P', monospace",
-              fontSize: "0.85rem",
+              fontSize: "1.4rem",
               color: result.correct ? "#226644" : "#882222",
             }}>{result.predicted}</span>
             <span style={{
               fontFamily: "'Press Start 2P', monospace",
-              fontSize: "0.38rem",
-              padding: "2px 5px", borderRadius: 2,
+              fontSize: "0.65rem",
+              padding: "3px 7px", borderRadius: 2,
               background: result.correct ? "#b0ddb0" : "#ddb0b0",
               color: result.correct ? "#155533" : "#771111",
               border: `1px solid ${result.correct ? "#338855" : "#aa3333"}`,
@@ -297,28 +297,28 @@ function ImageCard({ index, pixels, label, result, status, activeStage, isCurren
         ) : isCurrent ? (
           <span style={{
             fontFamily: "'Press Start 2P', monospace",
-            fontSize: "0.32rem", color: "#8a6a00",
+            fontSize: "0.55rem", color: "#8a6a00",
           }}>Running…</span>
         ) : isError ? (
           <span style={{
             fontFamily: "'Press Start 2P', monospace",
-            fontSize: "0.32rem", color: "#882222",
+            fontSize: "0.55rem", color: "#882222",
           }}>Error</span>
         ) : (
-          <span style={{ color: "#9a8a6a", fontSize: "0.8rem" }}>—</span>
+          <span style={{ color: "#9a8a6a", fontSize: "1.2rem" }}>—</span>
         )}
       </div>
 
       {/* Time */}
-      <div style={{ width: 52, textAlign: "right", flexShrink: 0 }}>
+      <div style={{ width: 70, textAlign: "right", flexShrink: 0 }}>
         {isDone && result ? (
           <span style={{
             fontFamily: "'Press Start 2P', monospace",
-            fontSize: "0.38rem", letterSpacing: "0.04em",
+            fontSize: "0.6rem", letterSpacing: "0.04em",
             color: "#4a5a7a",
           }}>{(result.totalMs / 1000).toFixed(1)}s</span>
         ) : (
-          <span style={{ color: "#9a8a6a", fontSize: "0.8rem" }}>—</span>
+          <span style={{ color: "#9a8a6a", fontSize: "1.2rem" }}>—</span>
         )}
       </div>
     </div>
@@ -487,15 +487,15 @@ export default function MnistBatchBenchmark() {
   const StageLegend = (
     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
       {STAGES.map((s) => (
-        <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <div style={{
-            width: 12, height: 7, borderRadius: 2,
+            width: 20, height: 12, borderRadius: 3,
             background: s.color,
             border: "1px solid rgba(0,0,0,0.2)",
           }} />
           <span style={{
             fontFamily: "'Press Start 2P', monospace",
-            fontSize: "0.32rem", letterSpacing: "0.08em",
+            fontSize: "0.55rem", letterSpacing: "0.08em",
             color: "#5a4a22",
           }}>{s.label}</span>
         </div>
@@ -519,12 +519,12 @@ export default function MnistBatchBenchmark() {
         }}>
           <span style={{
             fontFamily: "'Press Start 2P', monospace",
-            fontSize: "0.42rem", letterSpacing: "0.1em",
+            fontSize: "0.65rem", letterSpacing: "0.1em",
             color: "#1a0e00",
           }}>Each image ~30s · Total ~5 min</span>
           <span style={{
             fontFamily: "'Press Start 2P', monospace",
-            fontSize: "0.38rem", color: "rgba(26,14,0,0.65)",
+            fontSize: "0.55rem", color: "rgba(26,14,0,0.65)",
           }}>Sequential · BFV 128-bit</span>
         </div>
 
@@ -540,9 +540,9 @@ export default function MnistBatchBenchmark() {
         }}>
           <span style={{
             fontFamily: "'Press Start 2P', monospace",
-            fontSize: "0.36rem", letterSpacing: "0.14em",
+            fontSize: "0.55rem", letterSpacing: "0.14em",
             color: "#5a4a22", textTransform: "uppercase",
-            display: "block", marginBottom: 6,
+            display: "block", marginBottom: 8,
           }}>Pipeline stages</span>
           {StageLegend}
         </div>
@@ -561,8 +561,8 @@ export default function MnistBatchBenchmark() {
             onClick={handleRun}
             style={{
               fontFamily: "'Press Start 2P', monospace",
-              fontSize: "0.6rem", letterSpacing: "0.14em",
-              padding: "10px 28px",
+              fontSize: "0.85rem", letterSpacing: "0.14em",
+              padding: "14px 36px",
               background: "linear-gradient(180deg, #f0c030 0%, #c89800 100%)",
               border: "2px solid #7a5e00",
               borderTop: "2px solid #f8e060",
@@ -658,8 +658,8 @@ export default function MnistBatchBenchmark() {
             onClick={handleStop}
             style={{
               fontFamily: "'Press Start 2P', monospace",
-              fontSize: "0.38rem", letterSpacing: "0.1em",
-              padding: "5px 12px",
+              fontSize: "0.6rem", letterSpacing: "0.1em",
+              padding: "8px 18px",
               background: "linear-gradient(180deg, #cc4444, #882222)",
               border: "2px solid #551111",
               borderTop: "2px solid #ee6666",
@@ -684,11 +684,11 @@ export default function MnistBatchBenchmark() {
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
             <span style={{
               fontFamily: "'Press Start 2P', monospace",
-              fontSize: "0.38rem", color: "#5a4a22",
+              fontSize: "0.6rem", color: "#5a4a22",
             }}>Image {Math.min(results.length + 1, TEST_IMAGES.length)} of {TEST_IMAGES.length}</span>
             <span style={{
               fontFamily: "'Press Start 2P', monospace",
-              fontSize: "0.38rem", color: "#7a6a42",
+              fontSize: "0.55rem", color: "#7a6a42",
             }}>~{Math.round((TEST_IMAGES.length - results.length) * 30)}s remaining</span>
           </div>
           <div style={{
@@ -777,19 +777,19 @@ export default function MnistBatchBenchmark() {
             }}>
               <div style={{
                 fontFamily: "'Press Start 2P', monospace",
-                fontSize: "0.36rem", letterSpacing: "0.14em",
+                fontSize: "0.55rem", letterSpacing: "0.14em",
                 color: color, textTransform: "uppercase",
                 marginBottom: 5, opacity: 0.7,
               }}>{title}</div>
               <div style={{
                 fontFamily: "'Press Start 2P', monospace",
-                fontSize: "1.1rem", letterSpacing: "0.04em",
+                fontSize: "1.3rem", letterSpacing: "0.04em",
                 color,
               }}>{value}</div>
               <div style={{
                 fontFamily: "'Press Start 2P', monospace",
-                fontSize: "0.32rem", color, opacity: 0.6,
-                marginTop: 3,
+                fontSize: "0.5rem", color, opacity: 0.6,
+                marginTop: 4,
               }}>{sub}</div>
             </div>
           ))}
@@ -844,8 +844,8 @@ export default function MnistBatchBenchmark() {
             onClick={handleRun}
             style={{
               fontFamily: "'Press Start 2P', monospace",
-              fontSize: "0.48rem", letterSpacing: "0.1em",
-              padding: "7px 20px",
+              fontSize: "0.7rem", letterSpacing: "0.1em",
+              padding: "11px 28px",
               background: "linear-gradient(180deg, #5a5a5a, #3a3a3a)",
               border: "2px solid #222",
               borderTop: "2px solid #888",
