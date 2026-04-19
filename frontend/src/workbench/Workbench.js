@@ -12,6 +12,7 @@ import ParameterComparison from "./ParameterComparison";
 import BenchmarkResultsDashboard from "./BenchmarkResultsDashboard";
 import ArchitectureDiagram from "./ArchitectureDiagram";
 import NeuralHero from "./NeuralHero";
+import CnnClassroom from "./CnnClassroom";
 import useInferenceProgress from "./useInferenceProgress";
 import { checkHealth, predictDigit, runComparisonBenchmark } from "../api/client";
 
@@ -189,6 +190,9 @@ export default function Workbench() {
         hasHistory={runHistory.length > 0}
         onOpenHistory={() => { setHistoryIndex(runHistory.length - 1); setHistoryOpen(true); }}
       />
+
+      {/* ═══════════ CNN CLASSROOM — animated explainer ═══════════ */}
+      <CnnClassroom/>
 
       {/* ═══════════ STICKY NAV BAR ═══════════ */}
       <div
