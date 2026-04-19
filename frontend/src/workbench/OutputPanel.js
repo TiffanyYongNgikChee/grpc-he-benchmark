@@ -343,7 +343,6 @@ export default function OutputPanel({ result, error, loading, pixels, layerStatu
                   ((val - minLogit) / range) * 100,
                   1
                 );
-                const barColor = isWinner ? "#c89000" : "#2255aa";
                 const barBg    = isWinner ? "rgba(200,144,0,0.12)" : "rgba(34,85,170,0.07)";
                 const barBorder= isWinner ? "rgba(200,144,0,0.35)" : "rgba(34,85,170,0.18)";
 

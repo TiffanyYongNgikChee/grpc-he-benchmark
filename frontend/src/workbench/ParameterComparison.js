@@ -389,10 +389,10 @@ export default function ParameterComparison() {
         </p>
         {activeTab === "activation" ? (
           <ul className="text-xs space-y-1" style={{ color: "#8c6200" }}>
-            <li>• <b>x² (degree 2)</b> achieves {activationRows[0]?.accuracyPct ?? "—"}% FHE accuracy ({activationRows[0]?.accuracy}) — matching the activation used during training gives best results.</li>
-            <li>• <b>Degree 3</b> drops to {activationRows[1]?.accuracyPct ?? "—"}% accuracy due to modular clamping — intermediate polynomial values overflow the plaintext modulus (100,073,473).</li>
-            <li>• <b>Degree 4</b> drops to {activationRows[2]?.accuracyPct ?? "—"}% accuracy — higher-degree terms cause complete signal corruption despite plaintext float model achieving 86.91%.</li>
-            <li>• Inference time is similar across degrees (~12–14s) since the bottleneck is Conv/FC layers, not activation.</li>
+            <li>• <b>x² (degree 2)</b> achieves {activationRows[0]?.accuracyPct ?? "—"}% FHE accuracy ({activationRows[0]?.accuracy}) — matching the activation used during training gives best results. ✅ Validated.</li>
+            <li>• <b>Degree 3</b> drops to {activationRows[1]?.accuracyPct ?? "—"}% — the cubic term amplifies intermediate values beyond the plaintext modulus (100,073,473), causing modular wrap-around that corrupts activations. ❌ Noise overflow.</li>
+            <li>• <b>Degree 4</b> drops to {activationRows[2]?.accuracyPct ?? "—"}% — even the degree-3 failure mode is compounded by a fourth-power term; the signal is completely destroyed before FC. ⚠️ Run incomplete.</li>
+            <li>• Inference time is similar across degrees (~12–14s) — the bottleneck is Conv/FC ciphertext multiply, not activation. This confirms activation degree is an accuracy knob, not a latency knob.</li>
           </ul>
         ) : activeTab === "scale" ? (
           <ul className="text-xs space-y-1" style={{ color: "#8c6200" }}>
@@ -410,10 +410,10 @@ export default function ParameterComparison() {
           </ul>
         ) : (
           <ul className="text-xs space-y-1" style={{ color: "#8c6200" }}>
-            <li>• <b>128-bit</b> security works well on t3.xlarge (7.6 GB RAM) with BFV keygen completing in under 5 seconds.</li>
-            <li>• <b>192-bit</b> requires a much larger ring dimension (N), causing BFV context creation to exceed available memory (7.6 GB + 15 GB swap) — server never completed keygen after 60+ minutes.</li>
-            <li>• <b>256-bit</b> would require even more memory and was not attempted.</li>
-            <li>• Practical deployment: 128-bit is the feasible option for typical cloud instances. Higher security levels need 32 GB+ RAM (e.g., r5.xlarge).</li>
+            <li>• <b>128-bit</b> security works on r6i.large (~2.5 GB RAM); BFV keygen completes in under 5 seconds. ✅ Validated.</li>
+            <li>• <b>192-bit</b> requires a larger ring dimension (n ≥ 8192), causing BFV context creation to exhaust 7.6 GB RAM + 15 GB swap — keygen never completed after 60+ minutes. ❌ OOM failure.</li>
+            <li>• <b>256-bit</b> would need n ≥ 16384 — memory requirements exceed single-instance feasibility entirely. Not attempted. ❌ Not feasible.</li>
+            <li>• <b>Design decision:</b> 128-bit is the hardware ceiling for a single-node commodity cloud deployment. Higher levels require a distributed key-management architecture (future work).</li>
           </ul>
         )}
       </div>

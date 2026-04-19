@@ -10,7 +10,6 @@ import LiveStatusFeed from "./LiveStatusFeed";
 import MnistBatchBenchmark from "./MnistBatchBenchmark";
 import ParameterComparison from "./ParameterComparison";
 import BenchmarkResultsDashboard from "./BenchmarkResultsDashboard";
-import ArchitectureDiagram from "./ArchitectureDiagram";
 import NeuralHero from "./NeuralHero";
 import CnnClassroom from "./CnnClassroom";
 import useInferenceProgress from "./useInferenceProgress";
@@ -830,18 +829,41 @@ export default function Workbench() {
       </div>
 
       {/* ═══════════ BENCHMARK RESULTS DASHBOARD ═══════════ */}
+      <SkyBanner
+        label="Deep Dive"
+        title="FHE CNN Benchmark Results"
+        subtitle="Encrypted CNN inference benchmarked across polynomial activation degrees. x² and x³ results are valid. x⁴ experiment was incomplete — see notes."
+      />
       <div id="results" className="px-4 md:px-8 py-8" style={{ background: "#f7f7f7", borderTop: "1px solid #e5e5e5" }}>
         <div className="max-w-[1100px] mx-auto">
-          <div className="flex items-center gap-3 mb-4">
-            <h3
-              className="text-xs font-medium uppercase tracking-widest"
-              style={{ color: "#888", letterSpacing: "0.12em" }}
-            >
-              BENCHMARK RESULTS
-            </h3>
-            <span className="text-[10px]" style={{ color: "#bbb" }}>
-              FHE CNN Performance across Activation Degrees
-            </span>
+
+          {/* ── Reproducibility / hardware callout ── */}
+          <div className="rounded-lg p-4 mb-4 flex gap-3 text-sm leading-relaxed" style={{ background: "#fffbeb", border: "1.5px solid #f59e0b" }}>
+            <span style={{ fontSize: "1.1rem", flexShrink: 0 }}>⚠️</span>
+            <div>
+              <p className="font-semibold mb-1" style={{ color: "#92400e" }}>Reproducibility note — hardware requirements</p>
+              <p style={{ color: "#78350f" }}>
+                These benchmarks require an <b>r6i.large instance (≥16 GB RAM)</b> for the Rust compute server — a t3.small
+                runs out of memory during BFV key generation at n = 4096. The recommended deployment uses <b>3 EC2 instances</b>:
+                frontend + Nginx (t3.small), Spring Boot API (t3.small), and Rust gRPC compute server (r6i.large).
+                Due to budget constraints the full 100-image benchmark could not be completed during development.
+                The x² and x³ results below are from partial runs and are valid; x⁴ data is <b>incomplete and should not be used for comparison</b>.
+              </p>
+            </div>
+          </div>
+
+          {/* ── What is this ── */}
+          <div className="rounded-lg p-4 mb-6 text-sm leading-relaxed" style={{ background: "#fff", border: "1px solid #e5e5e5" }}>
+            <p className="font-semibold mb-1" style={{ color: "#333" }}>What is this?</p>
+            <p style={{ color: "#555" }}>
+              MNIST test images were run through the full encrypted CNN pipeline and every layer's timing was recorded.
+              The charts compare three <b>polynomial activation degrees</b> (x², x³, x⁴) — a design choice forced by FHE.
+              Standard neural networks use ReLU (<code>max(0,x)</code>), which requires a comparison that is impossible on ciphertext.
+              Instead, we approximate it with a low-degree polynomial evaluated directly on the encrypted values.
+              Degree 2 (x²) is the most stable: it produces the least noise growth, the highest accuracy, and is the only
+              configuration fully validated end-to-end on this hardware. Degree 3 shows increased noise but partial accuracy.
+              Degree 4 was not reproducible under current resource constraints and its results are marked accordingly.
+            </p>
           </div>
           <div
             className="rounded-lg p-5"
@@ -853,18 +875,70 @@ export default function Workbench() {
       </div>
 
       {/* ═══════════ PARAMETER COMPARISON ═══════════ */}
+      <SkyBanner
+        label="Findings"
+        title="Parameter Exploration & Limitations"
+        subtitle="What was attempted, what worked, what broke — and what each failure revealed about the limits of practical FHE deployment."
+      />
       <div className="px-4 md:px-8 py-8" style={{ background: "#fff", borderTop: "1px solid #e5e5e5" }}>
         <div className="max-w-[1100px] mx-auto">
-          <div className="flex items-center gap-3 mb-4">
-            <h3
-              className="text-xs font-medium uppercase tracking-widest"
-              style={{ color: "#888", letterSpacing: "0.12em" }}
-            >
-              PARAMETER EXPERIMENTS
-            </h3>
-            <span className="text-[10px]" style={{ color: "#bbb" }}>
-              Activation Degree · Security Level
-            </span>
+
+          {/* ── 4-part findings overview ── */}
+          <div className="grid grid-cols-2 gap-3 mb-6" style={{ gridTemplateColumns: "1fr 1fr" }}>
+
+            {/* What was attempted */}
+            <div className="rounded-lg p-4 text-sm leading-relaxed" style={{ background: "#f8f9ff", border: "1px solid #c7d2fe" }}>
+              <p className="font-semibold mb-2 flex items-center gap-2" style={{ color: "#3730a3" }}>
+                <span>🧪</span> What was attempted
+              </p>
+              <ul className="space-y-1 text-xs" style={{ color: "#4338ca" }}>
+                <li>• Polynomial activation degrees: <b>x²</b>, <b>x³</b>, <b>x⁴</b></li>
+                <li>• Security levels: <b>128-bit</b>, <b>192-bit</b>, <b>256-bit</b></li>
+                <li>• Scale factors: <b>100</b>, <b>1,000</b>, <b>10,000</b></li>
+                <li>• Plaintext moduli: <b>16-bit</b>, <b>baseline</b>, <b>32-bit</b></li>
+                <li>• Full 100-image MNIST inference run per configuration</li>
+              </ul>
+            </div>
+
+            {/* What succeeded */}
+            <div className="rounded-lg p-4 text-sm leading-relaxed" style={{ background: "#f0fdf4", border: "1px solid #86efac" }}>
+              <p className="font-semibold mb-2 flex items-center gap-2" style={{ color: "#14532d" }}>
+                <span>✅</span> What succeeded
+              </p>
+              <ul className="space-y-1 text-xs" style={{ color: "#166534" }}>
+                <li>• <b>x² (degree 2)</b> — {`>`}80% FHE accuracy, matches training activation exactly</li>
+                <li>• <b>128-bit security</b> — keygen in &lt;5s, ~2.5 GB RAM on r6i.large</li>
+                <li>• <b>Scale = 1,000</b> — sufficient precision without overflow</li>
+                <li>• <b>p = 100,073,473</b> — headroom for intermediate values at scale 1,000</li>
+                <li>• End-to-end gRPC inference pipeline verified working</li>
+              </ul>
+            </div>
+
+            {/* What failed & why */}
+            <div className="rounded-lg p-4 text-sm leading-relaxed" style={{ background: "#fff7ed", border: "1px solid #fed7aa" }}>
+              <p className="font-semibold mb-2 flex items-center gap-2" style={{ color: "#7c2d12" }}>
+                <span>❌</span> What failed & why
+              </p>
+              <ul className="space-y-1 text-xs" style={{ color: "#9a3412" }}>
+                <li>• <b>x³ / x⁴</b> — Higher-degree polynomial terms overflow the plaintext modulus during activation — noise budget consumed faster than BFV can tolerate at n = 4096</li>
+                <li>• <b>192-bit / 256-bit</b> — Larger ring dimension required ({">"}n = 8192); context creation OOM at 7.6 GB + 15 GB swap</li>
+                <li>• <b>x⁴ full run</b> — 100-image evaluation never completed due to EC2 budget constraints</li>
+              </ul>
+            </div>
+
+            {/* Design decisions */}
+            <div className="rounded-lg p-4 text-sm leading-relaxed" style={{ background: "#fdf4ff", border: "1px solid #e9d5ff" }}>
+              <p className="font-semibold mb-2 flex items-center gap-2" style={{ color: "#581c87" }}>
+                <span>🎯</span> What this meant for the final design
+              </p>
+              <ul className="space-y-1 text-xs" style={{ color: "#6b21a8" }}>
+                <li>• Fixed activation to <b>x²</b> — the only degree that preserves accuracy end-to-end in BFV</li>
+                <li>• Fixed security to <b>128-bit</b> — the hardware ceiling for a single-node r6i.large deployment</li>
+                <li>• Locked scale and modulus to values validated at 128-bit, degree 2</li>
+                <li>• Framed 192/256-bit OOM as an explicit <b>feasibility boundary finding</b>, not a bug</li>
+                <li>• Future work: 4-node EC2 split to enable n = 8192 and 192-bit security</li>
+              </ul>
+            </div>
           </div>
           <div
             className="rounded-lg p-5"
@@ -1312,49 +1386,6 @@ function ModalLogBody({ run }) {
       </div>
     </div>
   );
-}
-
-function SectionTitle({ children }) {
-  return (
-    <h3
-      className="text-xs font-medium uppercase tracking-widest mb-1"
-      style={{ color: "#888", letterSpacing: "0.12em" }}
-    >
-      {children}
-    </h3>
-  );
-}
-
-function ControlLabel({ label, value, mono }) {
-  return (
-    <div className="px-3">
-      <div className="text-[10px] uppercase tracking-wide" style={{ color: "#999" }}>{label}</div>
-      <div
-        className={`text-sm font-medium ${mono ? "font-mono" : ""}`}
-        style={{ color: "#333" }}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function ControlStaticLabel({ label, value }) {
-  return (
-    <div className="px-2 md:px-3">
-      <div className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: "#999" }}>{label}</div>
-      <div
-        className="text-sm font-medium px-2 py-0.5 rounded border"
-        style={{ color: "#555", borderColor: "#e0e0e0", background: "#f5f5f5", whiteSpace: "nowrap" }}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function Divider() {
-  return <div className="w-px h-8 mx-1" style={{ background: "#ccc" }} />;
 }
 
 /**

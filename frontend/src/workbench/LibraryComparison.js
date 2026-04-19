@@ -435,45 +435,6 @@ function PixelRadar({ results }) {
 }
 
 /* ══════════════════════════════════════════════════════
-   FULL-WIDTH TIME BARS  (readable, big)
-   ══════════════════════════════════════════════════════ */
-function BigTimeBars({ results }) {
-  const sorted   = [...results].sort((a, b) => a.totalTimeMs - b.totalTimeMs);
-  const maxTotal = Math.max(...results.map(r => r.totalTimeMs || 0), 1);
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      {sorted.map((lib, rank) => {
-        const lc  = LIB[lib.library] || LIB.SEAL;
-        const pct = Math.max((lib.totalTimeMs / maxTotal) * 100, 3);
-        const segs = Math.max(1, Math.floor(pct / 5));
-        return (
-          <div key={lib.library}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 10, height: 10, background: lc.color, flexShrink: 0, boxShadow: `0 0 0 2px ${P.borderLo}` }}/>
-                <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 9, color: lc.color }}>{lib.library}</span>
-                <PixelBadge color={lc.color}>{lc.scheme}</PixelBadge>
-                {rank === 0 && <IconTrophy size={13}/>}
-              </div>
-              <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 20, fontWeight: 700, color: lc.color, letterSpacing: "-0.02em" }}>
-                {lib.totalTimeMs.toFixed(1)}<span style={{ fontSize: 12, fontWeight: 400, marginLeft: 3, opacity: 0.7 }}>ms</span>
-              </span>
-            </div>
-            <div style={{ height: 20, background: P.panelBg, border: `2px solid ${P.border}`, boxShadow: `inset 2px 2px 0 ${P.borderLo}`, position: "relative", overflow: "hidden" }}>
-              <div style={{ position: "absolute", top: 0, left: 0, height: "100%", width: `${pct}%`, background: lc.color, boxShadow: `inset 0 5px 0 ${lc.color}80, inset 0 -3px 0 ${lc.dark}` }}>
-                {Array.from({ length: segs }).map((_, i) => (
-                  <div key={i} style={{ position: "absolute", left: `${((i + 1) / segs) * 100}%`, top: 0, bottom: 0, width: 2, background: `${P.borderLo}55` }}/>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════
    COMPACT TIME BARS  (smaller, single-screen friendly)
    ══════════════════════════════════════════════════════ */
 function CompactTimeBars({ results }) {
@@ -591,48 +552,6 @@ function BigOpRow({ op, results, isActive, onToggle }) {
         </div>
       )}
       <PixelDivider/>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════
-   BIG LIBRARY SUMMARY CARD
-   ══════════════════════════════════════════════════════ */
-function BigLibCard({ lib, rank }) {
-  const lc = LIB[lib.library] || LIB.SEAL;
-  return (
-    <div style={{ background: P.panel, border: `3px solid ${rank === 0 ? lc.color : P.border}`, boxShadow: rank === 0 ? `5px 5px 0 ${P.borderLo}` : `3px 3px 0 ${P.borderLo}`, position: "relative", overflow: "hidden" }}>
-      <Scanlines/>
-      {/* Header */}
-      <div style={{ background: `linear-gradient(90deg, ${lc.color}22, ${P.panelMid})`, borderBottom: `2px solid ${lc.color}55`, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", zIndex: 2 }}>
-        <div>
-          <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 12, color: lc.color, marginBottom: 4 }}>{lib.library}</div>
-          <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 12, color: P.dim }}>{lc.madeBy} · {lc.scheme}</div>
-        </div>
-        <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 9, color: rank === 0 ? P.gold : P.dim, background: P.panelBg, border: `2px solid ${rank === 0 ? P.gold : P.border}`, padding: "4px 9px", display: "flex", alignItems: "center", gap: 5 }}>
-          {rank === 0 && <IconTrophy size={12}/>}#{rank + 1}
-        </div>
-      </div>
-      {/* Big total */}
-      <div style={{ textAlign: "center", padding: "20px 14px 14px", borderBottom: `1px solid ${P.border}`, position: "relative", zIndex: 2 }}>
-        <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 48, fontWeight: 800, color: lc.color, textShadow: `3px 3px 0 ${P.borderLo}`, lineHeight: 1, letterSpacing: "-0.03em" }}>{lib.totalTimeMs.toFixed(0)}</div>
-        <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 16, color: P.dim, marginTop: 4, fontWeight: 500 }}>ms total</div>
-      </div>
-      {/* Per-op */}
-      <div style={{ padding: "10px 14px", position: "relative", zIndex: 2 }}>
-        {OPS.map(op => (
-          <div key={op.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 0", borderBottom: `1px solid ${P.border}44` }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <div style={{ opacity: 0.7 }}>{OP_ICONS[op.key]?.(op.color)}</div>
-              <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 13, color: P.cream, opacity: 0.7 }}>{op.short}</span>
-            </div>
-            <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 15, fontWeight: 700, color: lc.color }}>{(lib[op.key] || 0).toFixed(1)} ms</span>
-          </div>
-        ))}
-      </div>
-      <div style={{ padding: "8px 14px 10px", position: "relative", zIndex: 2 }}>
-        <PixelBadge color={lib.success ? P.openfhe : "#ff6080"}>{lib.success ? "ALL OK" : "FAILED"}</PixelBadge>
-      </div>
     </div>
   );
 }

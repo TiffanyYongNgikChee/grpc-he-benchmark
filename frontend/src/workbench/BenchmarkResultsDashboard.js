@@ -131,19 +131,28 @@ export default function BenchmarkResultsDashboard() {
       <div className="grid grid-cols-3 gap-3">
         {configs.map((cfg) => {
           const degColor = DEGREE_COLORS[cfg.degree] || DEGREE_COLORS[2];
+          const isInvalid = cfg.degree === 4;
           return (
             <button
               key={cfg.degree}
-              onClick={() => setSelectedDegree(selectedDegree === cfg.degree ? null : cfg.degree)}
-              className={`rounded-xl p-4 text-left transition-all border-2 hover:shadow-md ${
-                selectedDegree === cfg.degree ? "shadow-lg scale-[1.02]" : ""
-              }`}
+              onClick={() => !isInvalid && setSelectedDegree(selectedDegree === cfg.degree ? null : cfg.degree)}
+              className={`rounded-xl p-4 text-left transition-all border-2 ${
+                isInvalid ? "opacity-60 cursor-not-allowed" : "hover:shadow-md"
+              } ${selectedDegree === cfg.degree ? "shadow-lg scale-[1.02]" : ""}`}
               style={{
-                background: "#fff",
-                borderColor: selectedDegree === cfg.degree ? degColor.bg : "#e5e5e5",
+                background: isInvalid ? "#fafafa" : "#fff",
+                borderColor: isInvalid ? "#e5e5e5" : selectedDegree === cfg.degree ? degColor.bg : "#e5e5e5",
+                position: "relative",
+                overflow: "hidden",
               }}
             >
-              <div className="text-[11px] font-medium uppercase tracking-wider" style={{ color: degColor.text }}>
+              {isInvalid && (
+                <div className="absolute top-0 left-0 right-0 text-center text-[9px] font-bold tracking-widest uppercase py-0.5"
+                  style={{ background: "#fef3c7", color: "#92400e", borderBottom: "1px solid #fde68a" }}>
+                  ⚠ Incomplete — do not use for comparison
+                </div>
+              )}
+              <div className={`text-[11px] font-medium uppercase tracking-wider ${isInvalid ? "mt-4" : ""}`} style={{ color: isInvalid ? "#aaa" : degColor.text }}>
                 {cfg.label}
               </div>
               <div className="mt-2 flex items-end gap-2">
@@ -247,6 +256,24 @@ export default function BenchmarkResultsDashboard() {
             />
           </div>
         </div>
+      </div>
+
+      {/* x⁴ disclaimer note */}
+      <div style={{
+        background: "#fffbeb",
+        border: "1px solid #fde68a",
+        borderRadius: 8,
+        padding: "8px 14px",
+        fontSize: 11,
+        color: "#92400e",
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+      }}>
+        <span>⚠️</span>
+        <span>
+          <strong>Degree 4 (x⁴)</strong> results shown above are <strong>incomplete</strong> — the 100-image evaluation run was never finished due to EC2 budget constraints. Do not draw accuracy or latency conclusions from x⁴ data.
+        </span>
       </div>
 
       {/* ═══ Per-Layer Timing Breakdown (Stacked Bar) ═══ */}
