@@ -191,6 +191,13 @@ export default function Workbench() {
         onOpenHistory={() => { setHistoryIndex(runHistory.length - 1); setHistoryOpen(true); }}
       />
 
+      {/* ═══════════ MNIST SECTION HEADER ═══════════ */}
+      <SkyBanner
+        label="Interactive Demo"
+        title="MNIST Encrypted Inference"
+        subtitle="From your drawn digit to a prediction — every step happens on encrypted data. Scroll through the tutorial below to see exactly how."
+      />
+
       {/* ═══════════ CNN CLASSROOM — animated explainer ═══════════ */}
       <CnnClassroom/>
 
@@ -740,6 +747,11 @@ export default function Workbench() {
       </div>
 
       {/* ═══════════ LIBRARY COMPARISON ═══════════ */}
+      <SkyBanner
+        label="Live Benchmark"
+        title="Library Comparison"
+        subtitle="Run identical HE operations across OpenFHE, SEAL, and HElib — see which is fastest."
+      />
       <div style={{ background: "#1a0f06", borderTop: "1px solid #5a3510", overflow: "hidden" }}>
         <LibraryComparison
           data={compData}
@@ -751,6 +763,11 @@ export default function Workbench() {
       </div>
 
       {/* ═══════════ MNIST BATCH BENCHMARK ═══════════ */}
+      <SkyBanner
+        label="Batch Testing"
+        title="MNIST Batch Benchmark"
+        subtitle="10 real test images encrypted and classified end-to-end. Real timings, real results."
+      />
       <div id="benchmarks" style={{
         background: "#5a5a5a",
         borderTop: "4px solid #888",
@@ -946,36 +963,6 @@ export default function Workbench() {
                   <span><b style={{ color: "#8b5cf6" }}>HElib</b> — IBM's pioneering HE library, primarily supporting the BGV scheme.</span>
                 </li>
               </ul>
-            </div>
-          </div>
-
-          {/* ── How Does the Encrypted Inference Work? ── */}
-          <div>
-            <h2 className="text-xl font-medium mb-3" style={{ color: "#333" }}>
-              How Does the Encrypted Inference Work?
-            </h2>
-            <p className="mb-2">
-              When you draw a digit and press run, the following pipeline executes
-              end-to-end:
-            </p>
-            <ol className="list-decimal ml-5 space-y-1.5 mb-4">
-              <li>Your 28×28 pixel drawing is extracted and sent to the backend server.</li>
-              <li>The server <b>encrypts</b> all 784 pixel values into BFV ciphertext using OpenFHE.</li>
-              <li>A full <b>CNN (Convolutional Neural Network)</b> runs on the encrypted data — 12 layers, all computed without decrypting.</li>
-              <li>The server <b>decrypts</b> only the 10 final output values (logits) and returns the predicted digit.</li>
-            </ol>
-            <p>
-              The model was trained in PyTorch on the MNIST dataset with a{" "}
-              <b>polynomial activation function</b> instead of the usual ReLU. This is because
-              HE can only do addition and multiplication — it cannot do comparisons like
-              max(0, x). This demo uses the <b>x² (degree 2)</b> activation, which gives the
-              best accuracy and runs within the server's memory constraints. The benchmark
-              section below shows results across degree 2, 3, and 4 for comparison.
-            </p>
-
-            {/* Visual pipeline walkthrough */}
-            <div className="mt-6">
-              <ArchitectureDiagram />
             </div>
           </div>
 
@@ -1368,6 +1355,112 @@ function ControlStaticLabel({ label, value }) {
 
 function Divider() {
   return <div className="w-px h-8 mx-1" style={{ background: "#ccc" }} />;
+}
+
+/**
+ * SkyBanner — Stardew Valley–style sky-blue section divider.
+ * Golden pixel-art title with chunky dark drop shadow, soft clouds.
+ */
+function SkyBanner({ label, title, subtitle }) {
+  return (
+    <div style={{
+      background: "linear-gradient(180deg, #5bb8f5 0%, #82cef7 30%, #b8e4ff 70%, #d6f0ff 100%)",
+      borderTop: "4px solid #3a8abf",
+      borderBottom: "4px solid #2a6a9f",
+      padding: "52px 24px 44px",
+      textAlign: "center",
+      position: "relative",
+      overflow: "hidden",
+    }}>
+      {/* Pixel-art sun glow top-right */}
+      <div style={{
+        position: "absolute", top: -20, right: "12%",
+        width: 90, height: 90,
+        borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(255,240,160,0.55) 0%, transparent 70%)",
+        pointerEvents: "none",
+      }} />
+
+      {/* Cloud shapes */}
+      {[
+        { top: 14, left: "5%",  w: 80,  h: 28, op: 0.55 },
+        { top: 8,  left: "18%", w: 52,  h: 18, op: 0.4  },
+        { top: 20, left: "60%", w: 100, h: 34, op: 0.5  },
+        { top: 10, left: "78%", w: 60,  h: 22, op: 0.38 },
+        { top: 30, left: "88%", w: 40,  h: 14, op: 0.3  },
+      ].map((c, i) => (
+        <div key={i} style={{
+          position: "absolute", top: c.top, left: c.left,
+          width: c.w, height: c.h,
+          borderRadius: "50%",
+          background: "#fff",
+          opacity: c.op,
+          filter: "blur(4px)",
+          pointerEvents: "none",
+        }} />
+      ))}
+
+      {/* Label */}
+      <p style={{
+        fontFamily: "'Press Start 2P', monospace",
+        fontSize: "0.5rem", letterSpacing: "0.3em",
+        color: "#1a5a8a",
+        textTransform: "uppercase",
+        margin: "0 0 18px",
+        textShadow: "0 1px 0 rgba(255,255,255,0.7)",
+      }}>
+        ✦ {label} ✦
+      </p>
+
+      {/* Stardew-style title — golden with thick dark drop shadow */}
+      <h2 style={{
+        fontFamily: "'Press Start 2P', monospace",
+        fontSize: "clamp(1.1rem, 3vw, 1.9rem)",
+        letterSpacing: "0.06em",
+        lineHeight: 1.45,
+        margin: "0 0 20px",
+        color: "#f5d020",
+        /* layered drop shadows for chunky pixel-art look */
+        textShadow: [
+          "3px 3px 0 #5a3200",
+          "4px 4px 0 #3a1e00",
+          "-1px -1px 0 #c8900a",
+          "0 0 24px rgba(245,208,32,0.35)",
+        ].join(", "),
+      }}>
+        {title}
+      </h2>
+
+      {/* Subtitle */}
+      <p style={{
+        fontFamily: "system-ui, sans-serif",
+        fontSize: "clamp(0.85rem, 1.4vw, 1rem)",
+        color: "#0d3a5c",
+        maxWidth: 520,
+        margin: "0 auto 28px",
+        lineHeight: 1.75,
+        fontWeight: 500,
+        textShadow: "0 1px 0 rgba(255,255,255,0.5)",
+      }}>
+        {subtitle}
+      </p>
+
+      {/* Bouncing pixel arrow */}
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+        style={{ display: "inline-block", opacity: 0.55,
+          animation: "bounce 1.6s ease-in-out infinite" }}
+      >
+        <path d="M12 5v14M5 12l7 7 7-7" stroke="#0d3a5c" strokeWidth="3"
+          strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <style>{`
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(5px); }
+        }
+      `}</style>
+    </div>
+  );
 }
 
 /* ── Layer descriptions ── */
