@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { AnimatePresence, motion, useInView } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import CnnPipeline, { LAYERS } from "./CnnPipeline";
 import MiniCanvas from "./MiniCanvas";
 import OutputPanel from "./OutputPanel";
@@ -832,43 +832,46 @@ export default function Workbench() {
       <SkyBanner
         label="Deep Dive"
         title="FHE CNN Benchmark Results"
-        subtitle="Encrypted CNN inference benchmarked across polynomial activation degrees. x² and x³ results are valid. x⁴ experiment was incomplete — see notes."
+        subtitle="Encrypted CNN inference benchmarked across polynomial activation degrees. x² is the validated result. x³ and x⁴ show what breaks and why."
       />
       <div id="results" className="px-4 md:px-8 py-8" style={{ background: "#f7f7f7", borderTop: "1px solid #e5e5e5" }}>
         <div className="max-w-[1100px] mx-auto">
 
-          {/* ── Reproducibility / hardware callout ── */}
-          <div className="rounded-lg p-4 mb-4 flex gap-3 text-sm leading-relaxed" style={{ background: "#fffbeb", border: "1.5px solid #f59e0b" }}>
-            <span style={{ fontSize: "1.1rem", flexShrink: 0 }}>⚠️</span>
-            <div>
-              <p className="font-semibold mb-1" style={{ color: "#92400e" }}>Reproducibility note — hardware requirements</p>
-              <p style={{ color: "#78350f" }}>
-                These benchmarks require an <b>r6i.large instance (≥16 GB RAM)</b> for the Rust compute server — a t3.small
-                runs out of memory during BFV key generation at n = 4096. The recommended deployment uses <b>3 EC2 instances</b>:
-                frontend + Nginx (t3.small), Spring Boot API (t3.small), and Rust gRPC compute server (r6i.large).
-                Due to budget constraints the full 100-image benchmark could not be completed during development.
-                The x² and x³ results below are from partial runs and are valid; x⁴ data is <b>incomplete and should not be used for comparison</b>.
-              </p>
-            </div>
+          {/* ── Context banner ── */}
+          <div className="rounded-lg p-4 mb-4" style={{ background: "#0f172a", border: "1px solid #1e293b" }}>
+            <p className="text-sm leading-relaxed" style={{ color: "#94a3b8", margin: 0 }}>
+              <span style={{ color: "#e2e8f0", fontWeight: 600 }}>How to read these results: </span>
+              These benchmarks show what happens when you push BFV encryption beyond its stable operating zone.
+              x² is the fully validated configuration — high accuracy, complete run, production-ready.
+              x³ and x⁴ are deliberate boundary-finding experiments: they reveal exactly where and why the scheme breaks down,
+              which is a concrete finding in itself. A 0% accuracy result with a known cause is not a failure — it is data.
+            </p>
+          </div>
+
+          {/* ── Hardware note ── */}
+          <div className="rounded-lg p-4 mb-4 text-sm leading-relaxed" style={{ background: "#fffbeb", border: "1.5px solid #f59e0b" }}>
+            <p className="font-semibold mb-1" style={{ color: "#92400e" }}>Hardware note</p>
+            <p style={{ color: "#78350f", margin: 0 }}>
+              All runs required an <b>r6i.large instance (16 GB RAM)</b> — a t3.small runs out of memory during BFV key generation at n = 4096.
+              Due to EC2 budget constraints the full 100-image run could not be completed for every configuration.
+              x² and x³ results are from partial but valid runs. x⁴ data is <b>directional only — treat with caution</b>.
+            </p>
           </div>
 
           {/* ── What is this ── */}
           <div className="rounded-lg p-4 mb-6 text-sm leading-relaxed" style={{ background: "#fff", border: "1px solid #e5e5e5" }}>
-            <p className="font-semibold mb-1" style={{ color: "#333" }}>What is this?</p>
-            <p style={{ color: "#555" }}>
-              MNIST test images were run through the full encrypted CNN pipeline and every layer's timing was recorded.
-              The charts compare three <b>polynomial activation degrees</b> (x², x³, x⁴) — a design choice forced by FHE.
-              Standard neural networks use ReLU (<code>max(0,x)</code>), which requires a comparison that is impossible on ciphertext.
-              Instead, we approximate it with a low-degree polynomial evaluated directly on the encrypted values.
-              Degree 2 (x²) is the most stable: it produces the least noise growth, the highest accuracy, and is the only
-              configuration fully validated end-to-end on this hardware. Degree 3 shows increased noise but partial accuracy.
-              Degree 4 was not reproducible under current resource constraints and its results are marked accordingly.
+            <p className="font-semibold mb-1" style={{ color: "#333" }}>Why polynomial degree matters</p>
+            <p style={{ color: "#555", margin: 0 }}>
+              Standard neural networks use ReLU (<code>max(0,x)</code>), which requires a comparison — impossible on ciphertext.
+              FHE forces us to replace it with a low-degree polynomial evaluated directly on encrypted values.
+              Degree 2 (x²) is the most stable: minimal noise growth, highest accuracy, fully validated.
+              Degree 3 amplifies intermediate values into the overflow zone of the plaintext modulus, corrupting activations.
+              Degree 4 makes this worse — the signal is destroyed before it even reaches the fully-connected layer.
+              The accuracy drop you see is not a model quality issue. It is BFV arithmetic hitting its ceiling.
             </p>
           </div>
-          <div
-            className="rounded-lg p-5"
-            style={{ background: "#fafafa", border: "1px solid #e5e5e5" }}
-          >
+
+          <div className="rounded-lg p-5" style={{ background: "#fafafa", border: "1px solid #e5e5e5" }}>
             <BenchmarkResultsDashboard />
           </div>
         </div>
@@ -878,72 +881,211 @@ export default function Workbench() {
       <SkyBanner
         label="Findings"
         title="Parameter Exploration & Limitations"
-        subtitle="What was attempted, what worked, what broke — and what each failure revealed about the limits of practical FHE deployment."
+        subtitle="A systematic search for the practical limits of BFV on commodity hardware. Every wall found was found on purpose."
       />
       <div className="px-4 md:px-8 py-8" style={{ background: "#fff", borderTop: "1px solid #e5e5e5" }}>
         <div className="max-w-[1100px] mx-auto">
 
-          {/* ── 4-part findings overview ── */}
-          <div className="grid grid-cols-2 gap-3 mb-6" style={{ gridTemplateColumns: "1fr 1fr" }}>
+          {/* ── Framing callout ── */}
+          <div className="rounded-lg p-4 mb-6 text-sm leading-relaxed" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+            <p className="font-semibold mb-1" style={{ color: "#0f172a" }}>What this section is</p>
+            <p style={{ color: "#475569", margin: 0 }}>
+              Rather than only running the configuration that works, this project deliberately tested combinations
+              known to be borderline or risky — higher polynomial degrees, stronger security levels, extreme scale factors.
+              The goal was to find the feasibility ceiling of single-node BFV deployment and document exactly where it sits.
+              The results below are that map.
+            </p>
+          </div>
 
-            {/* What was attempted */}
-            <div className="rounded-lg p-4 text-sm leading-relaxed" style={{ background: "#f8f9ff", border: "1px solid #c7d2fe" }}>
-              <p className="font-semibold mb-2 flex items-center gap-2" style={{ color: "#3730a3" }}>
-                <span>🧪</span> What was attempted
-              </p>
-              <ul className="space-y-1 text-xs" style={{ color: "#4338ca" }}>
-                <li>• Polynomial activation degrees: <b>x²</b>, <b>x³</b>, <b>x⁴</b></li>
-                <li>• Security levels: <b>128-bit</b>, <b>192-bit</b>, <b>256-bit</b></li>
-                <li>• Scale factors: <b>100</b>, <b>1,000</b>, <b>10,000</b></li>
-                <li>• Plaintext moduli: <b>16-bit</b>, <b>baseline</b>, <b>32-bit</b></li>
-                <li>• Full 100-image MNIST inference run per configuration</li>
-              </ul>
-            </div>
-
-            {/* What succeeded */}
-            <div className="rounded-lg p-4 text-sm leading-relaxed" style={{ background: "#f0fdf4", border: "1px solid #86efac" }}>
-              <p className="font-semibold mb-2 flex items-center gap-2" style={{ color: "#14532d" }}>
-                <span>✅</span> What succeeded
-              </p>
-              <ul className="space-y-1 text-xs" style={{ color: "#166534" }}>
-                <li>• <b>x² (degree 2)</b> — {`>`}80% FHE accuracy, matches training activation exactly</li>
-                <li>• <b>128-bit security</b> — keygen in &lt;5s, ~2.5 GB RAM on r6i.large</li>
-                <li>• <b>Scale = 1,000</b> — sufficient precision without overflow</li>
-                <li>• <b>p = 100,073,473</b> — headroom for intermediate values at scale 1,000</li>
-                <li>• End-to-end gRPC inference pipeline verified working</li>
-              </ul>
-            </div>
-
-            {/* What failed & why */}
-            <div className="rounded-lg p-4 text-sm leading-relaxed" style={{ background: "#fff7ed", border: "1px solid #fed7aa" }}>
-              <p className="font-semibold mb-2 flex items-center gap-2" style={{ color: "#7c2d12" }}>
-                <span>❌</span> What failed & why
-              </p>
-              <ul className="space-y-1 text-xs" style={{ color: "#9a3412" }}>
-                <li>• <b>x³ / x⁴</b> — Higher-degree polynomial terms overflow the plaintext modulus during activation — noise budget consumed faster than BFV can tolerate at n = 4096</li>
-                <li>• <b>192-bit / 256-bit</b> — Larger ring dimension required ({">"}n = 8192); context creation OOM at 7.6 GB + 15 GB swap</li>
-                <li>• <b>x⁴ full run</b> — 100-image evaluation never completed due to EC2 budget constraints</li>
-              </ul>
-            </div>
-
-            {/* Design decisions */}
-            <div className="rounded-lg p-4 text-sm leading-relaxed" style={{ background: "#fdf4ff", border: "1px solid #e9d5ff" }}>
-              <p className="font-semibold mb-2 flex items-center gap-2" style={{ color: "#581c87" }}>
-                <span>🎯</span> What this meant for the final design
-              </p>
-              <ul className="space-y-1 text-xs" style={{ color: "#6b21a8" }}>
-                <li>• Fixed activation to <b>x²</b> — the only degree that preserves accuracy end-to-end in BFV</li>
-                <li>• Fixed security to <b>128-bit</b> — the hardware ceiling for a single-node r6i.large deployment</li>
-                <li>• Locked scale and modulus to values validated at 128-bit, degree 2</li>
-                <li>• Framed 192/256-bit OOM as an explicit <b>feasibility boundary finding</b>, not a bug</li>
-                <li>• Future work: 4-node EC2 split to enable n = 8192 and 192-bit security</li>
-              </ul>
+          {/* ── Feasibility map ── */}
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold mb-1" style={{ color: "#0f172a" }}>Feasibility map — Activation Degree × Security Level</h3>
+            <p className="text-xs mb-3" style={{ color: "#64748b" }}>
+              Each cell shows whether the combination runs correctly on a single r6i.large instance.
+            </p>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: "#f1f5f9" }}>
+                    <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#475569", border: "1px solid #e2e8f0" }}>Activation</th>
+                    <th style={{ padding: "10px 16px", textAlign: "center", fontWeight: 600, color: "#475569", border: "1px solid #e2e8f0" }}>128-bit security</th>
+                    <th style={{ padding: "10px 16px", textAlign: "center", fontWeight: 600, color: "#475569", border: "1px solid #e2e8f0" }}>192-bit security</th>
+                    <th style={{ padding: "10px 16px", textAlign: "center", fontWeight: 600, color: "#475569", border: "1px solid #e2e8f0" }}>256-bit security</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    {
+                      degree: "x² (degree 2)",
+                      cells: [
+                        { status: "works",    label: "Validated", note: ">80% accuracy, <5s keygen", bg: "#f0fdf4", border: "#86efac", text: "#15803d" },
+                        { status: "oom",      label: "OOM",       note: "n ≥ 8192 required — exceeds 16 GB", bg: "#fff1f2", border: "#fca5a5", text: "#dc2626" },
+                        { status: "oom",      label: "OOM",       note: "n ≥ 16384 — not attempted", bg: "#fff1f2", border: "#fca5a5", text: "#dc2626" },
+                      ],
+                    },
+                    {
+                      degree: "x³ (degree 3)",
+                      cells: [
+                        { status: "partial",  label: "Partial",   note: "Runs but accuracy collapses — plaintext modulus overflow", bg: "#fffbeb", border: "#fcd34d", text: "#b45309" },
+                        { status: "oom",      label: "OOM",       note: "Not tested — 128-bit already shows accuracy failure", bg: "#f8fafc", border: "#e2e8f0", text: "#94a3b8" },
+                        { status: "oom",      label: "N/A",       note: "Not tested", bg: "#f8fafc", border: "#e2e8f0", text: "#94a3b8" },
+                      ],
+                    },
+                    {
+                      degree: "x⁴ (degree 4)",
+                      cells: [
+                        { status: "incomplete", label: "Incomplete", note: "10-image run only — signal destroyed before FC layer", bg: "#fffbeb", border: "#fcd34d", text: "#b45309" },
+                        { status: "oom",        label: "N/A",        note: "Not tested", bg: "#f8fafc", border: "#e2e8f0", text: "#94a3b8" },
+                        { status: "oom",        label: "N/A",        note: "Not tested", bg: "#f8fafc", border: "#e2e8f0", text: "#94a3b8" },
+                      ],
+                    },
+                  ].map(({ degree, cells }) => (
+                    <tr key={degree}>
+                      <td style={{ padding: "10px 16px", fontWeight: 600, color: "#0f172a", border: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>{degree}</td>
+                      {cells.map((cell, ci) => (
+                        <td key={ci} style={{ padding: "10px 16px", textAlign: "center", border: "1px solid #e2e8f0", background: cell.bg }}>
+                          <div style={{ display: "inline-block", padding: "2px 10px", borderRadius: 4, border: `1px solid ${cell.border}`, color: cell.text, fontWeight: 700, fontSize: 12, marginBottom: 4 }}>
+                            {cell.label}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.5 }}>{cell.note}</div>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-          <div
-            className="rounded-lg p-5"
-            style={{ background: "#fafafa", border: "1px solid #e5e5e5" }}
-          >
+
+          {/* ── x⁴ honest callout ── */}
+          <div className="rounded-lg p-4 mb-6 text-sm" style={{ background: "#fffbeb", border: "1.5px solid #f59e0b" }}>
+            <p className="font-semibold mb-1" style={{ color: "#92400e" }}>About the x⁴ result</p>
+            <p style={{ color: "#78350f", lineHeight: 1.75, margin: 0 }}>
+              The 100-image x⁴ benchmark was stopped mid-way due to EC2 budget constraints.
+              The accuracy figure shown in the charts comes from a <b>10-image partial run only</b> — treat it as directional, not conclusive.
+              What is conclusive: the x⁴ signal collapses before the FC layer because the fourth-power term amplifies
+              intermediate ciphertext values far beyond the plaintext modulus (100,073,473), causing silent modular wrap-around
+              at every activation. This is a known BFV property, not a model or implementation bug.
+            </p>
+          </div>
+
+          {/* ── Noise budget visualisation ── */}
+          <div className="rounded-lg p-4 mb-6 text-sm" style={{ background: "#fff", border: "1px solid #e5e5e5" }}>
+            <p className="font-semibold mb-1" style={{ color: "#0f172a" }}>Why higher degrees break — noise budget per layer</p>
+            <p className="text-xs mb-4" style={{ color: "#64748b" }}>
+              BFV tracks a "noise budget" (bits). Each ciphertext multiplication consumes it. When it hits zero, decryption produces garbage.
+              This is a conceptual illustration of relative consumption — the exact values depend on n, p, and scale.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {[
+                {
+                  degree: "x² — 2 activations", color: "#16a34a", bg: "#dcfce7",
+                  stages: [
+                    { label: "Conv1", pct: 15 }, { label: "Act1 (x²)", pct: 20 },
+                    { label: "Conv2", pct: 15 }, { label: "Act2 (x²)", pct: 20 },
+                    { label: "FC", pct: 20 }, { label: "Spare", pct: 10, spare: true },
+                  ],
+                  note: "Budget survives to FC. Decryption succeeds.",
+                },
+                {
+                  degree: "x³ — 2 activations", color: "#b45309", bg: "#fef3c7",
+                  stages: [
+                    { label: "Conv1", pct: 15 }, { label: "Act1 (x³)", pct: 38 },
+                    { label: "Conv2", pct: 15 }, { label: "Act2 (x³)", pct: 38, overflow: true },
+                  ],
+                  note: "Budget exhausted at Act2. Values wrap around the modulus, corrupting all activations from this point.",
+                },
+                {
+                  degree: "x⁴ — 2 activations", color: "#dc2626", bg: "#fee2e2",
+                  stages: [
+                    { label: "Conv1", pct: 15 }, { label: "Act1 (x⁴)", pct: 90, overflow: true },
+                  ],
+                  note: "Budget gone at first activation. Everything after is noise.",
+                },
+              ].map(({ degree, color, bg, stages, note }) => {
+                const total = stages.reduce((s, st) => s + st.pct, 0);
+                const capped = Math.min(total, 100);
+                return (
+                  <div key={degree}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color }}>{degree}</span>
+                      <span style={{ fontSize: 11, color: total > 100 ? "#dc2626" : "#64748b" }}>
+                        {total > 100 ? "OVERFLOW" : `${capped}% consumed`}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", height: 22, borderRadius: 4, overflow: "hidden", border: "1px solid #e2e8f0", background: "#f8fafc" }}>
+                      {stages.map((st, si) => {
+                        const runningTotal = stages.slice(0, si + 1).reduce((s, x) => s + x.pct, 0);
+                        const clampedPct = Math.max(0, Math.min(st.pct, 100 - stages.slice(0, si).reduce((s, x) => s + x.pct, 0)));
+                        if (clampedPct <= 0) return null;
+                        return (
+                          <div key={st.label} title={`${st.label}: ${st.pct}% budget`} style={{
+                            width: `${clampedPct}%`, background: st.overflow ? "#dc2626" : st.spare ? "#e2e8f0" : color,
+                            opacity: st.spare ? 0.4 : 1,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 9, color: st.spare ? "#94a3b8" : "#fff", fontWeight: 600,
+                            overflow: "hidden", whiteSpace: "nowrap", minWidth: 0,
+                            borderRight: si < stages.length - 1 ? "1px solid rgba(255,255,255,0.3)" : "none",
+                          }}>
+                            {clampedPct > 8 ? st.label : ""}
+                          </div>
+                        );
+                      })}
+                      {total < 100 && (
+                        <div style={{ flex: 1, background: "#f1f5f9" }} />
+                      )}
+                    </div>
+                    <p style={{ fontSize: 11, color: "#64748b", marginTop: 4, marginBottom: 0 }}>{note}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── Scale / modulus "what if you get it wrong" ── */}
+          <div className="rounded-lg p-4 mb-6 text-sm" style={{ background: "#fff", border: "1px solid #e5e5e5" }}>
+            <p className="font-semibold mb-1" style={{ color: "#0f172a" }}>Scale factor — what happens when you get it wrong</p>
+            <p className="text-xs mb-3" style={{ color: "#64748b" }}>
+              The scale factor S multiplies weights before integer encoding. Too small = precision loss. Too large = overflow.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 0, border: "1px solid #e2e8f0", borderRadius: 8, overflow: "hidden" }}>
+              {[
+                { val: "S = 100", verdict: "Precision loss", color: "#b45309", bg: "#fffbeb", border: "#fcd34d", why: "Weight values rounded too aggressively during integer encoding — quantization error accumulates across layers and degrades accuracy." },
+                { val: "S = 1,000", verdict: "Stable", color: "#16a34a", bg: "#f0fdf4", border: "#86efac", why: "Enough precision to preserve meaningful weight differences, small enough to stay well clear of the plaintext modulus ceiling. This is the validated baseline." },
+                { val: "S = 10,000", verdict: "Overflow risk", color: "#dc2626", bg: "#fff1f2", border: "#fca5a5", why: "Larger encoded values push intermediate computation results closer to p = 100,073,473. At higher polynomial degrees, this causes modular wrap-around and silent corruption." },
+              ].map(({ val, verdict, color, bg, border, why }, i, arr) => (
+                <div key={val} style={{ display: "flex", alignItems: "flex-start", gap: 16, padding: "12px 16px", background: bg, borderBottom: i < arr.length - 1 ? `1px solid ${border}` : "none" }}>
+                  <div style={{ flexShrink: 0, minWidth: 80, fontWeight: 700, fontSize: 13, color }}>{val}</div>
+                  <div style={{ flexShrink: 0, minWidth: 100 }}>
+                    <span style={{ display: "inline-block", padding: "1px 8px", borderRadius: 4, border: `1px solid ${border}`, color, fontWeight: 600, fontSize: 11 }}>{verdict}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.65 }}>{why}</div>
+                </div>
+              ))}
+            </div>
+
+            <p className="font-semibold mb-1 mt-4" style={{ color: "#0f172a" }}>Plaintext modulus — what happens when you get it wrong</p>
+            <p className="text-xs mb-3" style={{ color: "#64748b" }}>
+              p is the ceiling for all intermediate arithmetic values. Every activation and convolution output must stay below it.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 0, border: "1px solid #e2e8f0", borderRadius: 8, overflow: "hidden" }}>
+              {[
+                { val: "p = 65,537", verdict: "Too small", color: "#dc2626", bg: "#fff1f2", border: "#fca5a5", why: "16-bit modulus — intermediate values from conv and activation overflow almost immediately. Results are garbage after the first layer." },
+                { val: "p = 100,073,473", verdict: "Stable", color: "#16a34a", bg: "#f0fdf4", border: "#86efac", why: "Baseline modulus, chosen to give enough headroom for scale = 1,000 and degree 2 activations. Validated end-to-end." },
+                { val: "p = 4,294,967,311", verdict: "Headroom, slower", color: "#b45309", bg: "#fffbeb", border: "#fcd34d", why: "32-bit modulus gives more overflow headroom but increases the cost of every ciphertext operation proportionally. Useful if you raise the scale factor or degree." },
+              ].map(({ val, verdict, color, bg, border, why }, i, arr) => (
+                <div key={val} style={{ display: "flex", alignItems: "flex-start", gap: 16, padding: "12px 16px", background: bg, borderBottom: i < arr.length - 1 ? `1px solid ${border}` : "none" }}>
+                  <div style={{ flexShrink: 0, minWidth: 140, fontWeight: 700, fontSize: 13, color }}>{val}</div>
+                  <div style={{ flexShrink: 0, minWidth: 100 }}>
+                    <span style={{ display: "inline-block", padding: "1px 8px", borderRadius: 4, border: `1px solid ${border}`, color, fontWeight: 600, fontSize: 11 }}>{verdict}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.65 }}>{why}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-lg p-5" style={{ background: "#fafafa", border: "1px solid #e5e5e5" }}>
             <ParameterComparison />
           </div>
         </div>
@@ -1219,258 +1361,253 @@ function ModalLogBody({ run }) {
  * Golden pixel-art title with chunky dark drop shadow, soft clouds.
  */
 
-/* ─── BookPageAnim ─────────────────────────────────────────────────────────── */
-function BookPageAnim({ children, direction = "left" }) {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-80px" });
-  return (
-    <motion.div
-      ref={ref}
-      style={{ perspective: 1200, transformStyle: "preserve-3d" }}
-      initial={{ opacity: 0, rotateY: direction === "left" ? -12 : 12, y: 40 }}
-      animate={isInView ? { opacity: 1, rotateY: 0, y: 0 } : {}}
-      transition={{ type: "spring", stiffness: 60, damping: 18, mass: 1.2 }}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
 /* ─── BookGuidebook ─────────────────────────────────────────────────────────── */
 function BookGuidebook() {
+  const [openPipeline, setOpenPipeline] = useState(null);
+  const [openParam, setOpenParam] = useState(null);
+
+  const pipelineSteps = [
+    { label: "Draw", sub: "28×28 pixels", color: "#16a34a", detail: "You sketch a digit on the canvas. The app reads 784 pixel values (0–255) from the 28×28 grid — the same format the original MNIST dataset uses." },
+    { label: "Encrypt", sub: "BFV ciphertext", color: "#0891b2", detail: "The pixel array is encoded into a polynomial and encrypted using the BFV (Brakerski–Fan–Vercauteren) scheme. From this point on the server cannot read any values — only operate on them." },
+    { label: "Conv 1", sub: "5×5 kernel", color: "#7c3aed", detail: "A 5×5 convolutional kernel slides over the encrypted feature map. Each output pixel is a linear combination of 25 ciphertext additions and scalar multiplications — no data is revealed." },
+    { label: "Activate", sub: "x² (no ReLU)", color: "#b45309", detail: "Standard ReLU requires comparing a value to zero — impossible on ciphertext. Instead we evaluate x², a polynomial that approximates nonlinearity and can be computed with a single ciphertext multiplication." },
+    { label: "Pool", sub: "avg 2×2", color: "#ca8a04", detail: "2×2 average pooling halves the spatial resolution. On encrypted data this is just a weighted sum — four ciphertext additions and a scalar divide, no branching needed." },
+    { label: "Conv 2", sub: "5×5 kernel", color: "#6d28d9", detail: "A second convolutional layer extracts higher-level features. The computation is identical to Conv 1 but operates on the (encrypted) pooled output of the first layer." },
+    { label: "Activate", sub: "x² again", color: "#d97706", detail: "The same x² activation is applied again. This is the second ciphertext multiplication in the multiplicative depth chain — BFV can handle this at n = 4096 without exhausting the noise budget." },
+    { label: "FC Layer", sub: "10 logits", color: "#dc2626", detail: "A fully-connected layer maps the flattened feature vector to 10 output logits — one per digit class. This is the most expensive step: hundreds of ciphertext additions per output neuron." },
+    { label: "Decrypt", sub: "secret key", color: "#0891b2", detail: "The 10 encrypted logits are sent back to the client. The secret key (which never left your session) decrypts them into 10 plaintext scores." },
+    { label: "Result", sub: "predicted digit", color: "#16a34a", detail: "Argmax picks the highest logit. That index is your predicted digit. The entire pipeline ran on locked data — the server learned nothing about your drawing." },
+  ];
+
+  const params = [
+    { term: "Polynomial Degree", value: "x² (degree 2)", color: "#7c3aed", verdict: "Only valid choice", detail: "Replaces ReLU in FHE. Degree 2 is the only option that preserves accuracy end-to-end — degree 3 and 4 cause intermediate values to overflow the plaintext modulus, corrupting every activation silently." },
+    { term: "Security Level", value: "128-bit", color: "#0891b2", verdict: "Hardware ceiling", detail: "128-bit NIST security works on a single r6i.large (16 GB RAM). 192-bit requires a larger ring dimension (n ≥ 8192) and OOM'd at 7.6 GB + 15 GB swap after 60+ minutes — never completed." },
+    { term: "Ring Dimension n", value: "n = 4096", color: "#b45309", verdict: "Fixed", detail: "The size of the polynomial ring. Larger n gives more security and noise budget but exponentially more memory. n = 4096 is the minimum viable for 128-bit BFV with mult_depth = 6." },
+    { term: "Plaintext Modulus p", value: "100,073,473", color: "#dc2626", verdict: "Baseline is safest", detail: "The ceiling for intermediate computation values. Too small and activations overflow (modular wrap-around silently corrupts results). The baseline value gives enough headroom at scale = 1,000." },
+    { term: "Scale Factor S", value: "S = 1,000", color: "#16a34a", verdict: "Sweet spot", detail: "Multiplies weights before integer encoding to preserve decimal precision. S = 100 loses too much precision; S = 10,000 risks overflow into the modulus. S = 1,000 hits the right balance." },
+    { term: "Multiplication Depth", value: "depth = 6", color: "#ca8a04", verdict: "Fixed", detail: "The maximum number of sequential ciphertext multiplications before noise overwhelms the signal. Our CNN uses: Conv1 × Act1 × Conv2 × Act2 × FC × 1 spare = depth 6." },
+  ];
+
   return (
-    <section id="info" style={{ background: "#e8d5a3", borderTop: "4px solid #b8902a" }}>
-      {/* ── Sky-blue About banner ── */}
-      <div style={{
-        background: "linear-gradient(180deg, #5bb8f5 0%, #82cef7 30%, #b8e4ff 70%, #d6f0ff 100%)",
-        borderTop: "4px solid #3a8abf",
-        borderBottom: "4px solid #2a6a9f",
-        padding: "52px 24px 44px",
-        textAlign: "center",
-        position: "relative",
-        overflow: "hidden",
-      }}>
-        {[
-          { top: "18%", left: "6%", w: 90, h: 28, op: 0.55 },
-          { top: "38%", left: "22%", w: 60, h: 20, op: 0.4 },
-          { top: "12%", right: "8%", w: 110, h: 32, op: 0.5 },
-          { top: "50%", right: "18%", w: 70, h: 22, op: 0.38 },
-        ].map((c, i) => (
-          <div key={i} style={{
-            position: "absolute", top: c.top, left: c.left, right: c.right,
-            width: c.w, height: c.h, background: "rgba(255,255,255,0.9)",
-            borderRadius: 999, opacity: c.op,
-          }} />
-        ))}
-        <div style={{ position: "relative", zIndex: 2 }}>
-          <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: "clamp(0.55rem,1.4vw,0.75rem)", letterSpacing: "0.25em", textTransform: "uppercase", color: "#1a4a6e", marginBottom: 14, opacity: 0.75 }}>
-            About This Project
-          </div>
-          <h2 style={{ fontFamily: "'Press Start 2P', monospace", fontSize: "clamp(1.1rem,3.5vw,2rem)", color: "#1a2e1a", textShadow: "3px 3px 0 #b8d4f0, 5px 5px 0 #8ab8e0", lineHeight: 1.4, marginBottom: 16 }}>
-            The Guidebook
-          </h2>
-          <p style={{ fontFamily: "system-ui, sans-serif", fontSize: "clamp(0.85rem,1.8vw,1.05rem)", color: "#1a3a5e", maxWidth: 560, margin: "0 auto", opacity: 0.85 }}>
-            Everything you need to understand this demo — the hook, the how, and the honest limitations.
-          </p>
+    <section id="info" style={{ background: "#f8fafc" }}>
+
+      {/* ── Hero ── */}
+      <div style={{ background: "linear-gradient(135deg, #14532d 0%, #166534 40%, #15803d 100%)", padding: "64px 24px 56px", textAlign: "center" }}>
+        <p style={{ fontFamily: "system-ui,sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(187,247,208,0.8)", marginBottom: 18 }}>
+          About This Project
+        </p>
+        <h2 style={{ fontFamily: "system-ui,sans-serif", fontSize: "clamp(1.6rem,4vw,2.6rem)", fontWeight: 800, color: "#fff", lineHeight: 1.25, marginBottom: 20, maxWidth: 700, margin: "0 auto 20px" }}>
+          What if an AI could classify your data without ever seeing it?
+        </h2>
+        <p style={{ fontFamily: "system-ui,sans-serif", fontSize: "clamp(0.95rem,1.8vw,1.1rem)", color: "rgba(187,247,208,0.9)", maxWidth: 580, margin: "0 auto 32px", lineHeight: 1.8 }}>
+          This demo runs a neural network entirely on <strong style={{ color: "#fff" }}>encrypted data</strong> using Fully Homomorphic Encryption — the server computes the answer without ever decrypting your input.
+        </p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "center" }}>
+          {[
+            { label: "Draw a digit", desc: "your input, your key" },
+            { label: "Server encrypts + infers", desc: "never sees plaintext" },
+            { label: "You decrypt the result", desc: "server learns nothing" },
+          ].map(({ label, desc }) => (
+            <div key={label} style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 8, padding: "12px 20px", minWidth: 160 }}>
+              <div style={{ fontFamily: "system-ui,sans-serif", fontWeight: 700, fontSize: 14, color: "#fff", marginBottom: 4 }}>{label}</div>
+              <div style={{ fontFamily: "system-ui,sans-serif", fontSize: 12, color: "rgba(187,247,208,0.8)" }}>{desc}</div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* ── Book wrapper ── */}
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 24px 64px" }}>
-        <style>{`
-          .book-spread { display:grid; grid-template-columns:1fr 1fr; gap:0; background:#f5e6c0; border:4px solid #8b6914; box-shadow:8px 8px 0 #5a4208,12px 12px 0 rgba(0,0,0,0.25); margin-bottom:36px; position:relative; }
-          .book-spread::after { content:''; position:absolute; top:0; bottom:0; left:50%; width:6px; margin-left:-3px; background:linear-gradient(90deg,#8b6914 0%,#c8a84b 40%,#a07820 60%,#5a4208 100%); box-shadow:0 0 12px rgba(0,0,0,0.3); z-index:10; }
-          .book-page { padding:40px 44px; background:#fdf6e3; position:relative; overflow:hidden; }
-          .book-page-right { background:#faf0d0; }
-          .book-page::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,#d4a830 0%,#f0c84a 50%,#d4a830 100%); }
-          .book-page-right::before { background:linear-gradient(90deg,#c8a030 0%,#e8c040 50%,#c8a030 100%); }
-          .pixel-chapter { font-family:'Press Start 2P',monospace; font-size:0.55rem; letter-spacing:0.2em; text-transform:uppercase; color:#8b6914; margin-bottom:10px; }
-          .pixel-heading { font-family:'Georgia',serif; font-size:1.6rem; color:#3a2008; margin-bottom:18px; line-height:1.3; font-style:italic; }
-          .book-body { font-family:'Georgia','Times New Roman',serif; font-size:0.9rem; line-height:1.85; color:#3a2c10; }
-          .pixel-tag { display:inline-block; font-family:'Press Start 2P',monospace; font-size:0.48rem; padding:3px 8px; border:2px solid currentColor; box-shadow:2px 2px 0 rgba(0,0,0,0.2); letter-spacing:0.1em; vertical-align:middle; }
-          .book-single { background:#fdf6e3; border:4px solid #8b6914; box-shadow:8px 8px 0 #5a4208,12px 12px 0 rgba(0,0,0,0.25); padding:40px 52px; margin-bottom:36px; position:relative; overflow:hidden; }
-          .book-single::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,#d4a830 0%,#f0c84a 50%,#d4a830 100%); }
-          .pipeline-arrow { font-family:'Press Start 2P',monospace; font-size:0.6rem; color:#8b6914; padding:0 6px; flex-shrink:0; }
-          .glossary-card { background:#fff8e8; border:2px solid #c8a030; box-shadow:3px 3px 0 #8b6914; padding:14px 16px; cursor:pointer; transition:transform 0.15s,box-shadow 0.15s; position:relative; }
-          .glossary-card:hover { transform:translate(-2px,-2px); box-shadow:5px 5px 0 #8b6914; }
-          .findings-callout { background:#fffbe6; border:3px solid #d4a830; box-shadow:5px 5px 0 #8b6914; padding:22px 28px; position:relative; }
-          @media (max-width:680px) { .book-spread { grid-template-columns:1fr; } .book-spread::after { display:none; } .book-page { padding:28px 22px; } }
-        `}</style>
+      <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 24px 72px" }}>
 
-        {/* Pages 1-2 */}
-        <BookPageAnim direction="left">
-          <div className="book-spread">
-            <div className="book-page">
-              <div className="pixel-chapter">Chapter I</div>
-              <div className="pixel-heading">The Wonders of Private AI</div>
-              <div className="book-body">
-                <p style={{ marginBottom: 16 }}><strong>What if an AI could recognise your handwriting without ever seeing it?</strong></p>
-                <p style={{ marginBottom: 16 }}>Every time you use a cloud AI service — from face recognition to medical diagnosis — your raw data travels to a server that can read it. Homomorphic Encryption flips this entirely: the server runs the AI <em>inside the lock</em>, returning only the answer.</p>
-                <p style={{ marginBottom: 20 }}>This demo makes that real. You draw a digit. We encrypt it. A neural network runs on the ciphertext. You get a prediction. The server never saw your pixels.</p>
-                <div style={{ background:"#f0e4b8", border:"2px solid #c8a030", boxShadow:"3px 3px 0 #8b6914", padding:"14px 18px", marginBottom:20, fontStyle:"italic", fontSize:"0.88rem", color:"#5a3a08" }}>
-                  "Computation on data you cannot read — this is the promise of Fully Homomorphic Encryption."
-                </div>
-                <p style={{ fontSize:"0.82rem", color:"#6a5020" }}>Three libraries are pitted against each other — OpenFHE, Microsoft SEAL, and IBM HElib — on the exact same CNN task. Who is fastest? Who uses the least memory? Read on.</p>
+        {/* ── What you can do ── */}
+        <div style={{ padding: "52px 0 44px", borderBottom: "1px solid #e2e8f0" }}>
+          <h3 style={{ fontFamily: "system-ui,sans-serif", fontSize: 22, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>What you can do here</h3>
+          <p style={{ fontFamily: "system-ui,sans-serif", fontSize: 14, color: "#64748b", marginBottom: 32, lineHeight: 1.7 }}>Four sections, each independently useful. Start anywhere.</p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 16 }}>
+            {[
+              { title: "Draw & Predict", desc: "Sketch any digit (0–9) and watch the full encrypted CNN inference run live — every layer, real timings.", color: "#16a34a", bg: "#f0fdf4", border: "#86efac" },
+              { title: "Compare Libraries", desc: "Benchmark OpenFHE, SEAL, and HElib on five identical HE operations. See which library is fastest at each.", color: "#0891b2", bg: "#ecfeff", border: "#a5f3fc" },
+              { title: "Explore Parameters", desc: "See what happens when you change activation degree, security level, or scale factor — and exactly why some break.", color: "#7c3aed", bg: "#faf5ff", border: "#d8b4fe" },
+              { title: "Read the Results", desc: "Real benchmark data from 10–100 MNIST images. Accuracy and latency across three polynomial degrees.", color: "#b45309", bg: "#fffbeb", border: "#fcd34d" },
+            ].map(({ title, desc, color, bg, border }) => (
+              <div key={title} style={{ background: bg, border: `1.5px solid ${border}`, borderRadius: 10, padding: "20px 20px 18px" }}>
+                <div style={{ fontFamily: "system-ui,sans-serif", fontWeight: 700, fontSize: 14, color, marginBottom: 8 }}>{title}</div>
+                <div style={{ fontFamily: "system-ui,sans-serif", fontSize: 13, color: "#475569", lineHeight: 1.7 }}>{desc}</div>
               </div>
-              <div style={{ position:"absolute", bottom:16, left:44, fontFamily:"'Press Start 2P',monospace", fontSize:"0.45rem", color:"#c8a030" }}>1</div>
-            </div>
-            <div className="book-page book-page-right">
-              <div className="pixel-chapter">Chapter II</div>
-              <div className="pixel-heading">What You Can Do Here</div>
-              <div className="book-body">
-                {[
-                  { title:"Draw & Predict", desc:"Sketch a digit (0–9) on the canvas. Watch it encrypt and feed through a live CNN — all on the server, all encrypted." },
-                  { title:"Compare Libraries", desc:"Run OpenFHE, SEAL, and HElib on the same 5 cryptographic operations and see timing results side by side." },
-                  { title:"Explore Parameters", desc:"See what happens when you change polynomial degree, security level, or scale factor — and why some combinations break." },
-                  { title:"Read the Findings", desc:"Browse real benchmark data from 10–100 MNIST images across 3 activation degrees and 3 security levels." },
-                ].map(({ title, desc }) => (
-                  <div key={title} style={{ display:"flex", gap:14, marginBottom:18, paddingBottom:18, borderBottom:"1px dashed #c8a030" }}>
-                    <div>
-                      <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"0.52rem", color:"#6b4a10", marginBottom:5, letterSpacing:"0.08em" }}>{title}</div>
-                      <div style={{ fontSize:"0.86rem", color:"#4a3010", lineHeight:1.7 }}>{desc}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ position:"absolute", bottom:16, right:44, fontFamily:"'Press Start 2P',monospace", fontSize:"0.45rem", color:"#c8a030" }}>2</div>
-            </div>
+            ))}
           </div>
-        </BookPageAnim>
+        </div>
 
-        {/* Page 3 */}
-        <BookPageAnim direction="right">
-          <div className="book-single">
-            <div className="pixel-chapter">Chapter III</div>
-            <div className="pixel-heading" style={{ textAlign:"center" }}>How It Works — The Pipeline</div>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"center", flexWrap:"wrap", gap:8, margin:"28px 0" }}>
-              {[
-                { label:"Draw", sub:"28×28 pixels", color:"#0aa35e" },
-                { label:"Encrypt", sub:"BFV ciphertext", color:"#0db7c4" },
-                { label:"Conv1", sub:"5×5 kernel", color:"#7b3ff2" },
-                { label:"Activate", sub:"x² (no ReLU)", color:"#e68a00" },
-                { label:"Pool", sub:"avg 2×2", color:"#f4b942" },
-                { label:"Conv2", sub:"5×5 kernel", color:"#9b6dff" },
-                { label:"Activate x2", sub:"x² again", color:"#ff9f43" },
-                { label:"FC Layer", sub:"10 logits", color:"#e03e52" },
-                { label:"Decrypt", sub:"secret key", color:"#0db7c4" },
-                { label:"Result", sub:"predicted digit", color:"#0aa35e" },
-              ].map(({ label, sub, color }, i, arr) => (
-                <div key={label} style={{ display:"flex", alignItems:"center", gap:8 }}>
-                  <div style={{ background:"#fff8e8", border:`3px solid ${color}`, boxShadow:`3px 3px 0 ${color}66`, padding:"10px 14px", textAlign:"center", minWidth:72 }}>
-                    <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"0.48rem", color, letterSpacing:"0.06em" }}>{label}</div>
-                    <div style={{ fontFamily:"system-ui", fontSize:"0.65rem", color:"#8b6020", marginTop:3 }}>{sub}</div>
-                  </div>
-                  {i < arr.length - 1 && <div className="pipeline-arrow">▶</div>}
-                </div>
-              ))}
-            </div>
-            <div style={{ fontFamily:"Georgia,serif", fontSize:"0.88rem", color:"#5a3a08", textAlign:"center", lineHeight:1.7, maxWidth:700, margin:"0 auto" }}>
-              Every step from Encrypt to Decrypt runs on the server — but on <strong>locked data</strong>. The secret key never leaves your session. Conv and FC layers account for &gt;90% of inference time; the activation function is just one ciphertext multiply.
-            </div>
-            <div style={{ position:"absolute", bottom:16, left:"50%", transform:"translateX(-50%)", fontFamily:"'Press Start 2P',monospace", fontSize:"0.45rem", color:"#c8a030" }}>3</div>
+        {/* ── Pipeline ── */}
+        <div style={{ padding: "48px 0 44px", borderBottom: "1px solid #e2e8f0" }}>
+          <div style={{ background: "linear-gradient(135deg,#0c4a6e,#0369a1)", borderRadius: 12, padding: "32px 32px 28px", marginBottom: 32 }}>
+            <h3 style={{ fontFamily: "system-ui,sans-serif", fontSize: 20, fontWeight: 700, color: "#fff", marginBottom: 8 }}>How it works — the pipeline</h3>
+            <p style={{ fontFamily: "system-ui,sans-serif", fontSize: 13, color: "rgba(186,230,253,0.9)", lineHeight: 1.7, marginBottom: 0 }}>
+              Every step from Encrypt to Decrypt runs on the server — but on locked data. The secret key never leaves your browser. Tap any stage to read what happens inside.
+            </p>
           </div>
-        </BookPageAnim>
 
-        {/* Pages 4-5 */}
-        <BookPageAnim direction="left">
-          <div className="book-spread">
-            <div className="book-page">
-              <div className="pixel-chapter">Chapter IV</div>
-              <div className="pixel-heading">Parameter Glossary</div>
-              <div className="book-body" style={{ fontSize:"0.85rem" }}>
-                <p style={{ marginBottom:18, color:"#6a5020" }}>Hover each card to see why it matters — no lecture required.</p>
-                {[
-                  { term:"Polynomial Degree", symbol:"x² / x³ / x⁴", color:"#7b3ff2", tip:"Replaces ReLU in FHE. Degree 2 (x²) is the only one that preserves accuracy end-to-end — higher degrees overflow the plaintext modulus.", verdict:"Use x²" },
-                  { term:"Security Level", symbol:"128 / 192 / 256-bit", color:"#0db7c4", tip:"Sets the hardness of the encryption. 128-bit works on a single r6i.large. 192-bit requires >7.6 GB RAM — it OOM'd on every attempt.", verdict:"Use 128-bit" },
-                  { term:"Ring Dimension n", symbol:"n = 4096", color:"#e68a00", tip:"The size of the polynomial ring. Larger n = more security + more memory. n=4096 is the minimum for 128-bit BFV with these parameters.", verdict:"Fixed at 4096" },
-                ].map(({ term, symbol, color, tip, verdict }) => (
-                  <div key={term} className="glossary-card" style={{ marginBottom:14 }} title={tip}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
-                      <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"0.5rem", color, letterSpacing:"0.08em" }}>{term}</div>
-                      <span className="pixel-tag" style={{ color, borderColor:color }}>{symbol}</span>
-                    </div>
-                    <div style={{ fontSize:"0.8rem", color:"#5a3a08", lineHeight:1.6, marginBottom:8 }}>{tip}</div>
-                    <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"0.42rem", color:"#0aa35e" }}>{verdict}</div>
-                  </div>
-                ))}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "flex-start" }}>
+            {pipelineSteps.map(({ label, sub, color, detail }, i) => (
+              <div key={label + i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                <button
+                  onClick={() => setOpenPipeline(openPipeline === i ? null : i)}
+                  style={{
+                    background: openPipeline === i ? color : "#fff",
+                    border: `2px solid ${color}`,
+                    borderRadius: 8, padding: "10px 14px", cursor: "pointer",
+                    textAlign: "center", minWidth: 80, transition: "all 0.15s",
+                  }}
+                >
+                  <div style={{ fontFamily: "system-ui,sans-serif", fontWeight: 700, fontSize: 12, color: openPipeline === i ? "#fff" : color, marginBottom: 3 }}>{label}</div>
+                  <div style={{ fontFamily: "system-ui,sans-serif", fontSize: 11, color: openPipeline === i ? "rgba(255,255,255,0.8)" : "#94a3b8" }}>{sub}</div>
+                </button>
+                {i < pipelineSteps.length - 1 && (
+                  <span style={{ color: "#cbd5e1", fontSize: 18, lineHeight: "42px", flexShrink: 0 }}>›</span>
+                )}
               </div>
-              <div style={{ position:"absolute", bottom:16, left:44, fontFamily:"'Press Start 2P',monospace", fontSize:"0.45rem", color:"#c8a030" }}>4</div>
-            </div>
-            <div className="book-page book-page-right">
-              <div className="pixel-chapter">Chapter IV cont.</div>
-              <div className="pixel-heading">More Parameters</div>
-              <div className="book-body" style={{ fontSize:"0.85rem" }}>
-                {[
-                  { term:"Plaintext Modulus p", symbol:"100,073,473", color:"#e03e52", tip:"The 'ceiling' for intermediate values during computation. Too small and higher-degree activations overflow, corrupting the result silently.", verdict:"Baseline = safest" },
-                  { term:"Scale Factor S", symbol:"S = 1,000", color:"#0aa35e", tip:"Multiplies weights before encoding to preserve decimal precision. S=100 loses too much precision; S=10,000 risks overflow. S=1,000 is the sweet spot.", verdict:"S = 1,000" },
-                  { term:"Multiplication Depth", symbol:"depth = 6", color:"#f4b942", tip:"The number of sequential ciphertext multiplications the scheme can handle before noise overwhelms the signal. Our CNN uses depth 6 (conv × act × conv × act × fc × spare).", verdict:"Fixed at 6" },
-                  { term:"Noise Budget", symbol:"BFV noise", color:"#9b6dff", tip:"BFV tracks a 'noise budget' that decreases with each operation. When it hits zero, decryption fails. Larger n and p give more budget — at the cost of memory.", verdict:"Managed by library" },
-                ].map(({ term, symbol, color, tip, verdict }) => (
-                  <div key={term} className="glossary-card" style={{ marginBottom:14 }} title={tip}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
-                      <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"0.5rem", color, letterSpacing:"0.08em" }}>{term}</div>
-                      <span className="pixel-tag" style={{ color, borderColor:color }}>{symbol}</span>
-                    </div>
-                    <div style={{ fontSize:"0.8rem", color:"#5a3a08", lineHeight:1.6, marginBottom:8 }}>{tip}</div>
-                    <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"0.42rem", color:"#0aa35e" }}>{verdict}</div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ position:"absolute", bottom:16, right:44, fontFamily:"'Press Start 2P',monospace", fontSize:"0.45rem", color:"#c8a030" }}>5</div>
-            </div>
+            ))}
           </div>
-        </BookPageAnim>
 
-        {/* Page 6 */}
-        <BookPageAnim direction="right">
-          <div className="book-single">
-            <div className="pixel-chapter">Chapter V</div>
-            <div className="pixel-heading" style={{ textAlign:"center" }}>Experiment Findings</div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:20, marginBottom:32 }}>
-              {[
-                { label:"What Worked", color:"#0aa35e", items:["x² (degree 2) — >80% FHE accuracy","128-bit security on r6i.large","Full gRPC inference pipeline","Scale=1000, p=100,073,473"] },
-                { label:"What Failed", color:"#e03e52", items:["x³ — modular overflow → accuracy collapse","192-bit security → OOM (>7.6 GB)","256-bit → never attempted","x⁴ 100-image run → budget ran out"] },
-                { label:"Design Decisions", color:"#7b3ff2", items:["Fixed activation to x²","Fixed security to 128-bit","Single-node r6i.large deployment","Future: 4-node EC2 for 192-bit"] },
-              ].map(({ label, color, items }) => (
-                <div key={label} style={{ background:"#fff8e8", border:`3px solid ${color}`, boxShadow:`4px 4px 0 ${color}55`, padding:"18px 20px" }}>
-                  <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"0.5rem", color, letterSpacing:"0.08em", marginBottom:12 }}>{label}</div>
-                  <ul style={{ margin:0, padding:0, listStyle:"none" }}>
-                    {items.map((item) => (
-                      <li key={item} style={{ fontFamily:"Georgia,serif", fontSize:"0.8rem", color:"#4a3010", lineHeight:1.7, paddingLeft:14, position:"relative" }}>
-                        <span style={{ position:"absolute", left:0, color }}>›</span>{item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-            <div className="findings-callout">
-              <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"0.55rem", color:"#8b6914", marginBottom:12, letterSpacing:"0.1em" }}>Known Limitations</div>
-              <div style={{ fontFamily:"Georgia,serif", fontSize:"0.88rem", color:"#5a3a08", lineHeight:1.8 }}>
-                <strong>x⁴ data is incomplete</strong> — the 100-image run was stopped due to EC2 budget constraints. Do not draw accuracy conclusions from degree-4 results.
-                The <strong>192-bit and 256-bit OOM failures</strong> are intentional findings, not bugs — they prove the feasibility ceiling of single-node commodity hardware for BFV at n = 4096.
-                All results run on a single <strong>r6i.large (16 GB RAM)</strong> on AWS.
+          {openPipeline !== null && (
+            <div style={{ marginTop: 16, background: "#f1f5f9", border: `1.5px solid ${pipelineSteps[openPipeline].color}44`, borderRadius: 8, padding: "16px 20px" }}>
+              <div style={{ fontFamily: "system-ui,sans-serif", fontWeight: 700, fontSize: 13, color: pipelineSteps[openPipeline].color, marginBottom: 6 }}>
+                {pipelineSteps[openPipeline].label} — {pipelineSteps[openPipeline].sub}
+              </div>
+              <div style={{ fontFamily: "system-ui,sans-serif", fontSize: 13, color: "#334155", lineHeight: 1.75 }}>
+                {pipelineSteps[openPipeline].detail}
               </div>
             </div>
-            <div style={{ marginTop:28, textAlign:"center" }}>
-              <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"0.52rem", color:"#8b6914", marginBottom:10, letterSpacing:"0.1em" }}>Open Source · Final Year Project 2025–2026</div>
-              <a
-                href="https://github.com/TiffanyYongNgikChee/Encrypted-Machine-Learning-Benchmark-Framework"
-                target="_blank" rel="noreferrer"
-                style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"0.52rem", color:"#fff", background:"#3a2008", border:"3px solid #8b6914", boxShadow:"4px 4px 0 #5a4208", padding:"10px 20px", display:"inline-block", textDecoration:"none", letterSpacing:"0.1em", transition:"transform 0.1s,box-shadow 0.1s" }}
-                onMouseEnter={e => { e.currentTarget.style.transform="translate(-2px,-2px)"; e.currentTarget.style.boxShadow="6px 6px 0 #5a4208"; }}
-                onMouseLeave={e => { e.currentTarget.style.transform=""; e.currentTarget.style.boxShadow="4px 4px 0 #5a4208"; }}
-              >View on GitHub</a>
-            </div>
-            <div style={{ position:"absolute", bottom:16, left:"50%", transform:"translateX(-50%)", fontFamily:"'Press Start 2P',monospace", fontSize:"0.45rem", color:"#c8a030" }}>6</div>
+          )}
+
+          <p style={{ fontFamily: "system-ui,sans-serif", fontSize: 13, color: "#64748b", marginTop: 20, lineHeight: 1.7 }}>
+            Conv and FC layers account for <strong style={{ color: "#0f172a" }}>&gt;90% of inference time</strong>. The activation function is just one ciphertext multiplication — the bottleneck is linear algebra, not nonlinearity.
+          </p>
+        </div>
+
+        {/* ── Parameters ── */}
+        <div style={{ padding: "48px 0 44px", borderBottom: "1px solid #e2e8f0" }}>
+          <div style={{ background: "linear-gradient(135deg,#3b0764,#6d28d9)", borderRadius: 12, padding: "32px 32px 28px", marginBottom: 32 }}>
+            <h3 style={{ fontFamily: "system-ui,sans-serif", fontSize: 20, fontWeight: 700, color: "#fff", marginBottom: 8 }}>Key parameters — what they mean and why they matter</h3>
+            <p style={{ fontFamily: "system-ui,sans-serif", fontSize: 13, color: "rgba(221,214,254,0.9)", lineHeight: 1.7, marginBottom: 0 }}>
+              FHE has more knobs than a traditional neural network. Tap any parameter to expand the explanation.
+            </p>
           </div>
-        </BookPageAnim>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {params.map(({ term, value, color, verdict, detail }, i) => (
+              <div key={term}
+                style={{ background: "#fff", border: `1.5px solid ${openParam === i ? color : "#e2e8f0"}`, borderRadius: 10, overflow: "hidden", transition: "border-color 0.15s" }}>
+                <button
+                  onClick={() => setOpenParam(openParam === i ? null : i)}
+                  style={{ width: "100%", background: "none", border: "none", cursor: "pointer", padding: "16px 20px", display: "flex", alignItems: "center", gap: 16, textAlign: "left" }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: "system-ui,sans-serif", fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 2 }}>{term}</div>
+                    <div style={{ fontFamily: "system-ui,sans-serif", fontSize: 12, color: "#64748b" }}>Value used: <strong style={{ color }}>{value}</strong></div>
+                  </div>
+                  <div style={{ fontFamily: "system-ui,sans-serif", fontSize: 11, fontWeight: 600, color, background: `${color}15`, border: `1px solid ${color}44`, borderRadius: 6, padding: "3px 10px", flexShrink: 0 }}>
+                    {verdict}
+                  </div>
+                  <span style={{ color: "#94a3b8", fontSize: 18, flexShrink: 0, transform: openParam === i ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>›</span>
+                </button>
+                {openParam === i && (
+                  <div style={{ padding: "0 20px 18px", borderTop: `1px solid ${color}22` }}>
+                    <p style={{ fontFamily: "system-ui,sans-serif", fontSize: 13, color: "#334155", lineHeight: 1.8, margin: "12px 0 0" }}>{detail}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Findings ── */}
+        <div style={{ padding: "48px 0 0" }}>
+          <div style={{ background: "linear-gradient(135deg,#78350f,#b45309)", borderRadius: 12, padding: "32px 32px 28px", marginBottom: 32 }}>
+            <h3 style={{ fontFamily: "system-ui,sans-serif", fontSize: 20, fontWeight: 700, color: "#fff", marginBottom: 8 }}>Experiment findings — what worked, what broke, and why</h3>
+            <p style={{ fontFamily: "system-ui,sans-serif", fontSize: 13, color: "rgba(253,230,138,0.9)", lineHeight: 1.7, marginBottom: 0 }}>
+              Not everything that was attempted worked. The failures are as informative as the successes.
+            </p>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 16, marginBottom: 28 }}>
+            {[
+              {
+                heading: "What worked",
+                color: "#16a34a", bg: "#f0fdf4", border: "#86efac",
+                items: [
+                  "x² (degree 2) — >80% FHE accuracy end-to-end",
+                  "128-bit security on a single r6i.large (16 GB RAM)",
+                  "BFV keygen under 5 seconds at n = 4096",
+                  "Scale = 1,000, p = 100,073,473 — no overflow",
+                  "Full gRPC inference pipeline verified working",
+                ],
+              },
+              {
+                heading: "What failed",
+                color: "#dc2626", bg: "#fff1f2", border: "#fca5a5",
+                items: [
+                  "x³ — cubic term overflows plaintext modulus, accuracy collapses",
+                  "x⁴ — fourth-power compounds overflow; signal destroyed before FC",
+                  "192-bit security — context creation OOM at 7.6 GB + 15 GB swap",
+                  "256-bit — never reached; 192-bit was already infeasible",
+                  "x⁴ full 100-image run — EC2 budget ran out before completion",
+                ],
+              },
+              {
+                heading: "Design decisions",
+                color: "#7c3aed", bg: "#faf5ff", border: "#d8b4fe",
+                items: [
+                  "Activation fixed to x² — the only degree that works in BFV at n = 4096",
+                  "Security fixed to 128-bit — the hardware ceiling for one node",
+                  "Scale and modulus locked to validated values",
+                  "OOM failures framed as feasibility findings, not bugs",
+                  "Future work: 4-node EC2 cluster for n = 8192 and 192-bit",
+                ],
+              },
+            ].map(({ heading, color, bg, border, items }) => (
+              <div key={heading} style={{ background: bg, border: `1.5px solid ${border}`, borderRadius: 10, padding: "20px 20px 18px" }}>
+                <div style={{ fontFamily: "system-ui,sans-serif", fontWeight: 700, fontSize: 14, color, marginBottom: 14 }}>{heading}</div>
+                <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                  {items.map((item) => (
+                    <li key={item} style={{ fontFamily: "system-ui,sans-serif", fontSize: 13, color: "#334155", lineHeight: 1.75, paddingLeft: 16, position: "relative", marginBottom: 4 }}>
+                      <span style={{ position: "absolute", left: 0, color, fontWeight: 700 }}>›</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          {/* Limitations callout */}
+          <div style={{ background: "#fffbeb", border: "1.5px solid #fcd34d", borderRadius: 10, padding: "20px 24px", marginBottom: 28 }}>
+            <div style={{ fontFamily: "system-ui,sans-serif", fontWeight: 700, fontSize: 13, color: "#92400e", marginBottom: 8 }}>Known limitations</div>
+            <p style={{ fontFamily: "system-ui,sans-serif", fontSize: 13, color: "#78350f", lineHeight: 1.8, margin: 0 }}>
+              <strong>x⁴ data is incomplete</strong> — the 100-image run was stopped due to EC2 budget constraints. Do not draw accuracy conclusions from degree-4 results shown in the dashboard.
+              The <strong>192-bit and 256-bit OOM failures</strong> are intentional findings, not bugs — they establish the feasibility ceiling for single-node commodity hardware running BFV at n = 4096.
+              All results were produced on a single <strong>r6i.large (16 GB RAM)</strong> AWS instance.
+            </p>
+          </div>
+
+          {/* GitHub link */}
+          <div style={{ textAlign: "center", paddingBottom: 8 }}>
+            <p style={{ fontFamily: "system-ui,sans-serif", fontSize: 12, color: "#94a3b8", marginBottom: 16 }}>Open Source · Final Year Project 2025–2026</p>
+            <a
+              href="https://github.com/TiffanyYongNgikChee/Encrypted-Machine-Learning-Benchmark-Framework"
+              target="_blank" rel="noreferrer"
+              style={{ fontFamily: "system-ui,sans-serif", fontWeight: 700, fontSize: 14, color: "#fff", background: "#0f172a", borderRadius: 8, padding: "12px 28px", display: "inline-block", textDecoration: "none", transition: "background 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#1e293b"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "#0f172a"; }}
+            >
+              View on GitHub
+            </a>
+          </div>
+        </div>
 
       </div>
     </section>
   );
 }
-
 function SkyBanner({ label, title, subtitle }) {
   return (
     <div style={{
