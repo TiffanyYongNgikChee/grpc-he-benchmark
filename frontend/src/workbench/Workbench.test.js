@@ -247,7 +247,7 @@ describe("ParameterComparison", () => {
     // Click security tab
     fireEvent.click(screen.getByText("Security Level"));
     // Security-specific data should appear (OOM notes only in security tab)
-    expect(screen.getByText(/OOM/)).toBeInTheDocument();
+    expect(screen.getAllByText(/OOM/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("192-bit").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("256-bit").length).toBeGreaterThanOrEqual(1);
   });

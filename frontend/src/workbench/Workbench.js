@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useInView } from "framer-motion";
 import CnnPipeline, { LAYERS } from "./CnnPipeline";
 import MiniCanvas from "./MiniCanvas";
 import OutputPanel from "./OutputPanel";
@@ -958,182 +958,8 @@ export default function Workbench() {
         </a>
       </div>
 
-      {/* ═══════════ INFO SECTION ═══════════ */}
-      <section id="info" className="px-4 md:px-8 py-12" style={{ background: "#fff" }}>
-        <div className="max-w-3xl mx-auto space-y-12 text-[15px] leading-relaxed" style={{ color: "#555" }}>
-
-          {/* ── What This System Does ── */}
-          <div>
-            <h2 className="text-xl font-medium mb-3" style={{ color: "#333" }}>
-              What Does This System Do?
-            </h2>
-            <p className="mb-3">
-              This is an <b>Encrypted Machine Learning Benchmark Framework</b> — a Final Year
-              Project that demonstrates and benchmarks <b>machine learning inference on
-              fully encrypted data</b>. It has two main capabilities:
-            </p>
-            <div className="space-y-3 ml-1">
-              <div className="flex gap-3">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: "#0db7c4" }}>1</span>
-                <p>
-                  <b style={{ color: "#333" }}>Encrypted Digit Recognition</b> — You draw a handwritten
-                  digit (0–9) on the canvas. The system encrypts your pixel data, runs a full
-                  convolutional neural network (CNN) <em>entirely on the encrypted data</em>, then
-                  decrypts only the final result. The server <b>never sees your raw input</b>.
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: "#3b82f6" }}>2</span>
-                <p>
-                  <b style={{ color: "#333" }}>Library Benchmarking</b> — The system compares three
-                  leading homomorphic encryption libraries —{" "}
-                  <b style={{ color: "#0db7c4" }}>OpenFHE</b>,{" "}
-                  <b style={{ color: "#3b82f6" }}>Microsoft SEAL</b>, and{" "}
-                  <b style={{ color: "#8b5cf6" }}>HElib</b> — on identical cryptographic operations
-                  (key generation, encryption, addition, multiplication, decryption), so you
-                  can see which library is fastest for each task.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* ── What Is Homomorphic Encryption? ── */}
-          <div>
-            <h2 className="text-xl font-medium mb-3" style={{ color: "#333" }}>
-              What Is Homomorphic Encryption?
-            </h2>
-            <p className="mb-3">
-              <b>Homomorphic Encryption (HE)</b> is a form of encryption that allows you to
-              perform computations on encrypted data (called <b>ciphertext</b>) without
-              decrypting it first. The result, when decrypted, is the same as if you had
-              performed the computation on the original unencrypted data (called{" "}
-              <b>plaintext</b>).
-            </p>
-            <p className="mb-3">
-              In simple terms: the server can do maths on your data <b>without ever seeing
-              it</b>. This is extremely useful for privacy-sensitive applications like
-              medical records, financial data, or biometric analysis.
-            </p>
-            <p className="mb-3">
-              This project uses the <b>BFV (Brakerski/Fan–Vercauteren) scheme</b>, which
-              supports addition and multiplication on encrypted integers. These two
-              operations are enough to build a full neural network — convolutions, pooling,
-              and fully-connected layers are all just combinations of additions and
-              multiplications.
-            </p>
-            <div className="rounded-lg p-4 text-sm" style={{ background: "#f8f8f8", border: "1px solid #e5e5e5" }}>
-              <p className="font-medium mb-2" style={{ color: "#333" }}>The three HE libraries compared:</p>
-              <ul className="space-y-1.5 ml-1">
-                <li className="flex gap-2">
-                  <span className="inline-block w-2.5 h-2.5 rounded-sm mt-1.5 flex-shrink-0" style={{ background: "#0db7c4" }} />
-                  <span><b style={{ color: "#0db7c4" }}>OpenFHE</b> — A modern, open-source library supporting BFV, CKKS, and TFHE schemes. Developed by Duality Technologies and a broad academic consortium.</span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="inline-block w-2.5 h-2.5 rounded-sm mt-1.5 flex-shrink-0" style={{ background: "#3b82f6" }} />
-                  <span><b style={{ color: "#3b82f6" }}>Microsoft SEAL</b> — Microsoft Research's widely used HE library supporting BFV and CKKS schemes.</span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="inline-block w-2.5 h-2.5 rounded-sm mt-1.5 flex-shrink-0" style={{ background: "#8b5cf6" }} />
-                  <span><b style={{ color: "#8b5cf6" }}>HElib</b> — IBM's pioneering HE library, primarily supporting the BGV scheme.</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          {/* ── CNN Layer Glossary ── */}
-          <div>
-            <h2 className="text-xl font-medium mb-4" style={{ color: "#333" }}>
-              CNN Layer Glossary
-            </h2>
-            <p className="mb-4">
-              Each bubble in the network visualisation above represents a layer. Here is
-              what each one does:
-            </p>
-            <div className="space-y-4">
-              {[
-                {
-                  term: "Input",
-                  color: "#0aa35e",
-                  desc: "The raw 28×28 grayscale image (784 pixel values, 0 = black, 255 = white). This is the handwritten digit you drew on the canvas.",
-                },
-                {
-                  term: "Encrypt",
-                  color: "#0db7c4",
-                  desc: "Encodes and encrypts the 784 pixel values into BFV ciphertext using the OpenFHE library. After this step, the server can no longer see the raw pixel values — all subsequent computation happens on encrypted data.",
-                },
-                {
-                  term: "Convolution (Conv1, Conv2)",
-                  color: "#7b3ff2",
-                  desc: "A convolution slides a small filter (5×5 kernel) across the image and computes a weighted sum at each position. This detects local features like edges, curves, and corners. Conv1 reduces 28×28 → 24×24, and Conv2 reduces 12×12 → 8×8. In encrypted mode, each multiply-and-add is done on ciphertext.",
-                },
-                {
-                  term: "Bias (Bias1, Bias2, BiasFc)",
-                  color: "#7b3ff2",
-                  desc: "A bias is a fixed value added to each output of the previous layer. It shifts the activation, allowing the network to learn patterns that don't pass through zero. In encrypted mode, this is a simple ciphertext addition.",
-                },
-                {
-                  term: "Activation — x² (Square)",
-                  color: "#e68a00",
-                  desc: "An activation function introduces non-linearity so the network can learn complex patterns. Standard CNNs use ReLU (max(0, x)), but ReLU requires a comparison operation, which is impossible in HE. Instead, we use x² (squaring), which is a simple ciphertext multiplication and works natively in BFV.",
-                },
-                {
-                  term: "Average Pooling (Pool1, Pool2)",
-                  color: "#e68a00",
-                  desc: "Pooling reduces the spatial dimensions by averaging groups of pixels. A 2×2 average pool takes each 2×2 block and replaces it with the mean of the four values, halving the width and height. This is just addition and division (scaling), which HE supports natively.",
-                },
-                {
-                  term: "Fully Connected (FC)",
-                  color: "#e03e52",
-                  desc: "The fully-connected layer takes all remaining values (16, after the second pooling) and multiplies them by a weight matrix to produce 10 output values — one for each digit class (0–9). This is a standard matrix multiplication, done entirely on encrypted data.",
-                },
-                {
-                  term: "Decrypt",
-                  color: "#0db7c4",
-                  desc: "Decrypts the 10 encrypted output values (logits) back to plaintext using the secret key. This is the only point where the data becomes readable again.",
-                },
-                {
-                  term: "Output (Argmax)",
-                  color: "#0aa35e",
-                  desc: "Takes the 10 decrypted logit values and picks the index with the highest value — that index is the predicted digit. For example, if logit[7] is the largest, the prediction is \"7\".",
-                },
-              ].map(({ term, color, desc }) => (
-                <div key={term} className="flex gap-3">
-                  <span
-                    className="flex-shrink-0 w-3 h-3 rounded-full mt-1.5"
-                    style={{ background: color }}
-                  />
-                  <div>
-                    <p className="font-medium text-sm" style={{ color: "#333" }}>{term}</p>
-                    <p className="text-sm" style={{ color: "#666" }}>{desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* ── Can I Repurpose It? ── */}
-          <div>
-            <h2 className="text-xl font-medium mb-3" style={{ color: "#333" }}>
-              Can I Repurpose This?
-            </h2>
-            <p>
-              Absolutely. This is an open-source Final Year Project — an{" "}
-              <b>Encrypted Machine Learning Benchmark Framework</b> comparing three HE
-              libraries on standardised workloads. The entire system (Rust gRPC server,
-              Spring Boot API, React frontend) is available on{" "}
-              <a
-                href="https://github.com/TiffanyYongNgikChee/Encrypted-Machine-Learning-Benchmark-Framework"
-                target="_blank"
-                rel="noreferrer"
-                className="underline"
-                style={{ color: "#f4743a" }}
-              >
-                GitHub
-              </a>.
-            </p>
-          </div>
-        </div>
-      </section>
+      {/* ═══════════ INFO SECTION — PIXEL GUIDEBOOK ═══════════ */}
+      <BookGuidebook />
 
       {/* ═══════════ FOOTER ═══════════ */}
       <footer className="text-center py-4 text-xs" style={{ color: "#999", background: "#f7f7f7", borderTop: "1px solid #e5e5e5" }}>
@@ -1392,6 +1218,259 @@ function ModalLogBody({ run }) {
  * SkyBanner — Stardew Valley–style sky-blue section divider.
  * Golden pixel-art title with chunky dark drop shadow, soft clouds.
  */
+
+/* ─── BookPageAnim ─────────────────────────────────────────────────────────── */
+function BookPageAnim({ children, direction = "left" }) {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-80px" });
+  return (
+    <motion.div
+      ref={ref}
+      style={{ perspective: 1200, transformStyle: "preserve-3d" }}
+      initial={{ opacity: 0, rotateY: direction === "left" ? -12 : 12, y: 40 }}
+      animate={isInView ? { opacity: 1, rotateY: 0, y: 0 } : {}}
+      transition={{ type: "spring", stiffness: 60, damping: 18, mass: 1.2 }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/* ─── BookGuidebook ─────────────────────────────────────────────────────────── */
+function BookGuidebook() {
+  return (
+    <section id="info" style={{ background: "#e8d5a3", borderTop: "4px solid #b8902a" }}>
+      {/* ── Sky-blue About banner ── */}
+      <div style={{
+        background: "linear-gradient(180deg, #5bb8f5 0%, #82cef7 30%, #b8e4ff 70%, #d6f0ff 100%)",
+        borderTop: "4px solid #3a8abf",
+        borderBottom: "4px solid #2a6a9f",
+        padding: "52px 24px 44px",
+        textAlign: "center",
+        position: "relative",
+        overflow: "hidden",
+      }}>
+        {[
+          { top: "18%", left: "6%", w: 90, h: 28, op: 0.55 },
+          { top: "38%", left: "22%", w: 60, h: 20, op: 0.4 },
+          { top: "12%", right: "8%", w: 110, h: 32, op: 0.5 },
+          { top: "50%", right: "18%", w: 70, h: 22, op: 0.38 },
+        ].map((c, i) => (
+          <div key={i} style={{
+            position: "absolute", top: c.top, left: c.left, right: c.right,
+            width: c.w, height: c.h, background: "rgba(255,255,255,0.9)",
+            borderRadius: 999, opacity: c.op,
+          }} />
+        ))}
+        <div style={{ position: "relative", zIndex: 2 }}>
+          <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: "clamp(0.55rem,1.4vw,0.75rem)", letterSpacing: "0.25em", textTransform: "uppercase", color: "#1a4a6e", marginBottom: 14, opacity: 0.75 }}>
+            About This Project
+          </div>
+          <h2 style={{ fontFamily: "'Press Start 2P', monospace", fontSize: "clamp(1.1rem,3.5vw,2rem)", color: "#1a2e1a", textShadow: "3px 3px 0 #b8d4f0, 5px 5px 0 #8ab8e0", lineHeight: 1.4, marginBottom: 16 }}>
+            The Guidebook
+          </h2>
+          <p style={{ fontFamily: "system-ui, sans-serif", fontSize: "clamp(0.85rem,1.8vw,1.05rem)", color: "#1a3a5e", maxWidth: 560, margin: "0 auto", opacity: 0.85 }}>
+            Everything you need to understand this demo — the hook, the how, and the honest limitations.
+          </p>
+        </div>
+      </div>
+
+      {/* ── Book wrapper ── */}
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 24px 64px" }}>
+        <style>{`
+          .book-spread { display:grid; grid-template-columns:1fr 1fr; gap:0; background:#f5e6c0; border:4px solid #8b6914; box-shadow:8px 8px 0 #5a4208,12px 12px 0 rgba(0,0,0,0.25); margin-bottom:36px; position:relative; }
+          .book-spread::after { content:''; position:absolute; top:0; bottom:0; left:50%; width:6px; margin-left:-3px; background:linear-gradient(90deg,#8b6914 0%,#c8a84b 40%,#a07820 60%,#5a4208 100%); box-shadow:0 0 12px rgba(0,0,0,0.3); z-index:10; }
+          .book-page { padding:40px 44px; background:#fdf6e3; position:relative; overflow:hidden; }
+          .book-page-right { background:#faf0d0; }
+          .book-page::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,#d4a830 0%,#f0c84a 50%,#d4a830 100%); }
+          .book-page-right::before { background:linear-gradient(90deg,#c8a030 0%,#e8c040 50%,#c8a030 100%); }
+          .pixel-chapter { font-family:'Press Start 2P',monospace; font-size:0.55rem; letter-spacing:0.2em; text-transform:uppercase; color:#8b6914; margin-bottom:10px; }
+          .pixel-heading { font-family:'Georgia',serif; font-size:1.6rem; color:#3a2008; margin-bottom:18px; line-height:1.3; font-style:italic; }
+          .book-body { font-family:'Georgia','Times New Roman',serif; font-size:0.9rem; line-height:1.85; color:#3a2c10; }
+          .pixel-tag { display:inline-block; font-family:'Press Start 2P',monospace; font-size:0.48rem; padding:3px 8px; border:2px solid currentColor; box-shadow:2px 2px 0 rgba(0,0,0,0.2); letter-spacing:0.1em; vertical-align:middle; }
+          .book-single { background:#fdf6e3; border:4px solid #8b6914; box-shadow:8px 8px 0 #5a4208,12px 12px 0 rgba(0,0,0,0.25); padding:40px 52px; margin-bottom:36px; position:relative; overflow:hidden; }
+          .book-single::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,#d4a830 0%,#f0c84a 50%,#d4a830 100%); }
+          .pipeline-arrow { font-family:'Press Start 2P',monospace; font-size:0.6rem; color:#8b6914; padding:0 6px; flex-shrink:0; }
+          .glossary-card { background:#fff8e8; border:2px solid #c8a030; box-shadow:3px 3px 0 #8b6914; padding:14px 16px; cursor:pointer; transition:transform 0.15s,box-shadow 0.15s; position:relative; }
+          .glossary-card:hover { transform:translate(-2px,-2px); box-shadow:5px 5px 0 #8b6914; }
+          .findings-callout { background:#fffbe6; border:3px solid #d4a830; box-shadow:5px 5px 0 #8b6914; padding:22px 28px; position:relative; }
+          @media (max-width:680px) { .book-spread { grid-template-columns:1fr; } .book-spread::after { display:none; } .book-page { padding:28px 22px; } }
+        `}</style>
+
+        {/* Pages 1-2 */}
+        <BookPageAnim direction="left">
+          <div className="book-spread">
+            <div className="book-page">
+              <div className="pixel-chapter">Chapter I</div>
+              <div className="pixel-heading">The Wonders of Private AI</div>
+              <div className="book-body">
+                <p style={{ marginBottom: 16 }}><strong>What if an AI could recognise your handwriting without ever seeing it?</strong></p>
+                <p style={{ marginBottom: 16 }}>Every time you use a cloud AI service — from face recognition to medical diagnosis — your raw data travels to a server that can read it. Homomorphic Encryption flips this entirely: the server runs the AI <em>inside the lock</em>, returning only the answer.</p>
+                <p style={{ marginBottom: 20 }}>This demo makes that real. You draw a digit. We encrypt it. A neural network runs on the ciphertext. You get a prediction. The server never saw your pixels.</p>
+                <div style={{ background:"#f0e4b8", border:"2px solid #c8a030", boxShadow:"3px 3px 0 #8b6914", padding:"14px 18px", marginBottom:20, fontStyle:"italic", fontSize:"0.88rem", color:"#5a3a08" }}>
+                  "Computation on data you cannot read — this is the promise of Fully Homomorphic Encryption."
+                </div>
+                <p style={{ fontSize:"0.82rem", color:"#6a5020" }}>Three libraries are pitted against each other — OpenFHE, Microsoft SEAL, and IBM HElib — on the exact same CNN task. Who is fastest? Who uses the least memory? Read on.</p>
+              </div>
+              <div style={{ position:"absolute", bottom:16, left:44, fontFamily:"'Press Start 2P',monospace", fontSize:"0.45rem", color:"#c8a030" }}>1</div>
+            </div>
+            <div className="book-page book-page-right">
+              <div className="pixel-chapter">Chapter II</div>
+              <div className="pixel-heading">What You Can Do Here</div>
+              <div className="book-body">
+                {[
+                  { title:"Draw & Predict", desc:"Sketch a digit (0–9) on the canvas. Watch it encrypt and feed through a live CNN — all on the server, all encrypted." },
+                  { title:"Compare Libraries", desc:"Run OpenFHE, SEAL, and HElib on the same 5 cryptographic operations and see timing results side by side." },
+                  { title:"Explore Parameters", desc:"See what happens when you change polynomial degree, security level, or scale factor — and why some combinations break." },
+                  { title:"Read the Findings", desc:"Browse real benchmark data from 10–100 MNIST images across 3 activation degrees and 3 security levels." },
+                ].map(({ title, desc }) => (
+                  <div key={title} style={{ display:"flex", gap:14, marginBottom:18, paddingBottom:18, borderBottom:"1px dashed #c8a030" }}>
+                    <div>
+                      <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"0.52rem", color:"#6b4a10", marginBottom:5, letterSpacing:"0.08em" }}>{title}</div>
+                      <div style={{ fontSize:"0.86rem", color:"#4a3010", lineHeight:1.7 }}>{desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ position:"absolute", bottom:16, right:44, fontFamily:"'Press Start 2P',monospace", fontSize:"0.45rem", color:"#c8a030" }}>2</div>
+            </div>
+          </div>
+        </BookPageAnim>
+
+        {/* Page 3 */}
+        <BookPageAnim direction="right">
+          <div className="book-single">
+            <div className="pixel-chapter">Chapter III</div>
+            <div className="pixel-heading" style={{ textAlign:"center" }}>How It Works — The Pipeline</div>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"center", flexWrap:"wrap", gap:8, margin:"28px 0" }}>
+              {[
+                { label:"Draw", sub:"28×28 pixels", color:"#0aa35e" },
+                { label:"Encrypt", sub:"BFV ciphertext", color:"#0db7c4" },
+                { label:"Conv1", sub:"5×5 kernel", color:"#7b3ff2" },
+                { label:"Activate", sub:"x² (no ReLU)", color:"#e68a00" },
+                { label:"Pool", sub:"avg 2×2", color:"#f4b942" },
+                { label:"Conv2", sub:"5×5 kernel", color:"#9b6dff" },
+                { label:"Activate x2", sub:"x² again", color:"#ff9f43" },
+                { label:"FC Layer", sub:"10 logits", color:"#e03e52" },
+                { label:"Decrypt", sub:"secret key", color:"#0db7c4" },
+                { label:"Result", sub:"predicted digit", color:"#0aa35e" },
+              ].map(({ label, sub, color }, i, arr) => (
+                <div key={label} style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <div style={{ background:"#fff8e8", border:`3px solid ${color}`, boxShadow:`3px 3px 0 ${color}66`, padding:"10px 14px", textAlign:"center", minWidth:72 }}>
+                    <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"0.48rem", color, letterSpacing:"0.06em" }}>{label}</div>
+                    <div style={{ fontFamily:"system-ui", fontSize:"0.65rem", color:"#8b6020", marginTop:3 }}>{sub}</div>
+                  </div>
+                  {i < arr.length - 1 && <div className="pipeline-arrow">▶</div>}
+                </div>
+              ))}
+            </div>
+            <div style={{ fontFamily:"Georgia,serif", fontSize:"0.88rem", color:"#5a3a08", textAlign:"center", lineHeight:1.7, maxWidth:700, margin:"0 auto" }}>
+              Every step from Encrypt to Decrypt runs on the server — but on <strong>locked data</strong>. The secret key never leaves your session. Conv and FC layers account for &gt;90% of inference time; the activation function is just one ciphertext multiply.
+            </div>
+            <div style={{ position:"absolute", bottom:16, left:"50%", transform:"translateX(-50%)", fontFamily:"'Press Start 2P',monospace", fontSize:"0.45rem", color:"#c8a030" }}>3</div>
+          </div>
+        </BookPageAnim>
+
+        {/* Pages 4-5 */}
+        <BookPageAnim direction="left">
+          <div className="book-spread">
+            <div className="book-page">
+              <div className="pixel-chapter">Chapter IV</div>
+              <div className="pixel-heading">Parameter Glossary</div>
+              <div className="book-body" style={{ fontSize:"0.85rem" }}>
+                <p style={{ marginBottom:18, color:"#6a5020" }}>Hover each card to see why it matters — no lecture required.</p>
+                {[
+                  { term:"Polynomial Degree", symbol:"x² / x³ / x⁴", color:"#7b3ff2", tip:"Replaces ReLU in FHE. Degree 2 (x²) is the only one that preserves accuracy end-to-end — higher degrees overflow the plaintext modulus.", verdict:"Use x²" },
+                  { term:"Security Level", symbol:"128 / 192 / 256-bit", color:"#0db7c4", tip:"Sets the hardness of the encryption. 128-bit works on a single r6i.large. 192-bit requires >7.6 GB RAM — it OOM'd on every attempt.", verdict:"Use 128-bit" },
+                  { term:"Ring Dimension n", symbol:"n = 4096", color:"#e68a00", tip:"The size of the polynomial ring. Larger n = more security + more memory. n=4096 is the minimum for 128-bit BFV with these parameters.", verdict:"Fixed at 4096" },
+                ].map(({ term, symbol, color, tip, verdict }) => (
+                  <div key={term} className="glossary-card" style={{ marginBottom:14 }} title={tip}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
+                      <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"0.5rem", color, letterSpacing:"0.08em" }}>{term}</div>
+                      <span className="pixel-tag" style={{ color, borderColor:color }}>{symbol}</span>
+                    </div>
+                    <div style={{ fontSize:"0.8rem", color:"#5a3a08", lineHeight:1.6, marginBottom:8 }}>{tip}</div>
+                    <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"0.42rem", color:"#0aa35e" }}>{verdict}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ position:"absolute", bottom:16, left:44, fontFamily:"'Press Start 2P',monospace", fontSize:"0.45rem", color:"#c8a030" }}>4</div>
+            </div>
+            <div className="book-page book-page-right">
+              <div className="pixel-chapter">Chapter IV cont.</div>
+              <div className="pixel-heading">More Parameters</div>
+              <div className="book-body" style={{ fontSize:"0.85rem" }}>
+                {[
+                  { term:"Plaintext Modulus p", symbol:"100,073,473", color:"#e03e52", tip:"The 'ceiling' for intermediate values during computation. Too small and higher-degree activations overflow, corrupting the result silently.", verdict:"Baseline = safest" },
+                  { term:"Scale Factor S", symbol:"S = 1,000", color:"#0aa35e", tip:"Multiplies weights before encoding to preserve decimal precision. S=100 loses too much precision; S=10,000 risks overflow. S=1,000 is the sweet spot.", verdict:"S = 1,000" },
+                  { term:"Multiplication Depth", symbol:"depth = 6", color:"#f4b942", tip:"The number of sequential ciphertext multiplications the scheme can handle before noise overwhelms the signal. Our CNN uses depth 6 (conv × act × conv × act × fc × spare).", verdict:"Fixed at 6" },
+                  { term:"Noise Budget", symbol:"BFV noise", color:"#9b6dff", tip:"BFV tracks a 'noise budget' that decreases with each operation. When it hits zero, decryption fails. Larger n and p give more budget — at the cost of memory.", verdict:"Managed by library" },
+                ].map(({ term, symbol, color, tip, verdict }) => (
+                  <div key={term} className="glossary-card" style={{ marginBottom:14 }} title={tip}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
+                      <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"0.5rem", color, letterSpacing:"0.08em" }}>{term}</div>
+                      <span className="pixel-tag" style={{ color, borderColor:color }}>{symbol}</span>
+                    </div>
+                    <div style={{ fontSize:"0.8rem", color:"#5a3a08", lineHeight:1.6, marginBottom:8 }}>{tip}</div>
+                    <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"0.42rem", color:"#0aa35e" }}>{verdict}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ position:"absolute", bottom:16, right:44, fontFamily:"'Press Start 2P',monospace", fontSize:"0.45rem", color:"#c8a030" }}>5</div>
+            </div>
+          </div>
+        </BookPageAnim>
+
+        {/* Page 6 */}
+        <BookPageAnim direction="right">
+          <div className="book-single">
+            <div className="pixel-chapter">Chapter V</div>
+            <div className="pixel-heading" style={{ textAlign:"center" }}>Experiment Findings</div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:20, marginBottom:32 }}>
+              {[
+                { label:"What Worked", color:"#0aa35e", items:["x² (degree 2) — >80% FHE accuracy","128-bit security on r6i.large","Full gRPC inference pipeline","Scale=1000, p=100,073,473"] },
+                { label:"What Failed", color:"#e03e52", items:["x³ — modular overflow → accuracy collapse","192-bit security → OOM (>7.6 GB)","256-bit → never attempted","x⁴ 100-image run → budget ran out"] },
+                { label:"Design Decisions", color:"#7b3ff2", items:["Fixed activation to x²","Fixed security to 128-bit","Single-node r6i.large deployment","Future: 4-node EC2 for 192-bit"] },
+              ].map(({ label, color, items }) => (
+                <div key={label} style={{ background:"#fff8e8", border:`3px solid ${color}`, boxShadow:`4px 4px 0 ${color}55`, padding:"18px 20px" }}>
+                  <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"0.5rem", color, letterSpacing:"0.08em", marginBottom:12 }}>{label}</div>
+                  <ul style={{ margin:0, padding:0, listStyle:"none" }}>
+                    {items.map((item) => (
+                      <li key={item} style={{ fontFamily:"Georgia,serif", fontSize:"0.8rem", color:"#4a3010", lineHeight:1.7, paddingLeft:14, position:"relative" }}>
+                        <span style={{ position:"absolute", left:0, color }}>›</span>{item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            <div className="findings-callout">
+              <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"0.55rem", color:"#8b6914", marginBottom:12, letterSpacing:"0.1em" }}>Known Limitations</div>
+              <div style={{ fontFamily:"Georgia,serif", fontSize:"0.88rem", color:"#5a3a08", lineHeight:1.8 }}>
+                <strong>x⁴ data is incomplete</strong> — the 100-image run was stopped due to EC2 budget constraints. Do not draw accuracy conclusions from degree-4 results.
+                The <strong>192-bit and 256-bit OOM failures</strong> are intentional findings, not bugs — they prove the feasibility ceiling of single-node commodity hardware for BFV at n = 4096.
+                All results run on a single <strong>r6i.large (16 GB RAM)</strong> on AWS.
+              </div>
+            </div>
+            <div style={{ marginTop:28, textAlign:"center" }}>
+              <div style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"0.52rem", color:"#8b6914", marginBottom:10, letterSpacing:"0.1em" }}>Open Source · Final Year Project 2025–2026</div>
+              <a
+                href="https://github.com/TiffanyYongNgikChee/Encrypted-Machine-Learning-Benchmark-Framework"
+                target="_blank" rel="noreferrer"
+                style={{ fontFamily:"'Press Start 2P',monospace", fontSize:"0.52rem", color:"#fff", background:"#3a2008", border:"3px solid #8b6914", boxShadow:"4px 4px 0 #5a4208", padding:"10px 20px", display:"inline-block", textDecoration:"none", letterSpacing:"0.1em", transition:"transform 0.1s,box-shadow 0.1s" }}
+                onMouseEnter={e => { e.currentTarget.style.transform="translate(-2px,-2px)"; e.currentTarget.style.boxShadow="6px 6px 0 #5a4208"; }}
+                onMouseLeave={e => { e.currentTarget.style.transform=""; e.currentTarget.style.boxShadow="4px 4px 0 #5a4208"; }}
+              >View on GitHub</a>
+            </div>
+            <div style={{ position:"absolute", bottom:16, left:"50%", transform:"translateX(-50%)", fontFamily:"'Press Start 2P',monospace", fontSize:"0.45rem", color:"#c8a030" }}>6</div>
+          </div>
+        </BookPageAnim>
+
+      </div>
+    </section>
+  );
+}
+
 function SkyBanner({ label, title, subtitle }) {
   return (
     <div style={{
