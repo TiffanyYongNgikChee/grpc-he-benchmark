@@ -832,72 +832,258 @@ export default function Workbench() {
         title="Benchmark Results & Parameter Exploration"
         subtitle="What the experiments found — and what each failure revealed."
       />
-      <div id="results" className="px-4 md:px-8 py-8" style={{ background: "#f7f7f7", borderTop: "1px solid #e5e5e5" }}>
+      <div id="results" style={{ borderTop: "1px solid #d6cdb8", position: "relative", overflow: "hidden" }}>
+        {/* ═══ PIXEL-ART SCENE BACKGROUND ═══ */}
+        <div style={{
+          position: "absolute", inset: 0,
+          background: "linear-gradient(180deg, #a8d8f0 0%, #c8eafc 45%, #d6f0a8 45%, #6db84a 60%, #4a9632 100%)",
+          zIndex: 0,
+        }}>
+          {/* ── pixel clouds (CSS box-shadow mosaic) ── */}
+          <style>{`
+            @import url('https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Caveat:wght@400;700&display=swap');
+            .px-cloud { position:absolute; width:8px; height:8px; background:transparent; }
+            /* cloud 1 — top-left area */
+            .px-cloud-1 { top:28px; left:7%; box-shadow:
+              8px 0 0 #fff, 16px 0 0 #fff, 24px 0 0 #fff,
+              0 8px 0 #fff, 8px 8px 0 #fff, 16px 8px 0 #fff, 24px 8px 0 #fff, 32px 8px 0 #fff,
+              -8px 8px 0 #fff, 8px 16px 0 #fff, 16px 16px 0 #fff, 24px 16px 0 #fff;
+            }
+            /* cloud 2 — top-right area */
+            .px-cloud-2 { top:18px; right:12%; box-shadow:
+              8px 0 0 #fff, 16px 0 0 #fff,
+              0 8px 0 #fff, 8px 8px 0 #fff, 16px 8px 0 #fff, 24px 8px 0 #fff,
+              8px 16px 0 #fff, 16px 16px 0 #fff;
+            }
+            /* cloud 3 — mid-right */
+            .px-cloud-3 { top:60px; right:28%; box-shadow:
+              8px 0 0 #e8f8ff, 16px 0 0 #e8f8ff,
+              0 8px 0 #e8f8ff, 8px 8px 0 #e8f8ff, 16px 8px 0 #e8f8ff, 24px 8px 0 #e8f8ff,
+              8px 16px 0 #e8f8ff, 16px 16px 0 #e8f8ff;
+            }
+            /* ── pixel cottage ── */
+            .px-cottage { position:absolute; bottom:20px; right:6%; width:8px; height:8px; background:transparent; }
+            .px-cottage { box-shadow:
+              /* chimney */
+              16px -32px 0 #7a5a3a, 24px -32px 0 #7a5a3a,
+              16px -24px 0 #6a4a2a, 24px -24px 0 #6a4a2a,
+              /* smoke */
+              8px -48px 0 #cccccc88, 16px -56px 0 #cccccc66,
+              /* roof row 3 (peak) */
+              24px -16px 0 #c04040,
+              /* roof row 2 */
+              16px -8px 0 #c04040, 24px -8px 0 #c04040, 32px -8px 0 #c04040,
+              /* roof row 1 (base) */
+              8px 0 0 #c04040, 16px 0 0 #c04040, 24px 0 0 #c04040, 32px 0 0 #c04040, 40px 0 0 #c04040,
+              /* wall row 1 */
+              8px 8px 0 #e8d0a0, 16px 8px 0 #e8d0a0, 24px 8px 0 #e8d0a0, 32px 8px 0 #e8d0a0, 40px 8px 0 #e8d0a0,
+              /* wall row 2 — window left */
+              8px 16px 0 #e8d0a0, 16px 16px 0 #88aacc, 24px 16px 0 #e8d0a0, 32px 16px 0 #88aacc, 40px 16px 0 #e8d0a0,
+              /* wall row 3 — door */
+              8px 24px 0 #e8d0a0, 16px 24px 0 #e8d0a0, 24px 24px 0 #8b5e3c, 32px 24px 0 #e8d0a0, 40px 24px 0 #e8d0a0,
+              /* wall row 4 — door cont. */
+              8px 32px 0 #e8d0a0, 16px 32px 0 #e8d0a0, 24px 32px 0 #8b5e3c, 32px 32px 0 #e8d0a0, 40px 32px 0 #e8d0a0,
+              /* ground shadow */
+              8px 40px 0 #5a8a30, 16px 40px 0 #5a8a30, 24px 40px 0 #5a8a30, 32px 40px 0 #5a8a30, 40px 40px 0 #5a8a30;
+            }
+            /* ── pixel grass tufts ── */
+            .px-grass { position:absolute; bottom:0; left:0; right:0; height:28px; }
+            .px-tuft { position:absolute; bottom:0; width:8px; height:8px; background:transparent; }
+          `}</style>
+          <div className="px-cloud px-cloud-1" />
+          <div className="px-cloud px-cloud-2" />
+          <div className="px-cloud px-cloud-3" />
+          <div className="px-cottage" style={{ transform: "scale(1.6)", transformOrigin: "bottom right" }} />
+          {/* grass tufts strip */}
+          <div className="px-grass">
+            {[0,4,8,12,16,20,24,28,33,38,42,47,52,57,62,67,72,77,82,87,92].map(pct => (
+              <div key={pct} style={{
+                position:"absolute", bottom:0, left:`${pct}%`,
+                width:8, height:8, background:"transparent",
+                boxShadow: "0 0 0 8px #4a9632, 0 -8px 0 8px #5ab840, -8px -8px 0 8px #4a9632, 8px -8px 0 8px #5ab840",
+              }} />
+            ))}
+          </div>
+        </div>
+
+        {/* ── actual content sits above the scene ── */}
+        <div className="px-4 md:px-8 py-10" style={{ position:"relative", zIndex:1 }}>
         <div className="max-w-[1100px] mx-auto flex justify-center">
-          {/* ── Stardew-style secret note ── */}
+          {/* ── Stardew-style field notebook ── */}
           <div style={{
             position: "relative",
-            maxWidth: 620,
+            maxWidth: 780,
             width: "100%",
             background: "#fdf8e1",
-            borderRadius: 4,
-            padding: "52px 44px 44px 72px",
-            boxShadow: "2px 4px 18px rgba(0,0,0,0.18), inset 0 0 0 1px rgba(0,0,0,0.06)",
-            /* lined-paper effect via repeating-linear-gradient */
+            borderRadius: 3,
+            padding: "60px 52px 52px 88px",
+            boxShadow: "3px 5px 24px rgba(0,0,0,0.22), inset 0 0 0 1px rgba(0,0,0,0.05)",
             backgroundImage: [
-              "repeating-linear-gradient(transparent, transparent 31px, #c9bfa0 31px, #c9bfa0 32px)",
-              "linear-gradient(#fdf8e1, #fdf8e1)",
+              "repeating-linear-gradient(transparent, transparent 31px, #d4c9aa 31px, #d4c9aa 32px)",
+              "linear-gradient(#fdf8e1, #faf3d0)",
             ].join(", "),
             backgroundSize: "100% 32px, 100% 100%",
-            backgroundPositionY: "20px, 0",
-            /* red margin line */
-            borderLeft: "4px solid #e07070",
-            fontFamily: "'Caveat', 'Patrick Hand', 'Comic Sans MS', cursive",
+            backgroundPositionY: "28px, 0",
+            borderLeft: "5px solid #c94a4a",
           }}>
-            {/* Load Google font inline */}
-            <style>{`@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&display=swap');`}</style>
+            {/* fonts */}
+            <style>{`@import url('https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Caveat:wght@400;700&display=swap');`}</style>
 
-            {/* torn-tape flourish at top */}
+            {/* scotch-tape strip at top */}
             <div style={{
-              position: "absolute", top: -8, left: "50%", transform: "translateX(-50%)",
-              width: 80, height: 18,
-              background: "rgba(255,255,255,0.55)",
-              border: "1px solid rgba(0,0,0,0.12)",
+              position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)",
+              width: 90, height: 20,
+              background: "rgba(255,255,210,0.60)",
+              border: "1px solid rgba(180,160,80,0.30)",
               borderRadius: 2,
-              boxShadow: "0 1px 4px rgba(0,0,0,0.10)",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
             }} />
 
-            {/* header line */}
+            {/* notebook title */}
             <p style={{
-              fontFamily: "'Caveat', cursive",
-              fontWeight: 600,
-              fontSize: 18,
-              color: "#5a3e1b",
-              margin: "0 0 10px 0",
+              fontFamily: "'Patrick Hand', 'Caveat', cursive",
+              fontWeight: 700,
+              fontSize: 22,
+              color: "#4a2e0e",
+              margin: "0 0 6px 0",
               letterSpacing: "0.01em",
             }}>
-              It's the benchmark notes:
+              Parameter Exploration Notes
             </p>
-
             <p style={{
-              fontFamily: "'Caveat', cursive",
-              fontSize: 17,
-              color: "#3b2a10",
-              lineHeight: "32px",   /* matches the ruled lines */
-              margin: 0,
-              whiteSpace: "pre-line",
+              fontFamily: "Georgia, 'Times New Roman', serif",
+              fontSize: 13,
+              color: "#7a5a30",
+              margin: "0 0 28px 0",
+              fontStyle: "italic",
             }}>
-              {`The benchmark ran a LeNet-5 CNN on encrypted MNIST images using BFV, testing three polynomial activation degrees — x², x³, and x⁴ — on a single r6i.large instance (16 GB RAM).
-
-x² is the only fully validated config: over 80% accuracy, stable noise throughout.
-
-x³ runs but accuracy collapses — cubic activations push values past the plaintext modulus ceiling (100,073,473), causing silent wrap-around.
-
-x⁴ was cut after 10 images (EC2 budget). 0% accuracy is directional only, but fourth-power overflow at the first activation is conclusive.
-
-Higher security (192-bit, 256-bit) needs n ≥ 8192 — exhausts RAM during BFV key generation on this hardware.`}
+              BFV scheme · LeNet-5 CNN · MNIST encrypted inference · r6i.large (16 GB RAM)
             </p>
+
+            {/* ── Parameter entries ── */}
+            {[
+              {
+                tag: "Activation Degree",
+                color: "#7c3aed",
+                tried: "x², x³, x⁴",
+                what: "BFV cannot evaluate ReLU (it requires comparing an encrypted value to zero, which is impossible without decrypting). Instead, the activation is approximated by a low-degree polynomial. Higher degree = more expressive, but each extra power consumes one level of multiplicative depth and grows intermediate values fast.",
+                results: [
+                  { val: "x²", outcome: "✓ Works. 80 %+ accuracy on 100 MNIST images. Noise stays within budget through both Conv layers and the FC layer.", ok: true },
+                  { val: "x³", outcome: "✗ Runs but accuracy collapses. Cubic activations cube the scale-factor too — with S = 1,000 the intermediate values exceed the plaintext modulus (100,073,473), causing silent modular wrap-around that corrupts every prediction.", ok: false },
+                  { val: "x⁴", outcome: "✗ Stopped after 10 images (EC2 budget exhausted). 0% accuracy — fourth-power overflow destroys the signal at the very first activation layer.", ok: false },
+                ],
+              },
+              {
+                tag: "Security Level",
+                color: "#0891b2",
+                tried: "128-bit, 192-bit, 256-bit",
+                what: "The NIST security level determines how hard it is to break the encryption. Higher security forces a larger ring dimension n, which multiplies key size, ciphertext size, and RAM usage — roughly quadratically.",
+                results: [
+                  { val: "128-bit (n = 4096)", outcome: "✓ Works. Key generation takes ~2 s, full inference ~30 s per image on a 16 GB instance.", ok: true },
+                  { val: "192-bit (n = 8192)", outcome: "✗ OOM. Key generation allocates > 7.6 GB of ciphertext data plus a 15 GB swap file. Never completed in 60+ minutes — instance ran out of memory.", ok: false },
+                  { val: "256-bit (n = 16384)", outcome: "✗ Not attempted — 192-bit already failed. Would require ~4× more RAM than 192-bit.", ok: false },
+                ],
+              },
+              {
+                tag: "Scale Factor (S)",
+                color: "#16a34a",
+                tried: "S = 100, 1,000, 10,000",
+                what: "BFV works on integers only. The scale factor multiplies all floating-point weights before they are encoded, preserving decimal precision inside the integer ring. Too small → weights round to zero → the CNN loses precision. Too large → intermediate products overflow the plaintext modulus.",
+                results: [
+                  { val: "S = 100", outcome: "✗ Too little precision. Weights round severely; accuracy drops well below 50% even with x².", ok: false },
+                  { val: "S = 1,000", outcome: "✓ Sweet spot. Enough precision for LeNet-5 at 128-bit security with x² activations. Used in all valid benchmarks.", ok: true },
+                  { val: "S = 10,000", outcome: "✗ Overflow risk. Products of two x² activations × S² exceed the plaintext modulus, silently corrupting results.", ok: false },
+                ],
+              },
+              {
+                tag: "Plaintext Modulus (p)",
+                color: "#dc2626",
+                tried: "Several primes near 10⁸",
+                what: "The ceiling for all intermediate integer values. BFV arithmetic is modulo p — any value that exceeds p wraps around silently, giving a completely wrong result. The modulus must be large enough to hold the largest intermediate product, and it must be a prime satisfying p ≡ 1 (mod 2n) for the NTT to work.",
+                results: [
+                  { val: "p = 100,073,473", outcome: "✓ The baseline prime used in this project. Gives enough headroom for S = 1,000 with x² activations across both Conv layers and the FC layer.", ok: true },
+                  { val: "Smaller primes", outcome: "✗ Earlier experiments with smaller primes caused wrap-around in the FC layer even with x², producing nonsense logits.", ok: false },
+                ],
+              },
+            ].map((entry, ei) => (
+              <div key={ei} style={{ marginBottom: 32 }}>
+                {/* ── Section heading — on a ruled line ── */}
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  marginBottom: 8,
+                  lineHeight: "32px",
+                }}>
+                  <span style={{
+                    display: "inline-block",
+                    background: entry.color,
+                    color: "#fff",
+                    fontFamily: "Georgia, serif",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                    padding: "1px 9px",
+                    borderRadius: 3,
+                    textTransform: "uppercase",
+                    flexShrink: 0,
+                  }}>{entry.tag}</span>
+                  <span style={{
+                    fontFamily: "Georgia, serif",
+                    fontSize: 13,
+                    color: "#7a5a30",
+                    fontStyle: "italic",
+                  }}>tried: {entry.tried}</span>
+                </div>
+
+                {/* What this parameter does */}
+                <p style={{
+                  fontFamily: "Georgia, 'Times New Roman', serif",
+                  fontSize: 14,
+                  color: "#2d1f0a",
+                  lineHeight: "32px",
+                  margin: "0 0 8px 0",
+                }}>
+                  {entry.what}
+                </p>
+
+                {/* Results per value tried */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingLeft: 12 }}>
+                  {entry.results.map((r, ri) => (
+                    <div key={ri} style={{
+                      display: "flex", gap: 10, alignItems: "flex-start",
+                      lineHeight: "32px",
+                    }}>
+                      <span style={{
+                        fontFamily: "Georgia, serif",
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: r.ok ? "#15803d" : "#b91c1c",
+                        flexShrink: 0,
+                        minWidth: 110,
+                      }}>{r.val}</span>
+                      <span style={{
+                        fontFamily: "Georgia, 'Times New Roman', serif",
+                        fontSize: 13.5,
+                        color: "#3b2a10",
+                        lineHeight: 1.7,
+                        paddingTop: 6,
+                      }}>{r.outcome}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {/* closing sign-off */}
+            <p style={{
+              fontFamily: "'Patrick Hand', 'Caveat', cursive",
+              fontSize: 15,
+              color: "#7a5a30",
+              margin: "8px 0 0 0",
+              textAlign: "right",
+              fontStyle: "italic",
+            }}>— benchmark log, April 2026</p>
           </div>
+        </div>
         </div>
       </div>
 
