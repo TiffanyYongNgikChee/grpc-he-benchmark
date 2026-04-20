@@ -828,264 +828,30 @@ export default function Workbench() {
         </div>
       </div>
 
-      {/* ═══════════ BENCHMARK RESULTS DASHBOARD ═══════════ */}
+      {/* ═══════════ BENCHMARK & PARAMETER FINDINGS ═══════════ */}
       <SkyBanner
-        label="Deep Dive"
-        title="FHE CNN Benchmark Results"
-        subtitle="Encrypted CNN inference benchmarked across polynomial activation degrees. x² is the validated result. x³ and x⁴ show what breaks and why."
+        label="Findings"
+        title="Benchmark Results & Parameter Exploration"
+        subtitle="What the experiments found — and what each failure revealed."
       />
       <div id="results" className="px-4 md:px-8 py-8" style={{ background: "#f7f7f7", borderTop: "1px solid #e5e5e5" }}>
         <div className="max-w-[1100px] mx-auto">
-
-          {/* ── Context banner ── */}
-          <div className="rounded-lg p-4 mb-4" style={{ background: "#0f172a", border: "1px solid #1e293b" }}>
-            <p className="text-sm leading-relaxed" style={{ color: "#94a3b8", margin: 0 }}>
-              <span style={{ color: "#e2e8f0", fontWeight: 600 }}>How to read these results: </span>
-              These benchmarks show what happens when you push BFV encryption beyond its stable operating zone.
-              x² is the fully validated configuration — high accuracy, complete run, production-ready.
-              x³ and x⁴ are deliberate boundary-finding experiments: they reveal exactly where and why the scheme breaks down,
-              which is a concrete finding in itself. A 0% accuracy result with a known cause is not a failure — it is data.
+          <div className="rounded-lg p-5 mb-6 text-sm leading-relaxed" style={{ background: "#fff", border: "1px solid #e2e8f0", maxWidth: 780 }}>
+            <p style={{ color: "#334155", lineHeight: 1.85, margin: 0 }}>
+              The benchmark ran a LeNet-5 CNN on encrypted MNIST images using BFV, testing three polynomial activation
+              degrees — x², x³, and x⁴ — on a single r6i.large instance (16 GB RAM).
+              x² is the only fully validated configuration: it achieves over 80% accuracy with stable noise growth throughout the network.
+              x³ runs but accuracy collapses because cubic activations amplify intermediate values past the plaintext modulus ceiling
+              (100,073,473), causing silent modular wrap-around. x⁴ was stopped after 10 images due to EC2 budget constraints;
+              its 0% accuracy is directional only, though the underlying cause — fourth-power overflow destroying the signal at the
+              first activation — is conclusive. Higher security levels (192-bit, 256-bit) were not achievable on this hardware:
+              they require a ring dimension of n ≥ 8192, which exhausts available RAM during BFV key generation.
             </p>
           </div>
-
-          {/* ── Hardware note ── */}
-          <div className="rounded-lg p-4 mb-4 text-sm leading-relaxed" style={{ background: "#fffbeb", border: "1.5px solid #f59e0b" }}>
-            <p className="font-semibold mb-1" style={{ color: "#92400e" }}>Hardware note</p>
-            <p style={{ color: "#78350f", margin: 0 }}>
-              All runs required an <b>r6i.large instance (16 GB RAM)</b> — a t3.small runs out of memory during BFV key generation at n = 4096.
-              Due to EC2 budget constraints the full 100-image run could not be completed for every configuration.
-              x² and x³ results are from partial but valid runs. x⁴ data is <b>directional only — treat with caution</b>.
-            </p>
-          </div>
-
-          {/* ── What is this ── */}
-          <div className="rounded-lg p-4 mb-6 text-sm leading-relaxed" style={{ background: "#fff", border: "1px solid #e5e5e5" }}>
-            <p className="font-semibold mb-1" style={{ color: "#333" }}>Why polynomial degree matters</p>
-            <p style={{ color: "#555", margin: 0 }}>
-              Standard neural networks use ReLU (<code>max(0,x)</code>), which requires a comparison — impossible on ciphertext.
-              FHE forces us to replace it with a low-degree polynomial evaluated directly on encrypted values.
-              Degree 2 (x²) is the most stable: minimal noise growth, highest accuracy, fully validated.
-              Degree 3 amplifies intermediate values into the overflow zone of the plaintext modulus, corrupting activations.
-              Degree 4 makes this worse — the signal is destroyed before it even reaches the fully-connected layer.
-              The accuracy drop you see is not a model quality issue. It is BFV arithmetic hitting its ceiling.
-            </p>
-          </div>
-
           <div className="rounded-lg p-5" style={{ background: "#fafafa", border: "1px solid #e5e5e5" }}>
             <BenchmarkResultsDashboard />
           </div>
-        </div>
-      </div>
-
-      {/* ═══════════ PARAMETER COMPARISON ═══════════ */}
-      <SkyBanner
-        label="Findings"
-        title="Parameter Exploration & Limitations"
-        subtitle="A systematic search for the practical limits of BFV on commodity hardware. Every wall found was found on purpose."
-      />
-      <div className="px-4 md:px-8 py-8" style={{ background: "#fff", borderTop: "1px solid #e5e5e5" }}>
-        <div className="max-w-[1100px] mx-auto">
-
-          {/* ── Framing callout ── */}
-          <div className="rounded-lg p-4 mb-6 text-sm leading-relaxed" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-            <p className="font-semibold mb-1" style={{ color: "#0f172a" }}>What this section is</p>
-            <p style={{ color: "#475569", margin: 0 }}>
-              Rather than only running the configuration that works, this project deliberately tested combinations
-              known to be borderline or risky — higher polynomial degrees, stronger security levels, extreme scale factors.
-              The goal was to find the feasibility ceiling of single-node BFV deployment and document exactly where it sits.
-              The results below are that map.
-            </p>
-          </div>
-
-          {/* ── Feasibility map ── */}
-          <div className="mb-6">
-            <h3 className="text-sm font-semibold mb-1" style={{ color: "#0f172a" }}>Feasibility map — Activation Degree × Security Level</h3>
-            <p className="text-xs mb-3" style={{ color: "#64748b" }}>
-              Each cell shows whether the combination runs correctly on a single r6i.large instance.
-            </p>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead>
-                  <tr style={{ background: "#f1f5f9" }}>
-                    <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#475569", border: "1px solid #e2e8f0" }}>Activation</th>
-                    <th style={{ padding: "10px 16px", textAlign: "center", fontWeight: 600, color: "#475569", border: "1px solid #e2e8f0" }}>128-bit security</th>
-                    <th style={{ padding: "10px 16px", textAlign: "center", fontWeight: 600, color: "#475569", border: "1px solid #e2e8f0" }}>192-bit security</th>
-                    <th style={{ padding: "10px 16px", textAlign: "center", fontWeight: 600, color: "#475569", border: "1px solid #e2e8f0" }}>256-bit security</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    {
-                      degree: "x² (degree 2)",
-                      cells: [
-                        { status: "works",    label: "Validated", note: ">80% accuracy, <5s keygen", bg: "#f0fdf4", border: "#86efac", text: "#15803d" },
-                        { status: "oom",      label: "OOM",       note: "n ≥ 8192 required — exceeds 16 GB", bg: "#fff1f2", border: "#fca5a5", text: "#dc2626" },
-                        { status: "oom",      label: "OOM",       note: "n ≥ 16384 — not attempted", bg: "#fff1f2", border: "#fca5a5", text: "#dc2626" },
-                      ],
-                    },
-                    {
-                      degree: "x³ (degree 3)",
-                      cells: [
-                        { status: "partial",  label: "Partial",   note: "Runs but accuracy collapses — plaintext modulus overflow", bg: "#fffbeb", border: "#fcd34d", text: "#b45309" },
-                        { status: "oom",      label: "OOM",       note: "Not tested — 128-bit already shows accuracy failure", bg: "#f8fafc", border: "#e2e8f0", text: "#94a3b8" },
-                        { status: "oom",      label: "N/A",       note: "Not tested", bg: "#f8fafc", border: "#e2e8f0", text: "#94a3b8" },
-                      ],
-                    },
-                    {
-                      degree: "x⁴ (degree 4)",
-                      cells: [
-                        { status: "incomplete", label: "Incomplete", note: "10-image run only — signal destroyed before FC layer", bg: "#fffbeb", border: "#fcd34d", text: "#b45309" },
-                        { status: "oom",        label: "N/A",        note: "Not tested", bg: "#f8fafc", border: "#e2e8f0", text: "#94a3b8" },
-                        { status: "oom",        label: "N/A",        note: "Not tested", bg: "#f8fafc", border: "#e2e8f0", text: "#94a3b8" },
-                      ],
-                    },
-                  ].map(({ degree, cells }) => (
-                    <tr key={degree}>
-                      <td style={{ padding: "10px 16px", fontWeight: 600, color: "#0f172a", border: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>{degree}</td>
-                      {cells.map((cell, ci) => (
-                        <td key={ci} style={{ padding: "10px 16px", textAlign: "center", border: "1px solid #e2e8f0", background: cell.bg }}>
-                          <div style={{ display: "inline-block", padding: "2px 10px", borderRadius: 4, border: `1px solid ${cell.border}`, color: cell.text, fontWeight: 700, fontSize: 12, marginBottom: 4 }}>
-                            {cell.label}
-                          </div>
-                          <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.5 }}>{cell.note}</div>
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* ── x⁴ honest callout ── */}
-          <div className="rounded-lg p-4 mb-6 text-sm" style={{ background: "#fffbeb", border: "1.5px solid #f59e0b" }}>
-            <p className="font-semibold mb-1" style={{ color: "#92400e" }}>About the x⁴ result</p>
-            <p style={{ color: "#78350f", lineHeight: 1.75, margin: 0 }}>
-              The 100-image x⁴ benchmark was stopped mid-way due to EC2 budget constraints.
-              The accuracy figure shown in the charts comes from a <b>10-image partial run only</b> — treat it as directional, not conclusive.
-              What is conclusive: the x⁴ signal collapses before the FC layer because the fourth-power term amplifies
-              intermediate ciphertext values far beyond the plaintext modulus (100,073,473), causing silent modular wrap-around
-              at every activation. This is a known BFV property, not a model or implementation bug.
-            </p>
-          </div>
-
-          {/* ── Noise budget visualisation ── */}
-          <div className="rounded-lg p-4 mb-6 text-sm" style={{ background: "#fff", border: "1px solid #e5e5e5" }}>
-            <p className="font-semibold mb-1" style={{ color: "#0f172a" }}>Why higher degrees break — noise budget per layer</p>
-            <p className="text-xs mb-4" style={{ color: "#64748b" }}>
-              BFV tracks a "noise budget" (bits). Each ciphertext multiplication consumes it. When it hits zero, decryption produces garbage.
-              This is a conceptual illustration of relative consumption — the exact values depend on n, p, and scale.
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {[
-                {
-                  degree: "x² — 2 activations", color: "#16a34a", bg: "#dcfce7",
-                  stages: [
-                    { label: "Conv1", pct: 15 }, { label: "Act1 (x²)", pct: 20 },
-                    { label: "Conv2", pct: 15 }, { label: "Act2 (x²)", pct: 20 },
-                    { label: "FC", pct: 20 }, { label: "Spare", pct: 10, spare: true },
-                  ],
-                  note: "Budget survives to FC. Decryption succeeds.",
-                },
-                {
-                  degree: "x³ — 2 activations", color: "#b45309", bg: "#fef3c7",
-                  stages: [
-                    { label: "Conv1", pct: 15 }, { label: "Act1 (x³)", pct: 38 },
-                    { label: "Conv2", pct: 15 }, { label: "Act2 (x³)", pct: 38, overflow: true },
-                  ],
-                  note: "Budget exhausted at Act2. Values wrap around the modulus, corrupting all activations from this point.",
-                },
-                {
-                  degree: "x⁴ — 2 activations", color: "#dc2626", bg: "#fee2e2",
-                  stages: [
-                    { label: "Conv1", pct: 15 }, { label: "Act1 (x⁴)", pct: 90, overflow: true },
-                  ],
-                  note: "Budget gone at first activation. Everything after is noise.",
-                },
-              ].map(({ degree, color, bg, stages, note }) => {
-                const total = stages.reduce((s, st) => s + st.pct, 0);
-                const capped = Math.min(total, 100);
-                return (
-                  <div key={degree}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color }}>{degree}</span>
-                      <span style={{ fontSize: 11, color: total > 100 ? "#dc2626" : "#64748b" }}>
-                        {total > 100 ? "OVERFLOW" : `${capped}% consumed`}
-                      </span>
-                    </div>
-                    <div style={{ display: "flex", height: 22, borderRadius: 4, overflow: "hidden", border: "1px solid #e2e8f0", background: "#f8fafc" }}>
-                      {stages.map((st, si) => {
-                        const runningTotal = stages.slice(0, si + 1).reduce((s, x) => s + x.pct, 0);
-                        const clampedPct = Math.max(0, Math.min(st.pct, 100 - stages.slice(0, si).reduce((s, x) => s + x.pct, 0)));
-                        if (clampedPct <= 0) return null;
-                        return (
-                          <div key={st.label} title={`${st.label}: ${st.pct}% budget`} style={{
-                            width: `${clampedPct}%`, background: st.overflow ? "#dc2626" : st.spare ? "#e2e8f0" : color,
-                            opacity: st.spare ? 0.4 : 1,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: 9, color: st.spare ? "#94a3b8" : "#fff", fontWeight: 600,
-                            overflow: "hidden", whiteSpace: "nowrap", minWidth: 0,
-                            borderRight: si < stages.length - 1 ? "1px solid rgba(255,255,255,0.3)" : "none",
-                          }}>
-                            {clampedPct > 8 ? st.label : ""}
-                          </div>
-                        );
-                      })}
-                      {total < 100 && (
-                        <div style={{ flex: 1, background: "#f1f5f9" }} />
-                      )}
-                    </div>
-                    <p style={{ fontSize: 11, color: "#64748b", marginTop: 4, marginBottom: 0 }}>{note}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* ── Scale / modulus "what if you get it wrong" ── */}
-          <div className="rounded-lg p-4 mb-6 text-sm" style={{ background: "#fff", border: "1px solid #e5e5e5" }}>
-            <p className="font-semibold mb-1" style={{ color: "#0f172a" }}>Scale factor — what happens when you get it wrong</p>
-            <p className="text-xs mb-3" style={{ color: "#64748b" }}>
-              The scale factor S multiplies weights before integer encoding. Too small = precision loss. Too large = overflow.
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 0, border: "1px solid #e2e8f0", borderRadius: 8, overflow: "hidden" }}>
-              {[
-                { val: "S = 100", verdict: "Precision loss", color: "#b45309", bg: "#fffbeb", border: "#fcd34d", why: "Weight values rounded too aggressively during integer encoding — quantization error accumulates across layers and degrades accuracy." },
-                { val: "S = 1,000", verdict: "Stable", color: "#16a34a", bg: "#f0fdf4", border: "#86efac", why: "Enough precision to preserve meaningful weight differences, small enough to stay well clear of the plaintext modulus ceiling. This is the validated baseline." },
-                { val: "S = 10,000", verdict: "Overflow risk", color: "#dc2626", bg: "#fff1f2", border: "#fca5a5", why: "Larger encoded values push intermediate computation results closer to p = 100,073,473. At higher polynomial degrees, this causes modular wrap-around and silent corruption." },
-              ].map(({ val, verdict, color, bg, border, why }, i, arr) => (
-                <div key={val} style={{ display: "flex", alignItems: "flex-start", gap: 16, padding: "12px 16px", background: bg, borderBottom: i < arr.length - 1 ? `1px solid ${border}` : "none" }}>
-                  <div style={{ flexShrink: 0, minWidth: 80, fontWeight: 700, fontSize: 13, color }}>{val}</div>
-                  <div style={{ flexShrink: 0, minWidth: 100 }}>
-                    <span style={{ display: "inline-block", padding: "1px 8px", borderRadius: 4, border: `1px solid ${border}`, color, fontWeight: 600, fontSize: 11 }}>{verdict}</span>
-                  </div>
-                  <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.65 }}>{why}</div>
-                </div>
-              ))}
-            </div>
-
-            <p className="font-semibold mb-1 mt-4" style={{ color: "#0f172a" }}>Plaintext modulus — what happens when you get it wrong</p>
-            <p className="text-xs mb-3" style={{ color: "#64748b" }}>
-              p is the ceiling for all intermediate arithmetic values. Every activation and convolution output must stay below it.
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 0, border: "1px solid #e2e8f0", borderRadius: 8, overflow: "hidden" }}>
-              {[
-                { val: "p = 65,537", verdict: "Too small", color: "#dc2626", bg: "#fff1f2", border: "#fca5a5", why: "16-bit modulus — intermediate values from conv and activation overflow almost immediately. Results are garbage after the first layer." },
-                { val: "p = 100,073,473", verdict: "Stable", color: "#16a34a", bg: "#f0fdf4", border: "#86efac", why: "Baseline modulus, chosen to give enough headroom for scale = 1,000 and degree 2 activations. Validated end-to-end." },
-                { val: "p = 4,294,967,311", verdict: "Headroom, slower", color: "#b45309", bg: "#fffbeb", border: "#fcd34d", why: "32-bit modulus gives more overflow headroom but increases the cost of every ciphertext operation proportionally. Useful if you raise the scale factor or degree." },
-              ].map(({ val, verdict, color, bg, border, why }, i, arr) => (
-                <div key={val} style={{ display: "flex", alignItems: "flex-start", gap: 16, padding: "12px 16px", background: bg, borderBottom: i < arr.length - 1 ? `1px solid ${border}` : "none" }}>
-                  <div style={{ flexShrink: 0, minWidth: 140, fontWeight: 700, fontSize: 13, color }}>{val}</div>
-                  <div style={{ flexShrink: 0, minWidth: 100 }}>
-                    <span style={{ display: "inline-block", padding: "1px 8px", borderRadius: 4, border: `1px solid ${border}`, color, fontWeight: 600, fontSize: 11 }}>{verdict}</span>
-                  </div>
-                  <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.65 }}>{why}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-lg p-5" style={{ background: "#fafafa", border: "1px solid #e5e5e5" }}>
+          <div className="rounded-lg p-5 mt-6" style={{ background: "#fafafa", border: "1px solid #e5e5e5" }}>
             <ParameterComparison />
           </div>
         </div>
