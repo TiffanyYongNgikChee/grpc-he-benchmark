@@ -8,8 +8,6 @@ import LibraryComparison from "./LibraryComparison";
 import LiveStatusFeed from "./LiveStatusFeed";
 
 import MnistBatchBenchmark from "./MnistBatchBenchmark";
-import ParameterComparison from "./ParameterComparison";
-import BenchmarkResultsDashboard from "./BenchmarkResultsDashboard";
 import NeuralHero from "./NeuralHero";
 import CnnClassroom from "./CnnClassroom";
 import useInferenceProgress from "./useInferenceProgress";
@@ -835,24 +833,70 @@ export default function Workbench() {
         subtitle="What the experiments found — and what each failure revealed."
       />
       <div id="results" className="px-4 md:px-8 py-8" style={{ background: "#f7f7f7", borderTop: "1px solid #e5e5e5" }}>
-        <div className="max-w-[1100px] mx-auto">
-          <div className="rounded-lg p-5 mb-6 text-sm leading-relaxed" style={{ background: "#fff", border: "1px solid #e2e8f0", maxWidth: 780 }}>
-            <p style={{ color: "#334155", lineHeight: 1.85, margin: 0 }}>
-              The benchmark ran a LeNet-5 CNN on encrypted MNIST images using BFV, testing three polynomial activation
-              degrees — x², x³, and x⁴ — on a single r6i.large instance (16 GB RAM).
-              x² is the only fully validated configuration: it achieves over 80% accuracy with stable noise growth throughout the network.
-              x³ runs but accuracy collapses because cubic activations amplify intermediate values past the plaintext modulus ceiling
-              (100,073,473), causing silent modular wrap-around. x⁴ was stopped after 10 images due to EC2 budget constraints;
-              its 0% accuracy is directional only, though the underlying cause — fourth-power overflow destroying the signal at the
-              first activation — is conclusive. Higher security levels (192-bit, 256-bit) were not achievable on this hardware:
-              they require a ring dimension of n ≥ 8192, which exhausts available RAM during BFV key generation.
+        <div className="max-w-[1100px] mx-auto flex justify-center">
+          {/* ── Stardew-style secret note ── */}
+          <div style={{
+            position: "relative",
+            maxWidth: 620,
+            width: "100%",
+            background: "#fdf8e1",
+            borderRadius: 4,
+            padding: "52px 44px 44px 72px",
+            boxShadow: "2px 4px 18px rgba(0,0,0,0.18), inset 0 0 0 1px rgba(0,0,0,0.06)",
+            /* lined-paper effect via repeating-linear-gradient */
+            backgroundImage: [
+              "repeating-linear-gradient(transparent, transparent 31px, #c9bfa0 31px, #c9bfa0 32px)",
+              "linear-gradient(#fdf8e1, #fdf8e1)",
+            ].join(", "),
+            backgroundSize: "100% 32px, 100% 100%",
+            backgroundPositionY: "20px, 0",
+            /* red margin line */
+            borderLeft: "4px solid #e07070",
+            fontFamily: "'Caveat', 'Patrick Hand', 'Comic Sans MS', cursive",
+          }}>
+            {/* Load Google font inline */}
+            <style>{`@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&display=swap');`}</style>
+
+            {/* torn-tape flourish at top */}
+            <div style={{
+              position: "absolute", top: -8, left: "50%", transform: "translateX(-50%)",
+              width: 80, height: 18,
+              background: "rgba(255,255,255,0.55)",
+              border: "1px solid rgba(0,0,0,0.12)",
+              borderRadius: 2,
+              boxShadow: "0 1px 4px rgba(0,0,0,0.10)",
+            }} />
+
+            {/* header line */}
+            <p style={{
+              fontFamily: "'Caveat', cursive",
+              fontWeight: 600,
+              fontSize: 18,
+              color: "#5a3e1b",
+              margin: "0 0 10px 0",
+              letterSpacing: "0.01em",
+            }}>
+              It's the benchmark notes:
             </p>
-          </div>
-          <div className="rounded-lg p-5" style={{ background: "#fafafa", border: "1px solid #e5e5e5" }}>
-            <BenchmarkResultsDashboard />
-          </div>
-          <div className="rounded-lg p-5 mt-6" style={{ background: "#fafafa", border: "1px solid #e5e5e5" }}>
-            <ParameterComparison />
+
+            <p style={{
+              fontFamily: "'Caveat', cursive",
+              fontSize: 17,
+              color: "#3b2a10",
+              lineHeight: "32px",   /* matches the ruled lines */
+              margin: 0,
+              whiteSpace: "pre-line",
+            }}>
+              {`The benchmark ran a LeNet-5 CNN on encrypted MNIST images using BFV, testing three polynomial activation degrees — x², x³, and x⁴ — on a single r6i.large instance (16 GB RAM).
+
+x² is the only fully validated config: over 80% accuracy, stable noise throughout.
+
+x³ runs but accuracy collapses — cubic activations push values past the plaintext modulus ceiling (100,073,473), causing silent wrap-around.
+
+x⁴ was cut after 10 images (EC2 budget). 0% accuracy is directional only, but fourth-power overflow at the first activation is conclusive.
+
+Higher security (192-bit, 256-bit) needs n ≥ 8192 — exhausts RAM during BFV key generation on this hardware.`}
+            </p>
           </div>
         </div>
       </div>
