@@ -171,11 +171,11 @@ function EncryptedCube({ size = 54, colors, spin = "spin", floatDelay = 0, label
       {label && (
         <div style={{
           position: "absolute",
-          bottom: -18,
+          bottom: -20,
           left: "50%",
           transform: "translateX(-50%)",
           fontFamily: "'Press Start 2P',monospace",
-          fontSize: 6,
+          fontSize: "clamp(7px, 1vw, 9px)",
           color: top,
           whiteSpace: "nowrap",
         }}>{label}</div>
@@ -376,28 +376,21 @@ export default function HECubeHeader() {
       </div>
 
       {/* Animation stage */}
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 12,
-        padding: "28px 24px 20px",
-        position: "relative",
-        minHeight: 130,
-      }}>
+      <div className="he-cube-stage">
 
         {/* Left: input cubes */}
         <div style={{
           display: "flex",
-          gap: 14,
+          gap: "clamp(6px,1.5vw,14px)",
           alignItems: "center",
+          flexWrap: "wrap",
+          justifyContent: "center",
           opacity: phase === 3 ? 0.3 : 1,
-          transition: "opacity 0.6s",
           transform: phase === 1 || phase === 2 ? "translateX(20px)" : "translateX(0)",
           transition: "transform 0.9s cubic-bezier(.22,1,.36,1), opacity 0.6s",
         }}>
           {inputCubes.map((c, i) => (
-            <EncryptedCube key={i} size={50} colors={c.colors}
+            <EncryptedCube key={i} size={Math.min(50, Math.max(34, window.innerWidth * 0.04))} colors={c.colors}
               spin={c.spin} floatDelay={c.floatDelay} label={c.label} locked={true} />
           ))}
         </div>
@@ -421,14 +414,16 @@ export default function HECubeHeader() {
         {/* Right: output cubes (still locked!) */}
         <div style={{
           display: "flex",
-          gap: 14,
+          gap: "clamp(6px,1.5vw,14px)",
           alignItems: "center",
+          flexWrap: "wrap",
+          justifyContent: "center",
           opacity: phase === 3 ? 1 : 0.2,
           transform: phase === 3 ? "translateX(0)" : "translateX(-16px)",
           transition: "transform 0.7s cubic-bezier(.22,1,.36,1), opacity 0.5s",
         }}>
           {inputCubes.map((c, i) => (
-            <EncryptedCube key={i} size={50}
+            <EncryptedCube key={i} size={Math.min(50, Math.max(34, window.innerWidth * 0.04))}
               colors={[c.colors[0], c.colors[1], c.colors[2]]}
               spin={i % 2 === 0 ? "spin-r" : "spin"}
               floatDelay={i * 0.3}
@@ -439,16 +434,10 @@ export default function HECubeHeader() {
       </div>
 
       {/* Caption bar */}
-      <div style={{
-        padding: "6px 16px 12px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        borderTop: "1px solid #f0c03016",
-      }}>
+      <div className="he-caption-bar">
         <div style={{
           fontFamily: "system-ui,sans-serif",
-          fontSize: 12,
+          fontSize: "clamp(11px, 1.5vw, 13px)",
           color: "#cbd5e1",
           transition: "opacity 0.3s",
         }}>
@@ -472,14 +461,7 @@ export default function HECubeHeader() {
       </div>
 
       {/* KEY INSIGHT row */}
-      <div style={{
-        background: "#0a0f1e",
-        borderTop: "1px solid #f0c03022",
-        padding: "8px 16px",
-        display: "flex",
-        gap: 24,
-        flexWrap: "wrap",
-      }}>
+      <div className="he-key-insights">
         {[
           { icon: "🔒", text: "Data stays encrypted throughout computation" },
           { icon: "⚡", text: "5 HE primitives measured: KeyGen · Encrypt · Add · Multiply · Decrypt" },
@@ -488,7 +470,7 @@ export default function HECubeHeader() {
           <div key={i} style={{
             display: "flex", alignItems: "center", gap: 8,
             fontFamily: "system-ui,sans-serif",
-            fontSize: 11,
+            fontSize: "clamp(10px, 1.3vw, 12px)",
             color: "#94a3b8",
           }}>
             <span style={{ fontSize: 13 }}>{item.icon}</span>

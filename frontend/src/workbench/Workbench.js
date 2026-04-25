@@ -180,7 +180,7 @@ export default function Workbench() {
   const tTime = tl && tl.key && result ? result[tl.key] : null;
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "#f7f7f7" }}>
+    <div className="min-h-screen flex flex-col" style={{ background: "#f7f7f7", overflowX: "hidden" }}>
 
       {/* ═══════════ HERO — NEURAL NETWORK ANIMATION ═══════════ */}
       <NeuralHero
@@ -239,7 +239,7 @@ export default function Workbench() {
           background: "#5a5a5a",
           borderTop: "3px solid #888",
           borderBottom: "3px solid #333",
-          padding: "10px 12px 14px",
+          padding: "10px clamp(6px, 2vw, 12px) 14px",
         }}
       >
         {/* ── Top toolbar bar — gold Habbo header style ── */}
@@ -277,12 +277,10 @@ export default function Workbench() {
         </div>
 
         {/* ── Controls row — Habbo dark panel style ── */}
-        <div style={{
+        <div className="workbench-controls" style={{
           background: "linear-gradient(180deg, #404040 0%, #383838 100%)",
           border: "2px solid #222",
           borderTop: "1px solid #666",
-          padding: "7px 10px",
-          display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap",
           marginBottom: 8,
         }}>
           {/* Reset */}
@@ -432,13 +430,10 @@ export default function Workbench() {
         </div>
 
         {/* ── Three-column Habbo panel layout ── */}
-        <div style={{
-          display: "flex", gap: 6, alignItems: "stretch", minHeight: 620,
-        }}>
+        <div className="workbench-columns">
 
           {/* ── INPUT PANEL — Habbo-style titled box ── */}
-          <div style={{
-            flexShrink: 0, width: 240,
+          <div className="workbench-col-input" style={{
             display: "flex", flexDirection: "column",
             border: "2px solid #222",
             borderTop: "2px solid #777",
@@ -563,8 +558,7 @@ export default function Workbench() {
           </div>
 
           {/* ── PIPELINE PANEL ── */}
-          <div style={{
-            flex: 1, minWidth: 0,
+          <div className="workbench-col-pipeline" style={{
             display: "flex", flexDirection: "column",
             border: "2px solid #222",
             borderTop: "2px solid #777",
@@ -677,8 +671,7 @@ export default function Workbench() {
           </div>
 
           {/* ── OUTPUT PANEL ── */}
-          <div style={{
-            flexShrink: 0, width: 290,
+          <div className="workbench-col-output" style={{
             display: "flex", flexDirection: "column",
             border: "2px solid #222",
             borderTop: "2px solid #777",

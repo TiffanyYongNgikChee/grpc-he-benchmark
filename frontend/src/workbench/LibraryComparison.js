@@ -578,7 +578,7 @@ export default function LibraryComparison({ data, loading, error, onRun }) {
     return (
       <FullBleed>
         <style>{PIXEL_CSS}</style>
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 48px" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "clamp(14px,3vw,28px) clamp(12px,4vw,48px)" }}>
           {/* Banner */}
           <PixelPanel accent={P.gold} titleIcon={<IconChart size={14}/>} title="MNIST HE PRIMITIVE BENCHMARKS" style={{ marginBottom: 20 }}>
             <div style={{ padding: "10px 16px 12px", fontFamily: "system-ui, sans-serif", fontSize: 14, color: P.cream, opacity: 0.8, lineHeight: 1.6, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
@@ -590,9 +590,9 @@ export default function LibraryComparison({ data, loading, error, onRun }) {
           </PixelPanel>
 
           {/* Library tiles */}
-          <div style={{ display: "flex", gap: 16, justifyContent: "center", marginBottom: 24 }}>
+          <div style={{ display: "flex", gap: 16, justifyContent: "center", marginBottom: 24, flexWrap: "wrap" }}>
             {Object.entries(LIB).map(([name, lc]) => (
-              <div key={name} style={{ background: P.panel, border: `3px solid ${lc.color}`, boxShadow: `4px 4px 0 ${P.borderLo}`, padding: "18px 32px", textAlign: "center", minWidth: 140, position: "relative", overflow: "hidden" }}>
+              <div key={name} style={{ background: P.panel, border: `3px solid ${lc.color}`, boxShadow: `4px 4px 0 ${P.borderLo}`, padding: "14px clamp(12px,3vw,32px)", textAlign: "center", minWidth: 120, flex: "0 1 auto", position: "relative", overflow: "hidden" }}>
                 <Scanlines/>
                 <div style={{ position: "relative", zIndex: 2 }}>
                   <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 12, color: lc.color, marginBottom: 6 }}>{name}</div>
@@ -620,21 +620,21 @@ export default function LibraryComparison({ data, loading, error, onRun }) {
     return (
       <FullBleed>
         <style>{PIXEL_CSS}</style>
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 48px" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "clamp(14px,3vw,28px) clamp(12px,4vw,48px)" }}>
           <PixelPanel accent={P.gold} titleIcon={<IconChart size={14}/>} title="MNIST HE PRIMITIVE BENCHMARKS" style={{ marginBottom: 20 }}>
-            <div style={{ padding: "10px 16px 12px", fontFamily: "system-ui, sans-serif", fontSize: 14, color: P.cream, opacity: 0.7 }}>
+            <div style={{ padding: "10px 16px 12px", fontFamily: "system-ui, sans-serif", fontSize: "clamp(12px,1.5vw,14px)", color: P.cream, opacity: 0.7 }}>
               3 libraries · 5 operations · 10× averaged · n = 4096 · 128-bit security
             </div>
           </PixelPanel>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 0", gap: 20 }}>
             <div className="px-spin" style={{ width: 48, height: 48, border: `5px solid ${P.border}`, borderTop: `5px solid ${P.gold}`, boxShadow: `4px 4px 0 ${P.borderLo}` }}/>
-            <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 13, color: P.gold, letterSpacing: "0.1em" }}>RUNNING BENCHMARKS</div>
-            <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 15, color: P.cream, opacity: 0.6, textAlign: "center", lineHeight: 2 }}>
+            <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: "clamp(10px,1.5vw,13px)", color: P.gold, letterSpacing: "0.1em", textAlign: "center" }}>RUNNING BENCHMARKS</div>
+            <div style={{ fontFamily: "system-ui, sans-serif", fontSize: "clamp(13px,1.8vw,15px)", color: P.cream, opacity: 0.6, textAlign: "center", lineHeight: 2 }}>
               SEAL <span className="px-blink" style={{ color: P.gold, fontFamily: "'Press Start 2P', monospace" }}>...</span>
               {"  "}HELib{"  "}OpenFHE
               <br/>Estimated 30 – 90 seconds total
             </div>
-            <div style={{ width: 320, height: 18, background: P.panel, border: `2px solid ${P.border}`, boxShadow: `inset 2px 2px 0 ${P.borderLo}`, overflow: "hidden", position: "relative" }}>
+            <div style={{ width: "min(320px, 80vw)", height: 18, background: P.panel, border: `2px solid ${P.border}`, boxShadow: `inset 2px 2px 0 ${P.borderLo}`, overflow: "hidden", position: "relative" }}>
               <div className="px-march" style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: "40%", backgroundImage: `repeating-linear-gradient(90deg, ${P.gold} 0px, ${P.gold} 12px, ${P.goldDim} 12px, ${P.goldDim} 14px)`, backgroundSize: "28px 100%" }}/>
             </div>
           </div>
@@ -648,7 +648,7 @@ export default function LibraryComparison({ data, loading, error, onRun }) {
     return (
       <FullBleed>
         <style>{PIXEL_CSS}</style>
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 48px" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "clamp(14px,3vw,28px) clamp(12px,4vw,48px)" }}>
           <PixelPanel accent="#ff6080" title="BENCHMARK FAILED">
             <div style={{ padding: "20px 16px", textAlign: "center" }}>
               <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 15, color: "#ff6080", marginBottom: 16, lineHeight: 1.7 }}>{error}</div>

@@ -20,6 +20,8 @@
 
 html {
   scroll-behavior: smooth;
+  /* prevent horizontal overflow on small screens */
+  overflow-x: hidden;
 }
 
 body {
@@ -30,6 +32,94 @@ body {
   background-color: var(--bg);
   color: var(--text);
   min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Responsive helpers ── */
+
+/* Make the HE cube header animation wrap gracefully */
+.he-cube-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: clamp(6px, 1.5vw, 14px);
+  padding: clamp(14px, 3vw, 28px) clamp(10px, 2.5vw, 24px) clamp(10px, 2vw, 20px);
+  position: relative;
+  min-height: 120px;
+}
+
+/* Make the Workbench three-column layout responsive */
+.workbench-columns {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+  min-height: 480px;
+  flex-wrap: wrap;
+}
+
+.workbench-col-input {
+  flex: 0 0 clamp(180px, 22vw, 240px);
+  min-width: 180px;
+  max-width: 240px;
+}
+
+.workbench-col-pipeline {
+  flex: 1 1 300px;
+  min-width: 280px;
+}
+
+.workbench-col-output {
+  flex: 0 0 clamp(200px, 24vw, 290px);
+  min-width: 200px;
+  max-width: 290px;
+}
+
+/* Responsive controls bar */
+.workbench-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 7px 10px;
+}
+
+/* Key insight row — wrap on small screens */
+.he-key-insights {
+  background: #0a0f1e;
+  border-top: 1px solid #f0c03022;
+  padding: clamp(6px, 1.5vw, 8px) clamp(10px, 2vw, 16px);
+  display: flex;
+  gap: clamp(10px, 2.5vw, 24px);
+  flex-wrap: wrap;
+}
+
+/* Caption bar */
+.he-caption-bar {
+  padding: 6px clamp(8px, 2vw, 16px) 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-top: 1px solid #f0c03016;
+}
+
+@media (max-width: 900px) {
+  /* Stack workbench columns vertically on narrow viewports */
+  .workbench-columns {
+    flex-direction: column;
+  }
+  .workbench-col-input,
+  .workbench-col-output {
+    flex: none;
+    width: 100%;
+    max-width: 100%;
+  }
+  .workbench-col-pipeline {
+    flex: none;
+    width: 100%;
+  }
 }
 
 code, .mono {
