@@ -25,14 +25,14 @@ This project implements a full-stack FHE inference pipeline: a LeNet-5 convoluti
 
 ## Key Results
 
-> ⚠️ *Benchmark results will be added here once the full experiment run is complete.*
+![Benchmark Result](images/benchmark_result.png)
 
 ---
 
 ## System Architecture
 
-![System Architecture](system_architecture.png)
-
+![System Architecture](images/system_architecture.png)
+![AWS diagram](images/aws_architecture.png)
 **Deployment:**
 - Frontend → [Vercel](https://hexplore-neon.vercel.app) (CDN, always online)
 - Backend → AWS EC2 `r6i.large` (Docker Compose, online during demos)
@@ -42,7 +42,7 @@ This project implements a full-stack FHE inference pipeline: a LeNet-5 convoluti
 
 ## CNN Pipeline on Encrypted Data
 
-> 📸 *Screenshot of the live frontend pipeline visualisation will be added here.*
+![CNN pipeline](images/digit_inference.png)
 
 **Why x² instead of ReLU?** ReLU requires a comparison to zero — a non-polynomial operation that cannot be evaluated homomorphically without a prohibitively expensive polynomial approximation. The degree-2 polynomial x² is evaluable with a single ciphertext multiplication and is sufficient to introduce the non-linearity required for multi-layer classification (Fan & Vercauteren, 2012; Cheon et al., 2018).
 
@@ -585,26 +585,6 @@ Also verify port 8080 is open in the EC2 Security Group inbound rules.
 ## License
 
 This project is released under the [MIT License](LICENSE).
-
----
-
-## Citation
-
-If you use this framework in academic work, please cite:
-
-```bibtex
-@misc{yong2026hencrypt,
-  author       = {Tiffany Yong Ngik Chee},
-  title        = {Encrypted Machine Learning Benchmark Framework:
-                  End-to-End BFV Inference on MNIST with Parameter Exploration},
-  year         = {2026},
-  howpublished = {\url{https://github.com/TiffanyYongNgikChee/Encrypted-Machine-Learning-Benchmark-Framework}},
-  note         = {Final Year Project, 2025--2026}
-}
-```
-
----
-
 <p align="center">
   Built with Rust · C++ · Java · React · PyTorch · OpenFHE · SEAL · HElib · Docker · AWS<br/>
   <sub>Final Year Project 2025–2026</sub>
