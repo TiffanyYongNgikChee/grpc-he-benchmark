@@ -1539,7 +1539,7 @@ function BookGuidebook() {
                   "x⁴ — fourth-power compounds overflow; signal destroyed before FC",
                   "192-bit security — context creation OOM at 7.6 GB + 15 GB swap",
                   "256-bit — never reached; 192-bit was already infeasible",
-                  "x⁴ full 100-image run — EC2 budget ran out before completion",
+                  "x⁴ full 100-image run — OOM on EC2 before completion; run aborted",
                 ],
               },
               {

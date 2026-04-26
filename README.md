@@ -10,6 +10,15 @@
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Live Demo](https://img.shields.io/badge/Live_Demo-hexplore--neon.vercel.app-4f46e5)](https://hexplore-neon.vercel.app)
+[![Screencast Demo](https://img.shields.io/badge/Screencast_Demo-YouTube-FF0000?logo=youtube&logoColor=white)](https://youtu.be/-hU0B2686-g?si=2xzZ0W63JGrHHRkk)
+
+---
+
+## Screencast Demo
+
+[![Watch the demo](https://img.youtube.com/vi/-hU0B2686-g/maxresdefault.jpg)](https://youtu.be/-hU0B2686-g?si=2xzZ0W63JGrHHRkk)
+
+> **[▶ Watch on YouTube](https://youtu.be/-hU0B2686-g?si=2xzZ0W63JGrHHRkk)** — A 6-minute walkthrough of HEXplorer: live encrypted inference on a user-drawn digit, per-layer timing breakdown, batch accuracy results, and a head-to-head library comparison (SEAL vs HElib vs OpenFHE).
 
 ---
 
