@@ -15,12 +15,13 @@
 
 ## Abstract
 
-Homomorphic Encryption (HE) enables computation directly on encrypted data without ever decrypting it — a property with transformative implications for privacy-preserving machine learning. However, the practical cost of this property has been poorly characterised in the context of real neural network inference.
+Privacy-preserving machine learning demands encryption that survives computation, yet the practical performance cost of Fully Homomorphic Encryption (FHE) remains poorly characterised outside specialist research. Existing tools such as HEBench require local installation, benchmark only primitive operations, and provide no cross-library comparison or end-to-end inference evaluation. The seminal CryptoNets work demonstrated FHE-based neural network classification in 2016, but no accessible, interactive platform has since emerged to let developers observe and compare the real cost of computing on encrypted data.
 
-This project implements a full-stack FHE inference pipeline: a LeNet-5 convolutional neural network trained with polynomial activations is deployed as a service that classifies handwritten digits **entirely on ciphertext** using the BFV scheme. A live interactive dashboard and a batch benchmarking suite measure how key HE parameters — security level, polynomial activation degree, and quantisation scale factor — affect latency, classification accuracy, and noise budget consumption.
+This project presents **HEXplorer** — a full-stack benchmarking platform that fills this gap. HEXplorer integrates three production FHE libraries (Microsoft SEAL, IBM HElib, and OpenFHE) behind a three-tier architecture (React → Spring Boot → Rust gRPC → C++ HE wrappers) and offers three interactive modes: live encrypted inference on a user-drawn digit, batch accuracy testing on ten MNIST images, and a head-to-head library comparison across five core operations. A LeNet-5 convolutional neural network, retrained with degree-2 polynomial (x²) activations, classifies 28×28 handwritten digits **entirely on ciphertext** using the BFV scheme at 128-bit security. Per-layer inference timings are streamed live to the browser via Server-Sent Events as each layer completes, making bottlenecks visible in real time without post-processing.
 
-**Core finding:** Encrypted CNN inference on a single 28×28 MNIST image takes ~5–8 seconds on AWS EC2 (r6i.large, 16 GB RAM) at 128-bit security with degree-2 polynomial activations, delivering **identical accuracy** (88.86%) to the plaintext model — a ~2,000× overhead that represents the measurable cost of computing on data you can never see.
+**Core findings:** At 128-bit security with degree-2 activations and scale factor 1,000, encrypted CNN inference achieves **88.86% accuracy** — identical to the plaintext baseline — with a latency of ~5–8 seconds per image on an AWS EC2 `r6i.large` instance (32 vCPUs, 256 GB RAM). This represents a ~2,000× overhead compared to plaintext inference and constitutes the first open, reproducible, browser-accessible measurement of end-to-end FHE neural network inference across three libraries on a standard benchmark dataset.
 
+![Project Overview](images/project_overview.png)
 ---
 
 ## Key Results
@@ -32,7 +33,44 @@ This project implements a full-stack FHE inference pipeline: a LeNet-5 convoluti
 ## System Architecture
 
 ![System Architecture](images/system_architecture.png)
+
+HEXplorer is built as a **four-layer pipeline**, where each layer has one clear job:
+
+```
+[ React Frontend ]
+       ↓  draws digit / clicks RUN
+[ Spring Boot REST API ]
+       ↓  translates HTTP → gRPC, streams SSE back to browser
+[ Rust gRPC Server ]
+       ↓  calls C++ HE libraries via FFI
+[ C++ HE Wrappers ]  ←  OpenFHE · SEAL · HElib
+```
+
+| Layer | Technology | What it does |
+|---|---|---|
+| **Frontend** | React 19 | Provides the drawing canvas, live pipeline animation, and library comparison charts. Communicates with the backend over REST and Server-Sent Events (SSE). |
+| **REST Gateway** | Spring Boot 3.2 | Receives HTTP requests from the browser, translates them into gRPC calls, and streams per-layer progress events back to the frontend as SSE. |
+| **Inference Engine** | Rust + Tonic gRPC | Orchestrates the CNN forward pass: loads quantised weights, calls the C++ HE library through FFI, and reports each layer's timing as it completes. |
+| **HE Libraries** | OpenFHE · SEAL · HElib | C++ libraries that perform the actual homomorphic operations (key generation, encryption, convolution, activation, pooling, decryption). All three are compiled into the same Docker image. |
+
+> **Why this layering?** The browser cannot call C++ directly, and Rust cannot serve HTTP/SSE natively with the same ease as Spring Boot. Each layer uses the best tool for its job, connected by well-defined interfaces (REST → gRPC → FFI).
+
+---
+
+### AWS Deployment Architecture
+
 ![AWS diagram](images/aws_architecture.png)
+
+The live deployment splits the system across **two AWS instances** to separate the lightweight frontend-serving concern from the memory-hungry HE computation:
+
+| Component | Instance | Why |
+|---|---|---|
+| React frontend | Vercel CDN | Always online, zero cost, global CDN — no need to pay for EC2 uptime for static files |
+| Spring Boot API | EC2 `t3.small` | Lightweight Java process; just translates HTTP↔gRPC |
+| Rust gRPC + HE | EC2 `r6i.large` | OpenFHE key generation at 128-bit security requires ~6 GB RAM; this instance provides headroom |
+
+> **Vercel proxy trick:** Vercel rewrites `/api/*` requests server-side to the EC2 IP. This means the browser only ever talks to `https://hexplore-neon.vercel.app` — no mixed-content (HTTPS→HTTP) browser errors, and the EC2 IP never needs to be exposed publicly.
+
 **Deployment:**
 - Frontend → [Vercel](https://hexplore-neon.vercel.app) (CDN, always online)
 - Backend → AWS EC2 `r6i.large` (Docker Compose, online during demos)
@@ -544,41 +582,77 @@ Also verify port 8080 is open in the EC2 Security Group inbound rules.
 
 ## References
 
-### Foundational Theory
+### Foundational Cryptography
 
-1. **Brakerski, Z.** (2012). *Fully Homomorphic Encryption without Modulus Switching from Classical GapSVP*. In *CRYPTO 2012*. IACR ePrint [2012/078](https://eprint.iacr.org/2012/078). — Theoretical foundation of the BFV scheme.
+1. R. Rivest, L. Adleman, and M. Dertouzos, "On data banks and privacy homomorphisms," in *Foundations of Secure Computation*, 1978, pp. 169–180. — First theoretical proposal of homomorphic encryption.
 
-2. **Fan, J. & Vercauteren, F.** (2012). *Somewhat Practical Fully Homomorphic Encryption*. IACR ePrint [2012/144](https://eprint.iacr.org/2012/144). — Specification of the BFV (Brakerski–Fan–Vercauteren) scheme implemented in this project.
+2. C. Gentry, "A fully homomorphic encryption scheme," Ph.D. dissertation, Stanford University, 2009. [Online]. Available: https://crypto.stanford.edu/craig — First construction of fully homomorphic encryption.
 
-3. **Cheon, J. H., Kim, A., Kim, M., & Song, Y.** (2017). *Homomorphic Encryption for Arithmetic of Approximate Numbers*. In *ASIACRYPT 2017*. IACR ePrint [2016/421](https://eprint.iacr.org/2016/421). — CKKS scheme; alternative to BFV for floating-point approximation.
+3. O. Regev, "On lattices, learning with errors, random linear codes, and cryptography," *Journal of the ACM*, vol. 56, no. 6, pp. 1–40, Sep. 2009. — LWE hardness assumption underlying BFV security.
 
-4. **Regev, O.** (2009). *On Lattices, Learning with Errors, Random Linear Codes, and Cryptography*. *Journal of the ACM*, 56(6). — LWE hardness assumption underlying BFV security.
+4. Z. Brakerski, C. Gentry, and V. Vaikuntanathan, "(Leveled) fully homomorphic encryption without bootstrapping," in *Proc. ITCS 2012*, pp. 309–325. IACR ePrint 2011/277. — BGV scheme; basis of HElib.
+
+5. J. Fan and F. Vercauteren, "Somewhat practical fully homomorphic encryption," IACR ePrint 2012/144, 2012. [Online]. Available: https://eprint.iacr.org/2012/144 — Specification of the BFV scheme implemented in this project.
+
+6. J. H. Cheon, A. Kim, M. Kim, and Y. Song, "Homomorphic encryption for arithmetic of approximate numbers," in *Proc. ASIACRYPT 2017*, Lecture Notes in Computer Science, vol. 10624, pp. 409–437. IACR ePrint 2016/421. — CKKS scheme for floating-point HE.
 
 ### Encrypted Machine Learning
 
-5. **Gilad-Bachrach, R., Dowlin, N., Laine, K., Lauter, K., Naehrig, M., & Wernsing, J.** (2016). *CryptoNets: Applying Neural Networks to Encrypted Data with High Throughput and Accuracy*. In *ICML 2016*. — Seminal work on HE-based CNN inference; first use of polynomial activation functions in FHE.
+7. R. Gilad-Bachrach, N. Dowlin, K. Laine, K. Lauter, M. Naehrig, and J. Wernsing, "CryptoNets: Applying neural networks to encrypted data with high throughput and accuracy," in *Proc. ICML 2016*, vol. 48, pp. 201–210. — Seminal work on HE-based CNN inference; introduced polynomial activation functions in FHE.
 
-6. **Boura, C., Gama, N., Georgieva, M., & Jetchev, D.** (2018). *Chimera: Combining Ring-LWE-based Fully Homomorphic Encryption Schemes*. *Journal of Mathematical Cryptology*. — Analysis of polynomial activation degree trade-offs in HE-ML.
+8. H. Chabanne, A. de Wargny, J. Milgram, C. Morel, and E. Prouff, "Privacy-preserving classification on deep neural network," IACR ePrint 2017/035, 2017. [Online]. Available: https://eprint.iacr.org/2017/035 — Batch-normalised HE inference; noise budget management.
 
-7. **Chabanne, H., de Wargny, A., Milgram, J., Morel, C., & Prouff, E.** (2017). *Privacy-Preserving Classification on Deep Neural Network*. IACR ePrint [2017/035](https://eprint.iacr.org/2017/035). — Batch-normalised HE inference; discusses noise budget management.
+9. W. Zhang, Y. Wang, Z. Zheng, Z. Chen, A. Bader, and E. Ng, "BatchCrypt: Efficient homomorphic encryption for Cross-Silo federated learning," in *Proc. USENIX ATC 2020*, pp. 493–506. — HE for federated learning across organisations.
 
-8. **Lu, W., Kawasaki, S., & Sakuma, J.** (2021). *Using Fully Homomorphic Encryption for Statistical Analysis of Categorical, Ordinal, and Numerical Data*. In *NDSS 2021*. — Quantisation strategies for BFV-compatible ML models.
+10. M. Blatt, A. Gusev, Y. Polyakov, K. Rohloff, and V. Vaikuntanathan, "Secure large-scale genome-wide association studies using homomorphic encryption," *Proceedings of the National Academy of Sciences*, vol. 117, no. 21, pp. 11608–11613, 2020. — FHE applied to genomic data.
 
-### HE Library Implementations
+11. C. Boura, N. Gama, M. Georgieva, and D. Jetchev, "CHIMERA: Combining ring-LWE-based fully homomorphic encryption schemes," *Journal of Mathematical Cryptology*, vol. 14, no. 1, pp. 316–338, 2020. — Polynomial activation degree trade-offs in HE-ML.
 
-9. **Al Badawi, A., Bates, J., Bergamaschi, F., Cousins, D. B., Erabelli, S., Genise, N., … Rohloff, K.** (2022). *OpenFHE: Open-Source Fully Homomorphic Encryption Library*. In *WAHC 2022*. IACR ePrint [2022/915](https://eprint.iacr.org/2022/915). — Primary HE library used in this project.
+12. H. Soni and R. Kumar, "Secure and efficient data storage in mobile edge computing using fully homomorphic encryption," *IEEE Internet of Things Journal*, vol. 8, no. 16, pp. 12604–12615, Aug. 2021. — FHE for secure aggregation in healthcare IoT.
 
-10. **Halevi, S. & Shoup, V.** (2020). *Bootstrapping for HElib*. *Journal of Cryptology*, 34(7). — IBM HElib design; BGV scheme used in micro-benchmarks.
+13. P. Boura, N. Gama, M. Georgieva, and D. Jetchev, "Illuminating the dark or how to recover what should not be there," *Journal of Mathematical Cryptology*, 2018. — Finance/fraud detection use case for HE deep learning.
 
-11. **Chen, H., Laine, K., & Player, R.** (2017). *Simple Encrypted Arithmetic Library – SEAL v2.1*. In *Financial Cryptography Workshops*. — Microsoft SEAL design; BFV implementation used in micro-benchmarks.
+### HE Libraries
+
+14. A. Al Badawi, J. Bates, F. Bergamaschi, D. B. Cousins, S. Erabelli, N. Genise, S. Halevi, H. Hunt, A. Kim, Y. Lee, Z. Liu, D. Micciancio, I. Quah, Y. Polyakov, S. R. V., K. Rohloff, J. Saylor, D. Suponitsky, M. Triplett, V. Vaikuntanathan, and V. Zucca, "OpenFHE: Open-source fully homomorphic encryption library," in *Proc. WAHC 2022*, Nov. 2022, pp. 53–63. IACR ePrint 2022/915. [Online]. Available: https://eprint.iacr.org/2022/915 — Primary HE library used for encrypted inference.
+
+15. S. Halevi and V. Shoup, "Bootstrapping for HElib," *Journal of Cryptology*, vol. 34, no. 7, 2021. [Online]. Available: https://github.com/homenc/HElib — IBM HElib; BGV scheme used in micro-benchmarks.
+
+16. H. Chen, K. Laine, and R. Player, "Simple encrypted arithmetic library – SEAL v2.1," in *Proc. Financial Cryptography Workshops 2017*, Lecture Notes in Computer Science, vol. 10323, pp. 3–18, 2017. — Microsoft SEAL BFV implementation used in micro-benchmarks.
 
 ### Standards and Benchmarking
 
-12. **HomomorphicEncryption.org.** (2018). *Homomorphic Encryption Standard*. [https://homomorphicencryption.org/standard/](https://homomorphicencryption.org/standard/). — Security parameter guidelines (ring dimension, plaintext modulus) referenced for parameter selection.
+17. HomomorphicEncryption.org, "Homomorphic Encryption Standard," 2018. [Online]. Available: https://homomorphicencryption.org/standard/ — Security parameter guidelines (ring dimension, plaintext modulus) for BFV parameter selection.
 
-13. **HEBench Project.** (2022). *HE Benchmarking Framework*. [https://hebench.github.io/](https://hebench.github.io/). — Standardised HE workload specification; inspiration for this project's benchmark design.
+18. HEBench Project, "HE benchmarking framework," 2022. [Online]. Available: https://hebench.github.io/ — Standardised HE workload specification; primary motivation for HEXplorer's benchmark design.
 
-14. **LeCun, Y., Bottou, L., Bengio, Y., & Haffner, P.** (1998). *Gradient-Based Learning Applied to Document Recognition*. *Proceedings of the IEEE*, 86(11), 2278–2324. — LeNet-5 architecture used as the plaintext model baseline.
+### Machine Learning and Datasets
+
+19. Y. LeCun, L. Bottou, Y. Bengio, and P. Haffner, "Gradient-based learning applied to document recognition," *Proceedings of the IEEE*, vol. 86, no. 11, pp. 2278–2324, Nov. 1998. — LeNet-5 architecture used as the CNN baseline in this project.
+
+20. X. Glorot and Y. Bengio, "Understanding the difficulty of training deep feedforward neural networks," in *Proc. AISTATS 2010*, vol. 9, pp. 249–256. — Activation function analysis supporting polynomial activation choice.
+
+### Infrastructure and Protocols
+
+21. gRPC Authors, "gRPC: A high-performance, open-source universal RPC framework," 2016. [Online]. Available: https://grpc.io — gRPC transport layer used between Spring Boot API and Rust inference engine.
+
+22. Google LLC, "Protocol Buffers (protobuf) language guide," 2023. [Online]. Available: https://developers.google.com/protocol-buffers — Schema definition language for gRPC service contracts.
+
+23. M. Belshe, R. Peon, and M. Thomson, "Hypertext Transfer Protocol Version 2 (HTTP/2)," IETF RFC 7540, May 2015. [Online]. Available: https://tools.ietf.org/html/rfc7540 — Underlying transport for gRPC streaming.
+
+24. Pivotal Software, "Spring Boot reference documentation," 2023. [Online]. Available: https://docs.spring.io/spring-boot/docs/current/reference/html/ — Java middleware framework for REST-to-gRPC bridging.
+
+25. L. Lerche and F. LeCuyer, "Tonic: A Rust implementation of gRPC," 2023. [Online]. Available: https://github.com/hyperium/tonic — Rust gRPC library used in the inference server.
+
+26. React Authors, "React: A JavaScript library for building user interfaces," 2023. [Online]. Available: https://react.dev — Frontend framework for the HEXplorer interactive dashboard.
+
+27. Docker Inc., "Docker compose: Multi-container orchestration," 2023. [Online]. Available: https://docs.docker.com/compose/ — Used for multi-stage build and deployment of all HE libraries and services.
+
+### Privacy Regulations and Cloud Standards
+
+28. European Parliament, "General Data Protection Regulation (GDPR)," Regulation (EU) 2016/679, Official Journal of the European Union, May 2018. [Online]. Available: https://gdpr-info.eu — Data protection regulation motivating privacy-preserving inference.
+
+29. P. Mell and T. Grance, "The NIST definition of cloud computing," NIST Special Publication 800-145, Sep. 2011. [Online]. Available: https://csrc.nist.gov/publications/detail/sp/800-145/final — Cloud computing security model referenced for deployment architecture.
 
 ---
 
